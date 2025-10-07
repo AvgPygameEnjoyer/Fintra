@@ -8,10 +8,12 @@ from google import genai
 from google.genai.errors import APIError
 import dotenv
 
-# Initialize Flask App
 app = Flask(__name__)
-CORS(app, origins=["https://stock-dashboard-fqtn.onrender.com", "https://budgetjordanbuffet.vercel.app"])  # Allow cross-origin requests
 dotenv.load_dotenv()
+
+# ALLOW YOUR FRONTEND OR ALL ORIGINS (prod safe)
+CORS(app, resources={r"/*": {"origins": ["https://budgetjordanbuffet.vercel.app"]}}, supports_credentials=True)
+
 # --- Gemini API Initialization ---
 try:
     # Uses the GEMINI_API_KEY environment variable automatically
@@ -205,6 +207,7 @@ def health():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # use Render's PORT or default to 5000 locally
     app.run(host="0.0.0.0", port=port, debug=True)
+
 
 
 
