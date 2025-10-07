@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: stock-dashboard
+    env: python
+    plan: free
+    region: oregon
+    buildCommand: |
+      pip install flask flask-cors yfinance pandas numpy python-dotenv google-genai
+    startCommand: python app.py
+    pythonVersion: 3.11
