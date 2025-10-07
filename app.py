@@ -5,22 +5,20 @@ import pandas as pd
 import numpy as np
 import os
 from google import genai
-from google.genai.errors import APIError
+# Import the specific exception for rate limits
+from google.genai.errors import APIError, ResourceExhaustedError
 import dotenv
 
 app = Flask(__name__)
 dotenv.load_dotenv()
 
 # ALLOW YOUR FRONTEND OR ALL ORIGINS (prod safe)
-
-
 CORS(app, origins="https://budgetjordanbuffet.vercel.app", supports_credentials=True, allow_headers="*", methods=["GET","POST","OPTIONS"])
 
 
 # --- Gemini API Initialization ---
 try:
     # Uses the GEMINI_API_KEY environment variable automatically
-
     client = genai.Client()
     print("Gemini client initialized successfully.")
 except Exception as e:
@@ -84,18 +82,12 @@ def clean_df(df, columns):
     return df[cols_to_include].to_dict(orient='records')
 
 
-# --- GEMINI AI Function (Replaces Rule-Based Logic) ---
+# --- GEMINI AI Function (UPDATED with Rate Limit Fallback) ---
 
 def generate_gemini_review(symbol, latest_data_json):
     """
     Connects to the Gemini API to generate a technical analysis review.
-
-    Args:
-        symbol (str): The stock ticker symbol.
-        latest_data_json (str): A JSON string containing the last 7 days of indicator data.
-
-    Returns:
-        str: The AI-generated review text or an error message.
+    Includes specific error handling for API issues like rate limits.
     """
     if client is None:
         return """
@@ -115,31 +107,45 @@ def generate_gemini_review(symbol, latest_data_json):
         "**Technical Indicator Data (Last 7 Trading Days):**\n"
         f"```json\n{latest_data_json}\n```\n\n"
         "**Instructions:**\n"
-        "1. Start with a main heading '### AI Technical Summary for [SYMBOL]'.\n"
+        "1. Start with a main heading '### AI Technical Summary for {symbol}'.\n"
         "2. Provide an 'Overall Sentiment' (**BULLISH**, **BEARISH**, or **NEUTRAL**) based on the MACD crossover and RSI levels.\n"
         "3. Create separate sub-sections for 'RSI Analysis (Momentum)' and 'MACD Analysis (Trend Following)'.\n"
         "4. Conclude with a 'Recommendation' (e.g., 'Monitor,' 'Cautiously buy,' 'Hold').\n"
         "5. Use **bold** formatting for key figures and sentiment words, but do NOT include the markdown code block in the final output."
-    )
+    ).format(symbol=symbol) # Use format to ensure symbol is in the header
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash-lite',
+            model='gemini-2.5-flash', # Updated to 2.5-flash for best performance
             contents=prompt,
             config=genai.types.GenerateContentConfig(
                 system_instruction=system_instruction,
             )
         )
         return response.text
+    # Catch specific rate limit exception
+    except ResourceExhaustedError:
+        print(f"Gemini API Rate Limit hit for {symbol}.")
+        return """
+        ### ⚠️ AI Review Error: Rate Limit Exceeded
+        The Gemini API rate limit has been reached. The technical data below is still valid, please try the AI review again shortly.
+        """
+    # Catch other general API errors
     except APIError as e:
         print(f"Gemini API Error: {e}")
-        return f"### ❌ AI Review Generation Failed\nAn error occurred connecting to the Gemini API: {e}. Please check your key or network connection."
+        return f"""
+        ### ❌ AI Review Generation Failed
+        An API error occurred: {e}. The technical data below is still valid.
+        """
     except Exception as e:
         print(f"General AI Error: {e}")
-        return f"### ❌ AI Review Generation Failed\nAn unexpected error occurred: {e}."
+        return f"""
+        ### ❌ AI Review Generation Failed
+        An unexpected error occurred during AI generation: {e}. The technical data below is still valid.
+        """
 
 
-# --- API Route ---
+# --- API Route (Decoupled from AI Error) ---
 @app.route('/get_data', methods=['POST'])
 def get_data():
     try:
@@ -167,7 +173,6 @@ def get_data():
         hist_display = hist.tail(7)
 
         # Prepare the data needed for the AI prompt
-        # Use clean_df to serialize the data safely for the JSON prompt string
         ai_data_for_prompt = clean_df(
             hist_display,
             ['Close', 'MA5', 'MA10', 'RSI', 'MACD', 'Signal', 'Histogram']
@@ -175,7 +180,8 @@ def get_data():
         # Convert the list of dicts to a JSON string for the prompt
         ai_data_json = pd.Series(ai_data_for_prompt).to_json(indent=2)
 
-        # Generate the AI Review using the Gemini API
+        # --- AI Call: This function is now guaranteed to return a string (review OR error message)
+        # --- It will NOT raise an exception that stops this block.
         ai_review_text = generate_gemini_review(symbol, ai_data_json)
 
         # Prepare JSON response
@@ -185,14 +191,15 @@ def get_data():
             "MA": clean_df(hist_display, ['MA5', 'MA10']),
             "RSI": [convert_to_serializable(x) for x in hist_display['RSI'].tolist()],
             "MACD": clean_df(hist_display, ['MACD', 'Signal', 'Histogram']),
-            "AI_Review": ai_review_text  # The generated text from Gemini
+            "AI_Review": ai_review_text  # Will contain the review or the error message string
         }
 
+        # Return the response with HTTP 200, as the core stock data succeeded.
         return jsonify(response), 200
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        # Provide a more user-friendly error message if it's a known yfinance issue
+        # This general catch block is now only for critical stock-data-related errors (e.g., yfinance failure)
         if "No data found" in str(e):
             return jsonify({"error": f"No data found for symbol '{symbol}'. Please verify the ticker."}), 404
 
@@ -206,14 +213,6 @@ def health():
     return jsonify({"status": "healthy"}), 200
 
 
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # use Render's PORT or default to 5000 locally
+    port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)
-
-
-
-
-
-
-
