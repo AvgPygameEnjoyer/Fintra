@@ -160,7 +160,8 @@ The AI analysis service is currently unavailable. Technical indicators are displ
 2. Provide an 'Overall Sentiment' (**BULLISH**, **BEARISH**, or **NEUTRAL**) based on the MACD crossover and RSI levels.
 3. Create separate sub-sections for 'RSI Analysis (Momentum)' and 'MACD Analysis (Trend Following)'.
 4. Conclude with a 'Recommendation' (e.g., 'Monitor,' 'Cautiously buy,' 'Hold').
-5. Use **bold** formatting for key figures and sentiment words, but do NOT include the markdown code block in the final output."""
+5. Use **bold** formatting for key figures and sentiment words, but do NOT include the markdown code block in the final output.
+6- At the end include a BUY or DONT BUY."""
 
         response = client.models.generate_content(
             model='gemini-2.0-flash-exp',
@@ -329,4 +330,5 @@ if __name__ == "__main__":
     print(f"📍 Available endpoints: /, /health, /get_data")
     print(f"🤖 AI Status: {'Enabled' if client else 'Disabled'}")
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
