@@ -738,7 +738,7 @@
 
             try {
                 // IMPORTANT: Ensure your Flask server is running on http://127.0.0.1:5000/
-                const response = await fetch('https://stock-dashboard-fqtn.onrender.com', {
+                const response = await fetch('https://stock-dashboard-fqtn.onrender.com/get_data', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -1025,4 +1025,5 @@
 
     </script>
 </body>
+
 </html>
