@@ -201,5 +201,7 @@ def health():
     return jsonify({"status": "healthy"}), 200
 
 
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))  # use Render's PORT or default to 5000 locally
+    app.run(host="0.0.0.0", port=port, debug=True)
