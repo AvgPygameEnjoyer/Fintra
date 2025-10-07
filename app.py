@@ -6,24 +6,22 @@ import numpy as np
 import os
 from google import genai
 from google.genai.errors import APIError 
-# CORRECT IMPORT: ResourceExhaustedError is usually found in google.api_core.exceptions
-from google.api_core.exceptions import ResourceExhaustedError 
+from google.api_core.exceptions import ResourceExhausted
 import dotenv
+import json
 
 app = Flask(__name__)
 dotenv.load_dotenv()
 
-# ALLOW YOUR FRONTEND OR ALL ORIGINS (prod safe)
+# CORS Configuration
 CORS(app, origins="https://budgetjordanbuffet.vercel.app", supports_credentials=True, allow_headers="*", methods=["GET","POST","OPTIONS"])
 
 
 # --- Gemini API Initialization ---
 try:
-    # Uses the GEMINI_API_KEY environment variable automatically
-    client = genai.Client()
+    client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
     print("Gemini client initialized successfully.")
 except Exception as e:
-    # This will catch if the key is not set or invalid upon initialization
     print(f"Warning: Failed to initialize Gemini client. Check GEMINI_API_KEY environment variable. Error: {e}")
     client = None
 
@@ -35,7 +33,6 @@ def compute_rsi(series, period=14):
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    # Standard formula uses ewm (exponentially weighted moving average)
     avg_gain = gain.ewm(span=period, adjust=False).mean()
     avg_loss = loss.ewm(span=period, adjust=False).mean()
     rs = avg_gain / avg_loss
@@ -85,65 +82,68 @@ def clean_df(df, columns):
 
 # --- GEMINI AI Function (with Rate Limit Fallback) ---
 
-def generate_gemini_review(symbol, latest_data_json):
+def generate_gemini_review(symbol, latest_data_list):
     """
     Connects to the Gemini API to generate a technical analysis review.
     Includes specific error handling for API issues like rate limits.
     """
     if client is None:
         return """
-        ### 🤖 AI Review Unavailable
-        The Gemini API client failed to initialize. Please check the `GEMINI_API_KEY` environment variable.
-        """
+### 🤖 AI Review Unavailable
+The Gemini API client failed to initialize. Please check the `GEMINI_API_KEY` environment variable.
+"""
+
+    # Convert list of dicts to properly formatted JSON string
+    latest_data_json = json.dumps(latest_data_list, indent=2)
 
     # --- Construct the Prompt ---
     system_instruction = (
         "You are an expert financial analyst focused solely on technical indicators "
         "for the last 7 days of trading data. Your goal is to provide a concise, "
-        "professional summary in a markdown format."
+        "professional summary in markdown format."
     )
 
-    prompt = (
-        f"**Stock Symbol:** {symbol}\n\n"
-        "**Technical Indicator Data (Last 7 Trading Days):**\n"
-        f"```json\n{latest_data_json}\n```\n\n"
-        "**Instructions:**\n"
-        "1. Start with a main heading '### AI Technical Summary for {symbol}'.\n"
-        "2. Provide an 'Overall Sentiment' (**BULLISH**, **BEARISH**, or **NEUTRAL**) based on the MACD crossover and RSI levels.\n"
-        "3. Create separate sub-sections for 'RSI Analysis (Momentum)' and 'MACD Analysis (Trend Following)'.\n"
-        "4. Conclude with a 'Recommendation' (e.g., 'Monitor,' 'Cautiously buy,' 'Hold').\n"
-        "5. Use **bold** formatting for key figures and sentiment words, but do NOT include the markdown code block in the final output."
-    ).format(symbol=symbol)
+    prompt = f"""**Stock Symbol:** {symbol}
+
+**Technical Indicator Data (Last 7 Trading Days):**
+```json
+{latest_data_json}
+```
+
+**Instructions:**
+1. Start with a main heading '### AI Technical Summary for {symbol}'.
+2. Provide an 'Overall Sentiment' (**BULLISH**, **BEARISH**, or **NEUTRAL**) based on the MACD crossover and RSI levels.
+3. Create separate sub-sections for 'RSI Analysis (Momentum)' and 'MACD Analysis (Trend Following)'.
+4. Conclude with a 'Recommendation' (e.g., 'Monitor,' 'Cautiously buy,' 'Hold').
+5. Use **bold** formatting for key figures and sentiment words, but do NOT include the markdown code block in the final output."""
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash-exp',
             contents=prompt,
             config=genai.types.GenerateContentConfig(
                 system_instruction=system_instruction,
             )
         )
         return response.text
-    # Catch specific rate limit exception
-    except ResourceExhaustedError:
+    except ResourceExhausted:
         print(f"Gemini API Rate Limit hit for {symbol}.")
         return """
-        ### ⚠️ AI Review Error: Rate Limit Exceeded
-        The Gemini API rate limit has been reached. The technical data below is still valid, please try the AI review again shortly.
-        """
-    # Catch other general API errors
+### ⚠️ AI Review Error: Rate Limit Exceeded
+The Gemini API rate limit has been reached. The technical data below is still valid, please try the AI review again shortly.
+"""
     except APIError as e:
         print(f"Gemini API Error: {e}")
         return f"""
-        ### ❌ AI Review Generation Failed
-        An API error occurred: {e}. The technical data below is still valid.
-        """
+### ❌ AI Review Generation Failed
+An API error occurred: {e}. The technical data below is still valid.
+"""
     except Exception as e:
         print(f"General AI Error: {e}")
         return f"""
-        ### ❌ AI Review Generation Failed
-        An unexpected error occurred during AI generation: {e}. The technical data below is still valid.
-        """
+### ❌ AI Review Generation Failed
+An unexpected error occurred during AI generation: {e}. The technical data below is still valid.
+"""
 
 
 # --- API Route (Decoupled from AI Error) ---
@@ -157,7 +157,7 @@ def get_data():
             return jsonify({"error": "Stock symbol is required"}), 400
 
         stock = yf.Ticker(symbol)
-        # Fetch 3 months of data to ensure RSI and MACD (which have lookback periods of 14/26) are fully calculated.
+        # Fetch 3 months of data to ensure RSI and MACD are fully calculated
         hist = stock.history(period="3mo")
 
         if hist.empty:
@@ -170,19 +170,17 @@ def get_data():
         hist['RSI'] = compute_rsi(hist['Close'])
         hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
 
-        # Get the last 7 days for the dashboard display AND for the AI prompt
+        # Get the last 7 days for display
         hist_display = hist.tail(7)
 
-        # Prepare the data needed for the AI prompt
+        # Prepare the data for the AI prompt (as a list, not JSON string)
         ai_data_for_prompt = clean_df(
             hist_display,
             ['Close', 'MA5', 'MA10', 'RSI', 'MACD', 'Signal', 'Histogram']
         )
-        # Convert the list of dicts to a JSON string for the prompt
-        ai_data_json = pd.Series(ai_data_for_prompt).to_json(indent=2)
 
-        # AI Call: If this fails, it returns a string error message, but does not crash the function.
-        ai_review_text = generate_gemini_review(symbol, ai_data_json)
+        # AI Call: Pass the list directly, not a JSON string
+        ai_review_text = generate_gemini_review(symbol, ai_data_for_prompt)
 
         # Prepare JSON response
         response = {
@@ -191,15 +189,13 @@ def get_data():
             "MA": clean_df(hist_display, ['MA5', 'MA10']),
             "RSI": [convert_to_serializable(x) for x in hist_display['RSI'].tolist()],
             "MACD": clean_df(hist_display, ['MACD', 'Signal', 'Histogram']),
-            "AI_Review": ai_review_text  # Will contain the review or the error message string
+            "AI_Review": ai_review_text
         }
 
-        # Return the response with HTTP 200, as the core stock data succeeded.
         return jsonify(response), 200
 
     except Exception as e:
         print(f"Error: {str(e)}")
-        # This general catch block is now only for critical stock-data-related errors (e.g., yfinance failure)
         if "No data found" in str(e):
             return jsonify({"error": f"No data found for symbol '{symbol}'. Please verify the ticker."}), 404
 
