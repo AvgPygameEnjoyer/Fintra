@@ -23,7 +23,7 @@ CACHE_DURATION = timedelta(hours=1)  # Cache AI responses for 1 hour
 
 # CORS Configuration - Allow both production and local development
 allowed_origins = [
-    "https://budgetjordanbuffet.vercel.app",
+    "https://budgetwarrenbuffet.vercel.app",
     "https://stock-dashboard-fqtn.onrender.com",
     "http://localhost:3000",
     "http://localhost:5173",
@@ -329,3 +329,4 @@ if __name__ == "__main__":
     print(f"📍 Available endpoints: /, /health, /get_data")
     print(f"🤖 AI Status: {'Enabled' if client else 'Disabled'}")
     app.run(host="0.0.0.0", port=port, debug=False)
+
