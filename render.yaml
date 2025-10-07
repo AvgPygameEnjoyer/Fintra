@@ -7,4 +7,4 @@ services:
     buildCommand: |
       pip install flask flask-cors yfinance pandas numpy python-dotenv google-genai
     startCommand: python app.py
-    pythonVersion: 3.11
+
