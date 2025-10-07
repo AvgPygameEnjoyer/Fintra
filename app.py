@@ -4,14 +4,22 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import os
-from google import genai
-from google.genai.errors import APIError 
-from google.api_core.exceptions import ResourceExhausted
-import dotenv
+import traceback
 import json
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
-dotenv.load_dotenv()
+
+# Load environment variables
+try:
+    import dotenv
+    dotenv.load_dotenv()
+except ImportError:
+    print("Warning: python-dotenv not installed")
+
+# Simple in-memory cache for AI responses
+ai_cache = {}
+CACHE_DURATION = timedelta(hours=1)  # Cache AI responses for 1 hour
 
 # CORS Configuration - Allow both production and local development
 allowed_origins = [
@@ -31,36 +39,55 @@ CORS(app,
 
 
 # --- Gemini API Initialization ---
+client = None
 try:
-    client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
-    print("Gemini client initialized successfully.")
+    from google import genai
+    from google.genai.errors import APIError 
+    from google.api_core.exceptions import ResourceExhausted
+    
+    api_key = os.getenv('GEMINI_API_KEY')
+    if api_key:
+        client = genai.Client(api_key=api_key)
+        print("✓ Gemini client initialized successfully.")
+    else:
+        print("⚠ Warning: GEMINI_API_KEY not found in environment variables")
+except ImportError as e:
+    print(f"⚠ Warning: Gemini libraries not installed: {e}")
 except Exception as e:
-    print(f"Warning: Failed to initialize Gemini client. Check GEMINI_API_KEY environment variable. Error: {e}")
-    client = None
+    print(f"⚠ Warning: Failed to initialize Gemini client: {e}")
 
 
 # --- Helper Functions (RSI, MACD, Serialization) ---
 
 def compute_rsi(series, period=14):
     """Calculate RSI indicator (using EWM for standard formula)"""
-    delta = series.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
-    avg_gain = gain.ewm(span=period, adjust=False).mean()
-    avg_loss = loss.ewm(span=period, adjust=False).mean()
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    return rsi
+    try:
+        delta = series.diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.ewm(span=period, adjust=False).mean()
+        avg_loss = loss.ewm(span=period, adjust=False).mean()
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+    except Exception as e:
+        print(f"Error computing RSI: {e}")
+        return pd.Series([None] * len(series), index=series.index)
 
 
 def compute_macd(series):
     """Calculate MACD, Signal line, and Histogram"""
-    ema12 = series.ewm(span=12, adjust=False).mean()
-    ema26 = series.ewm(span=26, adjust=False).mean()
-    macd = ema12 - ema26
-    signal = macd.ewm(span=9, adjust=False).mean()
-    histogram = macd - signal
-    return macd, signal, histogram
+    try:
+        ema12 = series.ewm(span=12, adjust=False).mean()
+        ema26 = series.ewm(span=26, adjust=False).mean()
+        macd = ema12 - ema26
+        signal = macd.ewm(span=9, adjust=False).mean()
+        histogram = macd - signal
+        return macd, signal, histogram
+    except Exception as e:
+        print(f"Error computing MACD: {e}")
+        null_series = pd.Series([None] * len(series), index=series.index)
+        return null_series, null_series, null_series
 
 
 def convert_to_serializable(value):
@@ -73,24 +100,28 @@ def convert_to_serializable(value):
         if np.isnan(value) or np.isinf(value):
             return None
         return float(value)
-    if isinstance(value, (np.bool_)):
+    if isinstance(value, (np.bool_, bool)):
         return bool(value)
     return value
 
 
 def clean_df(df, columns):
     """Clean DataFrame and convert to JSON-safe format"""
-    df = df.copy().reset_index()
+    try:
+        df = df.copy().reset_index()
 
-    if 'Date' in df.columns:
-        df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
+        if 'Date' in df.columns:
+            df['Date'] = df['Date'].dt.strftime('%Y-%m-%d')
 
-    for col in columns:
-        if col in df.columns:
-            df[col] = df[col].apply(convert_to_serializable)
+        for col in columns:
+            if col in df.columns:
+                df[col] = df[col].apply(convert_to_serializable)
 
-    cols_to_include = ['Date'] + [col for col in columns if col in df.columns]
-    return df[cols_to_include].to_dict(orient='records')
+        cols_to_include = ['Date'] + [col for col in columns if col in df.columns]
+        return df[cols_to_include].to_dict(orient='records')
+    except Exception as e:
+        print(f"Error in clean_df: {e}")
+        return []
 
 
 # --- GEMINI AI Function (with Rate Limit Fallback) ---
@@ -103,20 +134,21 @@ def generate_gemini_review(symbol, latest_data_list):
     if client is None:
         return """
 ### 🤖 AI Review Unavailable
-The Gemini API client failed to initialize. Please check the `GEMINI_API_KEY` environment variable.
+The AI analysis service is currently unavailable. Technical indicators are displayed below.
 """
 
-    # Convert list of dicts to properly formatted JSON string
-    latest_data_json = json.dumps(latest_data_list, indent=2)
+    try:
+        # Convert list of dicts to properly formatted JSON string
+        latest_data_json = json.dumps(latest_data_list, indent=2)
 
-    # --- Construct the Prompt ---
-    system_instruction = (
-        "You are an expert financial analyst focused solely on technical indicators "
-        "for the last 7 days of trading data. Your goal is to provide a concise, "
-        "professional summary in markdown format."
-    )
+        # --- Construct the Prompt ---
+        system_instruction = (
+            "You are an expert financial analyst focused solely on technical indicators "
+            "for the last 7 days of trading data. Your goal is to provide a concise, "
+            "professional summary in markdown format."
+        )
 
-    prompt = f"""**Stock Symbol:** {symbol}
+        prompt = f"""**Stock Symbol:** {symbol}
 
 **Technical Indicator Data (Last 7 Trading Days):**
 ```json
@@ -130,7 +162,6 @@ The Gemini API client failed to initialize. Please check the `GEMINI_API_KEY` en
 4. Conclude with a 'Recommendation' (e.g., 'Monitor,' 'Cautiously buy,' 'Hold').
 5. Use **bold** formatting for key figures and sentiment words, but do NOT include the markdown code block in the final output."""
 
-    try:
         response = client.models.generate_content(
             model='gemini-2.0-flash-exp',
             contents=prompt,
@@ -139,23 +170,23 @@ The Gemini API client failed to initialize. Please check the `GEMINI_API_KEY` en
             )
         )
         return response.text
-    except ResourceExhausted:
-        print(f"Gemini API Rate Limit hit for {symbol}.")
+    except NameError:
         return """
-### ⚠️ AI Review Error: Rate Limit Exceeded
-The Gemini API rate limit has been reached. The technical data below is still valid, please try the AI review again shortly.
-"""
-    except APIError as e:
-        print(f"Gemini API Error: {e}")
-        return f"""
-### ❌ AI Review Generation Failed
-An API error occurred: {e}. The technical data below is still valid.
+### 🤖 AI Review Unavailable
+Gemini API libraries not available. Technical indicators are displayed below.
 """
     except Exception as e:
-        print(f"General AI Error: {e}")
-        return f"""
-### ❌ AI Review Generation Failed
-An unexpected error occurred during AI generation: {e}. The technical data below is still valid.
+        error_name = type(e).__name__
+        if 'ResourceExhausted' in error_name:
+            print(f"Gemini API Rate Limit hit for {symbol}.")
+            return """
+### ⚠️ AI Review Error: Rate Limit Exceeded
+The Gemini API rate limit has been reached. Please try again shortly.
+"""
+        print(f"Gemini API Error ({error_name}): {e}")
+        return """
+### ⚠️ AI Review Temporarily Unavailable
+Unable to generate AI analysis at this time. Technical indicators are displayed below.
 """
 
 
@@ -174,6 +205,7 @@ def root():
         "message": "Stock Analysis API",
         "version": "1.0",
         "status": "running",
+        "ai_enabled": client is not None,
         "frontend": "https://budgetjordanbuffet.vercel.app",
         "endpoints": {
             "/health": "GET - Health check",
@@ -194,19 +226,27 @@ def get_data():
         return response, 200
     
     try:
-        data = request.json
+        # Parse request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON data"}), 400
+            
         symbol = data.get('symbol', '').strip().upper()
 
         if not symbol:
             return jsonify({"error": "Stock symbol is required"}), 400
 
+        print(f"Fetching data for symbol: {symbol}")
+
+        # Fetch stock data
         stock = yf.Ticker(symbol)
-        # Fetch 3 months of data to ensure RSI and MACD are fully calculated
         hist = stock.history(period="3mo")
 
         if hist.empty:
             return jsonify(
                 {"error": f"No data found for symbol '{symbol}'. Please check the symbol and try again."}), 404
+
+        print(f"Successfully fetched {len(hist)} rows of data for {symbol}")
 
         # Calculate indicators
         hist['MA5'] = hist['Close'].rolling(window=5, min_periods=1).mean()
@@ -217,13 +257,13 @@ def get_data():
         # Get the last 7 days for display
         hist_display = hist.tail(7)
 
-        # Prepare the data for the AI prompt (as a list, not JSON string)
+        # Prepare the data for the AI prompt
         ai_data_for_prompt = clean_df(
             hist_display,
             ['Close', 'MA5', 'MA10', 'RSI', 'MACD', 'Signal', 'Histogram']
         )
 
-        # AI Call: Pass the list directly, not a JSON string
+        # AI Call
         ai_review_text = generate_gemini_review(symbol, ai_data_for_prompt)
 
         # Prepare JSON response
@@ -236,14 +276,21 @@ def get_data():
             "AI_Review": ai_review_text
         }
 
+        print(f"Successfully prepared response for {symbol}")
         return jsonify(response_data), 200
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        error_trace = traceback.format_exc()
+        print(f"Error in get_data: {str(e)}")
+        print(f"Traceback:\n{error_trace}")
+        
         if "No data found" in str(e):
-            return jsonify({"error": f"No data found for symbol '{symbol}'. Please verify the ticker."}), 404
+            return jsonify({"error": f"No data found for symbol. Please verify the ticker."}), 404
 
-        return jsonify({"error": f"An unexpected server error occurred. Please try again later. ({str(e)})"}), 500
+        return jsonify({
+            "error": "An unexpected server error occurred. Please try again later.",
+            "details": str(e) if app.debug else None
+        }), 500
 
 
 # --- Health Check Route ---
@@ -257,7 +304,11 @@ def health():
         response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
         return response, 200
     
-    return jsonify({"status": "healthy", "timestamp": pd.Timestamp.now().isoformat()}), 200
+    return jsonify({
+        "status": "healthy",
+        "ai_enabled": client is not None,
+        "timestamp": pd.Timestamp.now().isoformat()
+    }), 200
 
 
 # --- Error Handlers ---
@@ -268,11 +319,13 @@ def not_found(e):
 
 @app.errorhandler(500)
 def internal_error(e):
+    print(f"500 Error: {str(e)}")
     return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"Starting Flask server on port {port}...")
-    print(f"Available endpoints: /, /health, /get_data")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    print(f"🚀 Starting Flask server on port {port}...")
+    print(f"📍 Available endpoints: /, /health, /get_data")
+    print(f"🤖 AI Status: {'Enabled' if client else 'Disabled'}")
+    app.run(host="0.0.0.0", port=port, debug=False)
