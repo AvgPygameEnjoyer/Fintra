@@ -10,7 +10,7 @@ import dotenv
 
 # Initialize Flask App
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests
+CORS(app, origins="https://stock-dashboard-fqtn.onrender.com")  # Allow cross-origin requests
 dotenv.load_dotenv()
 # --- Gemini API Initialization ---
 try:
@@ -205,3 +205,4 @@ def health():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # use Render's PORT or default to 5000 locally
     app.run(host="0.0.0.0", port=port, debug=True)
+
