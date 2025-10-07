@@ -124,7 +124,7 @@ def generate_gemini_review(symbol, latest_data_json):
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash-001',
+            model='gemini-2.5-flash-lite',
             contents=prompt,
             config=genai.types.GenerateContentConfig(
                 system_instruction=system_instruction,
@@ -210,6 +210,7 @@ def health():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # use Render's PORT or default to 5000 locally
     app.run(host="0.0.0.0", port=port, debug=True)
+
 
 
 
