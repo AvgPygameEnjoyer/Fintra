@@ -5,8 +5,9 @@ import pandas as pd
 import numpy as np
 import os
 from google import genai
-# Import the specific exception for rate limits
-from google.genai.errors import APIError, ResourceExhaustedError
+from google.genai.errors import APIError 
+# CORRECT IMPORT: ResourceExhaustedError is usually found in google.api_core.exceptions
+from google.api_core.exceptions import ResourceExhaustedError 
 import dotenv
 
 app = Flask(__name__)
@@ -82,7 +83,7 @@ def clean_df(df, columns):
     return df[cols_to_include].to_dict(orient='records')
 
 
-# --- GEMINI AI Function (UPDATED with Rate Limit Fallback) ---
+# --- GEMINI AI Function (with Rate Limit Fallback) ---
 
 def generate_gemini_review(symbol, latest_data_json):
     """
@@ -112,11 +113,11 @@ def generate_gemini_review(symbol, latest_data_json):
         "3. Create separate sub-sections for 'RSI Analysis (Momentum)' and 'MACD Analysis (Trend Following)'.\n"
         "4. Conclude with a 'Recommendation' (e.g., 'Monitor,' 'Cautiously buy,' 'Hold').\n"
         "5. Use **bold** formatting for key figures and sentiment words, but do NOT include the markdown code block in the final output."
-    ).format(symbol=symbol) # Use format to ensure symbol is in the header
+    ).format(symbol=symbol)
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash', # Updated to 2.5-flash for best performance
+            model='gemini-2.5-flash',
             contents=prompt,
             config=genai.types.GenerateContentConfig(
                 system_instruction=system_instruction,
@@ -180,8 +181,7 @@ def get_data():
         # Convert the list of dicts to a JSON string for the prompt
         ai_data_json = pd.Series(ai_data_for_prompt).to_json(indent=2)
 
-        # --- AI Call: This function is now guaranteed to return a string (review OR error message)
-        # --- It will NOT raise an exception that stops this block.
+        # AI Call: If this fails, it returns a string error message, but does not crash the function.
         ai_review_text = generate_gemini_review(symbol, ai_data_json)
 
         # Prepare JSON response
