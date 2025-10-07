@@ -5,6 +5,6 @@ services:
     plan: free
     region: oregon
     buildCommand: |
-      pip install flask flask-cors yfinance pandas numpy python-dotenv google-genai
+      pip install flask flask-cors yfinance pandas numpy python-dotenv google-genai google-api-core 
     startCommand: python app.py
 
