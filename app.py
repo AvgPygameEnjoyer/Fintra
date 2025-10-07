@@ -13,8 +13,21 @@ import json
 app = Flask(__name__)
 dotenv.load_dotenv()
 
-# CORS Configuration
-CORS(app, origins="https://budgetjordanbuffet.vercel.app", supports_credentials=True, allow_headers="*", methods=["GET","POST","OPTIONS"])
+# CORS Configuration - Allow both production and local development
+allowed_origins = [
+    "https://budgetjordanbuffet.vercel.app",
+    "https://stock-dashboard-fqtn.onrender.com",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173"
+]
+
+CORS(app, 
+     resources={r"/*": {"origins": allowed_origins}},
+     supports_credentials=True, 
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "OPTIONS"])
 
 
 # --- Gemini API Initialization ---
@@ -146,9 +159,40 @@ An unexpected error occurred during AI generation: {e}. The technical data below
 """
 
 
+# --- Root Route ---
+@app.route('/', methods=['GET', 'OPTIONS'])
+def root():
+    """Root endpoint"""
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+        return response, 200
+    
+    return jsonify({
+        "message": "Stock Analysis API",
+        "version": "1.0",
+        "status": "running",
+        "frontend": "https://budgetjordanbuffet.vercel.app",
+        "endpoints": {
+            "/health": "GET - Health check",
+            "/get_data": "POST - Get stock data and analysis (requires 'symbol' in JSON body)"
+        }
+    }), 200
+
+
 # --- API Route (Decoupled from AI Error) ---
-@app.route('/get_data', methods=['POST'])
+@app.route('/get_data', methods=['POST', 'OPTIONS'])
 def get_data():
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response, 200
+    
     try:
         data = request.json
         symbol = data.get('symbol', '').strip().upper()
@@ -183,7 +227,7 @@ def get_data():
         ai_review_text = generate_gemini_review(symbol, ai_data_for_prompt)
 
         # Prepare JSON response
-        response = {
+        response_data = {
             "ticker": symbol,
             "OHLCV": clean_df(hist_display, ['Open', 'High', 'Low', 'Close', 'Volume']),
             "MA": clean_df(hist_display, ['MA5', 'MA10']),
@@ -192,7 +236,7 @@ def get_data():
             "AI_Review": ai_review_text
         }
 
-        return jsonify(response), 200
+        return jsonify(response_data), 200
 
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -203,12 +247,32 @@ def get_data():
 
 
 # --- Health Check Route ---
-@app.route('/health', methods=['GET'])
+@app.route('/health', methods=['GET', 'OPTIONS'])
 def health():
     """Health check endpoint"""
-    return jsonify({"status": "healthy"}), 200
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', request.headers.get('Origin', '*'))
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET,OPTIONS')
+        return response, 200
+    
+    return jsonify({"status": "healthy", "timestamp": pd.Timestamp.now().isoformat()}), 200
+
+
+# --- Error Handlers ---
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"error": "Endpoint not found. Available endpoints: /, /health, /get_data"}), 404
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    print(f"Starting Flask server on port {port}...")
+    print(f"Available endpoints: /, /health, /get_data")
     app.run(host="0.0.0.0", port=port, debug=True)
