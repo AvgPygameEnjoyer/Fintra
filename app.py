@@ -12,7 +12,10 @@ app = Flask(__name__)
 dotenv.load_dotenv()
 
 # ALLOW YOUR FRONTEND OR ALL ORIGINS (prod safe)
-CORS(app, resources={r"/*": {"origins": ["https://budgetjordanbuffet.vercel.app"]}}, supports_credentials=True)
+
+
+CORS(app, origins="https://budgetjordanbuffet.vercel.app", supports_credentials=True, allow_headers="*", methods=["GET","POST","OPTIONS"])
+
 
 # --- Gemini API Initialization ---
 try:
@@ -207,6 +210,7 @@ def health():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))  # use Render's PORT or default to 5000 locally
     app.run(host="0.0.0.0", port=port, debug=True)
+
 
 
 
