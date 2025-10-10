@@ -114,13 +114,21 @@ function initializeSidebar() {
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarSearch = document.getElementById('sidebarSearch');
 
-    // Create mobile toggle button
+    // Create mobile toggle button (for mobile devices)
     const mobileToggle = document.createElement('button');
     mobileToggle.innerHTML = '☰';
     mobileToggle.className = 'mobile-sidebar-toggle';
     mobileToggle.setAttribute('aria-label', 'Toggle sidebar');
     mobileToggle.addEventListener('click', toggleSidebar);
     document.body.appendChild(mobileToggle);
+
+    // Create desktop toggle button (always visible on desktop)
+    const desktopToggle = document.createElement('button');
+    desktopToggle.innerHTML = '☰';
+    desktopToggle.className = 'desktop-sidebar-toggle';
+    desktopToggle.setAttribute('aria-label', 'Toggle sidebar');
+    desktopToggle.addEventListener('click', toggleSidebar);
+    document.body.appendChild(desktopToggle);
 
     // Sidebar toggle event
     sidebarToggle.addEventListener('click', toggleSidebar);
@@ -149,6 +157,7 @@ function setSidebarCollapsed(collapsed) {
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.querySelector('.container');
     const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
+    const desktopToggle = document.querySelector('.desktop-sidebar-toggle');
 
     isSidebarCollapsed = collapsed;
 
@@ -170,10 +179,9 @@ function setSidebarCollapsed(collapsed) {
         }
     }
     
-    // Update mobile toggle button
+    // Update toggle buttons
     if (mobileToggle) {
         mobileToggle.innerHTML = isSidebarCollapsed ? '☰' : '✕';
-        // Position toggle button based on sidebar state
         if (!isSidebarCollapsed && window.matchMedia('(max-width: 768px)').matches) {
             mobileToggle.style.left = '300px';
         } else {
@@ -181,9 +189,17 @@ function setSidebarCollapsed(collapsed) {
         }
     }
 
+    if (desktopToggle) {
+        desktopToggle.innerHTML = isSidebarCollapsed ? '☰' : '✕';
+        if (!isSidebarCollapsed && window.matchMedia('(min-width: 769px)').matches) {
+            desktopToggle.style.left = '340px';
+        } else {
+            desktopToggle.style.left = '20px';
+        }
+    }
+
     console.log('Sidebar collapsed:', isSidebarCollapsed);
 }
-
 function toggleSidebar() {
     setSidebarCollapsed(!isSidebarCollapsed);
 }
@@ -900,3 +916,4 @@ function createAnalysisContent(text) {
 window.selectStock = selectStock;
 window.fetchData = fetchData;
 window.toggleCard = toggleCard;
+
