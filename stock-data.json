@@ -1,0 +1,388 @@
+{
+  "stocks": [
+    {
+      "symbol": "NIFTYBEES.NS",
+      "name": "Nippon India Nifty 50 BeES"
+    },
+    {
+      "symbol": "BANKBEES.NS",
+      "name": "Nippon India ETF Nifty Bank BeES"
+    },
+    {
+      "symbol": "ITBEES.NS",
+      "name": "Nippon India ETF Nifty IT"
+    },
+    {
+      "symbol": "GOLDBEES.NS",
+      "name": "Nippon India ETF Gold BeES"
+    },
+    {
+      "symbol": "JUNIORBEES.NS",
+      "name": "Nippon India ETF Nifty Next 50 Junior BeES"
+    },
+    {
+      "symbol": "SILVERBEES.NS",
+      "name": "Nippon India Silver ETF"
+    },
+    {
+      "symbol": "MID150BEES.NS",
+      "name": "Nippon India ETF Nifty Midcap 150"
+    },
+    {
+      "symbol": "NIF100BEES.NS",
+      "name": "Nippon India ETF Nifty100"
+    },
+    {
+      "symbol": "SHARIABEES.NS",
+      "name": "Nippon India ETF Nifty 50 Shariah BeES"
+    },
+    {
+      "symbol": "PSUBNKBEES.NS",
+      "name": "Nippon India ETF Nifty PSU Bank BeES"
+    },
+    {
+      "symbol": "PHARMABEES.NS",
+      "name": "Nippon India Nifty Pharma ETF"
+    },
+    {
+      "symbol": "INFRABEES.NS",
+      "name": "Nippon India ETF Nifty Infrastructure BeES"
+    },
+    {
+      "symbol": "CONSUMBEES.NS",
+      "name": "Nippon India ETF Nifty India Consumption"
+    },
+    {
+      "symbol": "UTINIFTETF.NS",
+      "name": "UTI Nifty 50 ETF"
+    },
+    {
+      "symbol": "UTIBANKETF.NS",
+      "name": "UTI Nifty Bank ETF"
+    },
+    {
+      "symbol": "UTISENSETF.NS",
+      "name": "UTI BSE Sensex ETF"
+    },
+    {
+      "symbol": "UTINEXT50.NS",
+      "name": "UTI-Nifty Next 50 ETF"
+    },
+    {
+      "symbol": "HDFCNIFTY.NS",
+      "name": "HDFC Nifty 50 ETF"
+    },
+    {
+      "symbol": "HDFCNIFBAN.NS",
+      "name": "HDFC Nifty Banking ETF"
+    },
+    {
+      "symbol": "ICICIB22.NS",
+      "name": "BHARAT 22 ETF"
+    },
+    {
+      "symbol": "SBIETFCON.NS",
+      "name": "SBI Nifty Consumption ETF"
+    },
+    {
+      "symbol": "SBISENSEX.BO",
+      "name": "SBI ETF SENSEX"
+    },
+    {
+      "symbol": "SETFNIF50.NS",
+      "name": "SBI ETF Nifty 50"
+    },
+    {
+      "symbol": "SETFNIFBK.NS",
+      "name": "SBI ETF Nifty Bank"
+    },
+    {
+      "symbol": "AXISNIFTY.NS",
+      "name": "Axis NIFTY 50 ETF"
+    },
+    {
+      "symbol": "AXISBNKETF.NS",
+      "name": "Axis NIFTY Bank ETF"
+    },
+    {
+      "symbol": "BANKNIFTY1.NS",
+      "name": "Kotak Nifty Bank ETF"
+    },
+    {
+      "symbol": "NIFTY1.NS",
+      "name": "Kotak Nifty 50 ETF"
+    },
+    {
+      "symbol": "GOLD1.NS",
+      "name": "Kotak Gold ETF"
+    },
+    {
+      "symbol": "SILVER1.NS",
+      "name": "Kotak Silver ETF"
+    },
+    {
+      "symbol": "NIFTYIETF.NS",
+      "name": "ICICI Prudential Nifty 50 ETF"
+    },
+    {
+      "symbol": "BANKIETF.NS",
+      "name": "ICICI Prudential Nifty Bank ETF"
+    },
+    {
+      "symbol": "ITIETF.NS",
+      "name": "ICICI Prudential Nifty IT ETF"
+    },
+    {
+      "symbol": "NEXT50IETF.NS",
+      "name": "ICICI Prudential Nifty Next 50 ETF"
+    },
+    {
+      "symbol": "MAFANG.NS",
+      "name": "Mirae Asset NYSE FANG+ ETF"
+    },
+    {
+      "symbol": "BANKETF.NS",
+      "name": "Mirae Asset Nifty Bank ETF"
+    },
+    {
+      "symbol": "NIFTYETF.NS",
+      "name": "Mirae Asset Nifty 50 ETF"
+    },
+    {
+      "symbol": "NEXT50.NS",
+      "name": "Mirae Asset Nifty Next 50 ETF"
+    },
+    {
+      "symbol": "MON100.NS",
+      "name": "Motilal Oswal NASDAQ 100 ETF"
+    },
+    {
+      "symbol": "MONQ50.NS",
+      "name": "Motilal Oswal Nasdaq Q 50 ETF"
+    },
+    {
+      "symbol": "MOM100.NS",
+      "name": "Motilal Oswal Midcap 100 ETF"
+    },
+    {
+      "symbol": "MAHKTECH.NS",
+      "name": "Mirae Asset Hang Seng TECH ETF"
+    },
+    {
+      "symbol": "HNGSNGBEES.NS",
+      "name": "Nippon India ETF Hang Seng BeES"
+    },
+    {
+      "symbol": "MASPTOP50.NS",
+      "name": "Mirae Asset S&P 500 Top 50 ETF"
+    },
+    {
+      "symbol": "IT.NS",
+      "name": "Kotak Nifty IT ETF"
+    },
+    {
+      "symbol": "CONS.NS",
+      "name": "Kotak Nifty India Consumption ETF"
+    },
+    {
+      "symbol": "CONSUMER.NS",
+      "name": "Mirae Asset Nifty India New Age Consumption ETF"
+    },
+    {
+      "symbol": "EVINDIA.NS",
+      "name": "Mirae Asset Nifty EV and New Age Automotive ETF"
+    },
+    {
+      "symbol": "MAKEINDIA.NS",
+      "name": "Mirae Asset Nifty India Manufacturing ETF"
+    },
+    {
+      "symbol": "MANUFGBEES.NS",
+      "name": "Nippon India Nifty India Manufacturing ETF"
+    },
+    {
+      "symbol": "HDFCGOLD.NS",
+      "name": "HDFC Gold ETF"
+    },
+    {
+      "symbol": "BSLGOLDETF.NS",
+      "name": "Aditya Birla Sun Life Gold ETF"
+    },
+    {
+      "symbol": "GOLDIETF.NS",
+      "name": "ICICI Prudential Gold ETF"
+    },
+    {
+      "symbol": "TATAGOLD.NS",
+      "name": "Tata Gold ETF"
+    },
+    {
+      "symbol": "GOLDETF.NS",
+      "name": "Mirae Asset Gold ETF"
+    },
+    {
+      "symbol": "GOLD360.NS",
+      "name": "360 ONE Gold ETF"
+    },
+    {
+      "symbol": "HDFCSILVER.NS",
+      "name": "HDFC Silver ETF"
+    },
+    {
+      "symbol": "SILVERIETF.NS",
+      "name": "ICICI Prudential Silver ETF"
+    },
+    {
+      "symbol": "MIDCAP.NS",
+      "name": "Kotak Nifty Midcap 50 ETF"
+    },
+    {
+      "symbol": "NIFMID150.NS",
+      "name": "UTI Nifty Midcap 150 ETF"
+    },
+    {
+      "symbol": "HDFCMID150.NS",
+      "name": "HDFC Nifty Midcap 150 ETF"
+    },
+    {
+      "symbol": "HDFCSML250.NS",
+      "name": "HDFC Nifty Smallcap 250 ETF"
+    },
+    {
+      "symbol": "SMALLCAP.NS",
+      "name": "Mirae Asset Nifty Smallcap 250 ETF"
+    },
+    {
+      "symbol": "ALPHA.NS",
+      "name": "Kotak Nifty Alpha 50 ETF"
+    },
+    {
+      "symbol": "NV20.NS",
+      "name": "Kotak Nifty 50 value 20 ETF"
+    },
+    {
+      "symbol": "LOWVOL1.NS",
+      "name": "Kotak Nifty 100 Low Volatility 30 ETF"
+    },
+    {
+      "symbol": "MOMOMENTUM.NS",
+      "name": "Motilal Oswal Nifty 200 Momentum 30 ETF"
+    },
+    {
+      "symbol": "QUALITY30.NS",
+      "name": "Kotak Nifty200 Quality 30 ETF"
+    },
+    {
+      "symbol": "LIQUIDBEES.NS",
+      "name": "Nippon India ETF Nifty 1D Rate Liquid BeES"
+    },
+    {
+      "symbol": "LIQUID1.NS",
+      "name": "Kotak Nifty 1D Rate Liquid ETF"
+    },
+    {
+      "symbol": "ABSLLIQUID.NS",
+      "name": "Aditya Birla Sun Life CRISIL Liquid Overnight ETF"
+    },
+    {
+      "symbol": "EBBETF0433.NS",
+      "name": "Bharat Bond ETF - April 2033"
+    },
+    {
+      "symbol": "EBBETF0431.NS",
+      "name": "BHARAT Bond ETF April 2031"
+    },
+    {
+      "symbol": "EBBETF0430.NS",
+      "name": "Bharat Bond ETF - April 2030"
+    },
+    {
+      "symbol": "BBETF0432.NS",
+      "name": "BHARAT Bond ETF - April 2032"
+    },
+    {
+      "symbol": "LTGILTBEES.NS",
+      "name": "Reliance ETF Long Term Gilt"
+    },
+    {
+      "symbol": "PSUBANK.NS",
+      "name": "Kotak Nifty PSU Bank ETF"
+    },
+    {
+      "symbol": "MNC.NS",
+      "name": "Kotak Nifty MNC ETF"
+    },
+    {
+      "symbol": "CPSEETF.NS",
+      "name": "CPSE ETF"
+    },
+    {
+      "symbol": "FMCGIETF.NS",
+      "name": "ICICI Prudential Nifty FMCG ETF"
+    },
+    {
+      "symbol": "OILIETF.NS",
+      "name": "ICICI Prudential Nifty Oil & Gas ETF"
+    },
+    {
+      "symbol": "METALFUND.NS",
+      "name": "Mirae Asset Nifty Metal ETF"
+    },
+    {
+      "symbol": "INFRAIETF.NS",
+      "name": "ICICI Prudential Nifty Infrastructure ETF"
+    },
+    {
+      "symbol": "HEALTHADD.NS",
+      "name": "DSP Nifty Healthcare ETF"
+    },
+    {
+      "symbol": "AXISHCETF.NS",
+      "name": "Axis NIFTY Healthcare ETF"
+    },
+    {
+      "symbol": "SENSEXBEES.BO",
+      "name": "Reliance ETF Sensex"
+    },
+    {
+      "symbol": "SENSEX1.NS",
+      "name": "Kotak S&P BSE Sensex ETF"
+    },
+    {
+      "symbol": "GROWWPOWER.BO",
+      "name": "Groww BSE Power ETF"
+    },
+    {
+      "symbol": "GROWWEV.NS",
+      "name": "Groww Nifty EV & New Age Automotive ETF"
+    },
+    {
+      "symbol": "MODEFENCE.NS",
+      "name": "Motilal Oswal Nifty India Defence ETF"
+    },
+    {
+      "symbol": "MOTOUR.NS",
+      "name": "Motilal Oswal Nifty India Tourism ETF"
+    },
+    {
+      "symbol": "GROWWRAIL.NS",
+      "name": "Groww Nifty India Railways PSU ETF"
+    },
+    {
+      "symbol": "AAPL",
+      "name": "Apple Inc."
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft Corporation"
+    },
+    {
+      "symbol": "GOOGL",
+      "name": "Alphabet Inc. (Google)"
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla Inc."
+    }
+  ]
+}
