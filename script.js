@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     initializeEventListeners();
+    initializeSidebar();
 });
 
 function initializeEventListeners() {
@@ -53,6 +54,7 @@ function initializeEventListeners() {
 
     symbolInput.addEventListener('keydown', function(e) {
         const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
+        
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
@@ -63,9 +65,15 @@ function initializeEventListeners() {
             selectedIndex = Math.max(selectedIndex - 1, -1);
             updateSelection(items);
         }
-        else if (e.key === 'Enter' && selectedIndex >= 0) {
+        else if (e.key === 'Enter') {
             e.preventDefault();
-            items[selectedIndex].click();
+            if (selectedIndex >= 0) {
+                items[selectedIndex].click();
+            } else {
+                // Trigger search if no autocomplete item is selected
+                const form = document.querySelector('.search-form');
+                if (form) form.requestSubmit();
+            }
         }
         else if (e.key === 'Escape') {
             hideAutocomplete();
@@ -78,20 +86,39 @@ function initializeEventListeners() {
         }
     });
 
-    // Sidebar functionality
-    initializeSidebar();
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener('click', function(e) {
+        if (window.matchMedia('(max-width: 768px)').matches) {
+            const sidebar = document.getElementById('sidebar');
+            const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
+            
+            if (!sidebar.contains(e.target) && 
+                !mobileToggle.contains(e.target) && 
+                !isSidebarCollapsed) {
+                setSidebarCollapsed(true);
+            }
+        }
+    });
+
+    // Handle escape key to close sidebar
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !isSidebarCollapsed) {
+            setSidebarCollapsed(true);
+        }
+    });
 }
 
-// ==================== SIDEBAR FUNCTIONS ====================
+// ==================== SIDEBAR FUNCTIONS - COMPLETELY FIXED ====================
 
 function initializeSidebar() {
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarSearch = document.getElementById('sidebarSearch');
-    const mobileToggle = document.createElement('button');
 
     // Create mobile toggle button
+    const mobileToggle = document.createElement('button');
     mobileToggle.innerHTML = '☰';
     mobileToggle.className = 'mobile-sidebar-toggle';
+    mobileToggle.setAttribute('aria-label', 'Toggle sidebar');
     mobileToggle.addEventListener('click', toggleSidebar);
     document.body.appendChild(mobileToggle);
 
@@ -106,45 +133,57 @@ function initializeSidebar() {
     // Load stocks into sidebar
     loadSidebarStocks();
 
-    // Set initial sidebar state based on viewport (mobile collapsed by default)
-    const mediaQuery = window.matchMedia('(max-width: 768px)');
-    setSidebarCollapsed(mediaQuery.matches);
+    // Set initial sidebar state based on viewport
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    setSidebarCollapsed(isMobile);
 
-    // Keep defaults aligned when crossing breakpoint
-    if (mediaQuery.addEventListener) {
-        mediaQuery.addEventListener('change', (e) => setSidebarCollapsed(e.matches));
-    } else if (mediaQuery.addListener) {
-        // Fallback for older browsers
-        mediaQuery.addListener((e) => setSidebarCollapsed(e.matches));
-    }
+    // Handle viewport changes
+    window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
+        setSidebarCollapsed(e.matches);
+    });
+
+    console.log('Sidebar initialized - Mobile:', isMobile, 'Collapsed:', isMobile);
 }
 
-// Apply collapsed/expanded state safely and update UI bits
 function setSidebarCollapsed(collapsed) {
     const sidebar = document.getElementById('sidebar');
-    const mainContent = document.getElementById('mainContent') || document.querySelector('.main-content') || document.querySelector('.container');
+    const mainContent = document.querySelector('.container');
     const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
 
-    isSidebarCollapsed = !!collapsed;
+    isSidebarCollapsed = collapsed;
 
+    // Update sidebar state
     if (sidebar) {
-        if (isSidebarCollapsed) {
+        if (collapsed) {
             sidebar.classList.add('sidebar-collapsed');
         } else {
             sidebar.classList.remove('sidebar-collapsed');
         }
     }
+    
+    // Update main content state
     if (mainContent) {
-        if (isSidebarCollapsed) {
+        if (collapsed) {
             mainContent.classList.add('sidebar-collapsed');
         } else {
             mainContent.classList.remove('sidebar-collapsed');
         }
     }
+    
+    // Update mobile toggle button
     if (mobileToggle) {
-        mobileToggle.innerHTML = isSidebarCollapsed ? '☰' : '×';
+        mobileToggle.innerHTML = isSidebarCollapsed ? '☰' : '✕';
+        // Position toggle button based on sidebar state
+        if (!isSidebarCollapsed && window.matchMedia('(max-width: 768px)').matches) {
+            mobileToggle.style.left = '300px';
+        } else {
+            mobileToggle.style.left = '20px';
+        }
     }
+
+    console.log('Sidebar collapsed:', isSidebarCollapsed);
 }
+
 function toggleSidebar() {
     setSidebarCollapsed(!isSidebarCollapsed);
 }
@@ -153,20 +192,24 @@ function loadSidebarStocks() {
     const sidebarStocks = document.getElementById('sidebarStocks');
 
     if (!stockDatabase || stockDatabase.length === 0) {
-        sidebarStocks.innerHTML = '<div style="padding: 20px; text-align: center; color: #6b7280;">Loading stocks...</div>';
+        sidebarStocks.innerHTML = `
+            <div style="padding: 30px; text-align: center; color: #6b7280;">
+                <div style="font-size: 2rem; margin-bottom: 10px;">📈</div>
+                <div>Loading stocks database...</div>
+            </div>
+        `;
         return;
     }
 
     // Group stocks by category for better organization
     const groupedStocks = groupStocksByCategory(stockDatabase);
-
     let html = '';
 
     // Add Most Popular ETFs group
     if (groupedStocks.mostPopular.length > 0) {
         html += `
             <div class="sidebar-stock-group">
-                <div class="sidebar-group-header">Most Popular ETFs</div>
+                <div class="sidebar-group-header">🌟 Most Popular ETFs</div>
                 ${groupedStocks.mostPopular.map(stock => createSidebarStockItem(stock)).join('')}
             </div>
         `;
@@ -176,14 +219,18 @@ function loadSidebarStocks() {
     if (groupedStocks.majorFundHouses.length > 0) {
         html += `
             <div class="sidebar-stock-group">
-                <div class="sidebar-group-header">Major Fund Houses</div>
+                <div class="sidebar-group-header">🏦 Major Fund Houses</div>
                 ${groupedStocks.majorFundHouses.map(stock => createSidebarStockItem(stock)).join('')}
             </div>
         `;
     }
 
     // Add other groups
-    const otherGroups = ['kotak', 'icici', 'mirae', 'motilal', 'international', 'sector', 'gold', 'midSmall', 'factor', 'liquid', 'bond', 'niche', 'bse', 'internationalStocks'];
+    const otherGroups = [
+        'kotak', 'icici', 'mirae', 'motilal', 'international', 
+        'sector', 'gold', 'midSmall', 'factor', 'liquid', 
+        'bond', 'niche', 'bse', 'internationalStocks'
+    ];
 
     otherGroups.forEach(group => {
         if (groupedStocks[group] && groupedStocks[group].length > 0) {
@@ -206,6 +253,8 @@ function loadSidebarStocks() {
             selectStockFromSidebar(symbol);
         });
     });
+
+    console.log('Sidebar stocks loaded:', stockDatabase.length, 'stocks in', Object.keys(groupedStocks).length, 'groups');
 }
 
 function groupStocksByCategory(stocks) {
@@ -300,22 +349,22 @@ function groupStocksByCategory(stocks) {
 
 function getGroupDisplayName(groupKey) {
     const names = {
-        mostPopular: 'Most Popular ETFs',
-        majorFundHouses: 'Major Fund Houses',
-        kotak: 'Kotak ETFs',
-        icici: 'ICICI Prudential ETFs',
-        mirae: 'Mirae Asset ETFs',
-        motilal: 'Motilal Oswal ETFs',
-        international: 'International ETFs',
-        sector: 'Sector & Theme ETFs',
-        gold: 'Gold & Silver ETFs',
-        midSmall: 'Mid & Small Cap ETFs',
-        factor: 'Factor & Smart Beta ETFs',
-        liquid: 'Liquid & Debt ETFs',
-        bond: 'Bond & G-Sec ETFs',
-        niche: 'Niche ETFs',
-        bse: 'BSE ETFs',
-        internationalStocks: 'International Stocks'
+        mostPopular: '🌟 Most Popular ETFs',
+        majorFundHouses: '🏦 Major Fund Houses',
+        kotak: '📊 Kotak ETFs',
+        icici: '🔷 ICICI Prudential ETFs',
+        mirae: '🚀 Mirae Asset ETFs',
+        motilal: '📈 Motilal Oswal ETFs',
+        international: '🌍 International ETFs',
+        sector: '🏭 Sector & Theme ETFs',
+        gold: '🥇 Gold & Silver ETFs',
+        midSmall: '📊 Mid & Small Cap ETFs',
+        factor: '🎯 Factor & Smart Beta ETFs',
+        liquid: '💧 Liquid & Debt ETFs',
+        bond: '📋 Bond & G-Sec ETFs',
+        niche: '🔍 Niche ETFs',
+        bse: '📈 BSE ETFs',
+        internationalStocks: '🌎 International Stocks'
     };
 
     return names[groupKey] || groupKey;
@@ -333,17 +382,22 @@ function createSidebarStockItem(stock) {
 function filterSidebarStocks(query) {
     const sidebarStocks = document.getElementById('sidebarStocks');
     const allItems = sidebarStocks.querySelectorAll('.sidebar-stock-item');
+    const groupHeaders = sidebarStocks.querySelectorAll('.sidebar-group-header');
 
     if (!query) {
-        // Show all items if no query
+        // Show all items and groups if no query
         allItems.forEach(item => {
             item.style.display = 'flex';
+        });
+        groupHeaders.forEach(header => {
+            header.parentElement.style.display = 'block';
         });
         return;
     }
 
     const lowerQuery = query.toLowerCase();
 
+    // First, hide all items and show only matching ones
     allItems.forEach(item => {
         const symbol = item.querySelector('.sidebar-stock-symbol').textContent.toLowerCase();
         const name = item.querySelector('.sidebar-stock-name').textContent.toLowerCase();
@@ -353,6 +407,17 @@ function filterSidebarStocks(query) {
         } else {
             item.style.display = 'none';
         }
+    });
+
+    // Show/hide group headers based on whether they have visible items
+    groupHeaders.forEach(header => {
+        const group = header.parentElement;
+        const itemsInGroup = group.querySelectorAll('.sidebar-stock-item');
+        const hasVisibleInGroup = Array.from(itemsInGroup).some(item => 
+            item.style.display !== 'none'
+        );
+        
+        group.style.display = hasVisibleInGroup ? 'block' : 'none';
     });
 }
 
@@ -377,6 +442,11 @@ function selectStockFromSidebar(symbol) {
             item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     });
+
+    // Auto-collapse sidebar on mobile after selection
+    if (window.matchMedia('(max-width: 768px)').matches) {
+        setSidebarCollapsed(true);
+    }
 
     // Auto-fetch data for the selected stock
     fetchDataForSymbol(symbol);
@@ -407,6 +477,7 @@ async function fetchDataForSymbol(symbol) {
     } catch (error) {
         errorDiv.textContent = `Error: ${error.message}`;
         errorDiv.style.display = 'block';
+        console.error('Fetch error:', error);
     } finally {
         loadingDiv.style.display = 'none';
         searchBtn.disabled = false;
@@ -414,7 +485,7 @@ async function fetchDataForSymbol(symbol) {
     }
 }
 
-// ==================== AUTocomplete FUNCTIONS ====================
+// ==================== AUTCOMPLETE FUNCTIONS ====================
 
 function showAutocomplete(stocks) {
     selectedIndex = -1;
@@ -466,9 +537,15 @@ function selectStock(symbol) {
 
 // API call to fetch stock data
 async function fetchData(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
 
-    const symbol = symbolInput.value.toUpperCase();
+    const symbol = symbolInput.value.toUpperCase().trim();
+
+    if (!symbol) {
+        errorDiv.textContent = 'Please enter a stock symbol';
+        errorDiv.style.display = 'block';
+        return;
+    }
 
     outputDiv.innerHTML = '';
     errorDiv.style.display = 'none';
@@ -478,7 +555,7 @@ async function fetchData(event) {
     hideAutocomplete();
 
     try {
-        const response = await fetch('http://127.0.0.1:5000/get_data', {
+        const response = await fetch('https://stock-dashboard-fqtn.onrender.com/get_data', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -496,6 +573,7 @@ async function fetchData(event) {
     } catch (error) {
         errorDiv.textContent = `Error: ${error.message}`;
         errorDiv.style.display = 'block';
+        console.error('Fetch error:', error);
     } finally {
         loadingDiv.style.display = 'none';
         searchBtn.disabled = false;
@@ -581,6 +659,12 @@ function displayData(data) {
     grid.appendChild(macdCard);
 
     outputDiv.appendChild(grid);
+
+    // Auto-expand the first card for better UX
+    setTimeout(() => {
+        const firstCard = grid.querySelector('.data-card');
+        if (firstCard) toggleCard(firstCard);
+    }, 100);
 }
 
 // Card creation and management
@@ -624,7 +708,7 @@ function toggleCard(cardElement) {
 // Data table creation functions
 function createOhlcvTable(data) {
     if (!data || data.length === 0) {
-        return '<p>No OHLCV data available</p>';
+        return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No OHLCV data available for this stock.</p></div>';
     }
 
     const limitedData = data.slice(0, 7);
@@ -657,12 +741,13 @@ function createOhlcvTable(data) {
                 </table>
             </div>
         </div>
+        <p style="font-size: 0.9rem; color: #6b7280; margin-top: 10px;">Showing latest ${limitedData.length} trading sessions</p>
     `;
 }
 
 function createMaRsiContent(maData, rsiData) {
     if (!maData || maData.length === 0) {
-        return '<p>No Moving Average data available</p>';
+        return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No Moving Average data available for this stock.</p></div>';
     }
 
     const limitedMaData = maData.slice(0, 7);
@@ -677,45 +762,72 @@ function createMaRsiContent(maData, rsiData) {
     });
 
     return `
-        <div class="data-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>MA5 (Short)</th>
-                        <th>MA10 (Long)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${combinedData.map(item => `
+        <div class="table-scroll-wrapper">
+            <div class="data-table">
+                <table>
+                    <thead>
                         <tr>
-                            <td>${item.Date}</td>
-                            <td>${item.MA5 != null ? '$' + item.MA5.toFixed(2) : 'N/A'}</td>
-                            <td>${item.MA10 != null ? '$' + item.MA10.toFixed(2) : 'N/A'}</td>
+                            <th>Date</th>
+                            <th>MA5 (Short)</th>
+                            <th>MA10 (Long)</th>
+                            <th>RSI</th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        ${combinedData.map(item => `
+                            <tr>
+                                <td>${item.Date}</td>
+                                <td>${item.MA5 != null ? '$' + item.MA5.toFixed(2) : 'N/A'}</td>
+                                <td>${item.MA10 != null ? '$' + item.MA10.toFixed(2) : 'N/A'}</td>
+                                <td style="font-weight: 600; color: ${getRsiColor(item.RSI)}">${item.RSI != null ? item.RSI.toFixed(2) : 'N/A'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div style="padding-top: 20px;">
-            <h3 style="color: var(--primary-purple); font-size: 1.1rem; margin-bottom: 10px;">RSI (Latest 7 Days)</h3>
+            <h3 style="color: var(--primary-purple); font-size: 1.1rem; margin-bottom: 15px;">RSI Overview (Latest ${combinedData.length} Days)</h3>
             <div class="rsi-grid">
                 ${combinedData.map(item => `
                     <div class="rsi-item">
                         <strong>${item.Date ? item.Date.substring(5) : 'N/A'}</strong>
-                        <span class="rsi-value">${item.RSI != null ? item.RSI.toFixed(2) : 'N/A'}</span>
+                        <span class="rsi-value" style="color: ${getRsiColor(item.RSI)}; background: ${getRsiBackground(item.RSI)}">
+                            ${item.RSI != null ? item.RSI.toFixed(2) : 'N/A'}
+                        </span>
                     </div>
                 `).join('')}
             </div>
-            <p style="font-size: 0.9rem; color: #6b7280; margin-top: 15px;">RSI above 70 is considered Overbought, below 30 is Oversold.</p>
+            <div style="margin-top: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid var(--primary-purple);">
+                <p style="font-size: 0.9rem; color: #374151; margin: 0;">
+                    <strong>RSI Guide:</strong> 
+                    <span style="color: #ef4444;">Above 70 = Overbought</span> • 
+                    <span style="color: #10b981;">Below 30 = Oversold</span> • 
+                    <span style="color: #6b7280;">30-70 = Neutral</span>
+                </p>
+            </div>
         </div>
     `;
 }
 
+function getRsiColor(rsi) {
+    if (rsi === null || rsi === undefined) return '#6b7280';
+    if (rsi > 70) return '#ef4444';
+    if (rsi < 30) return '#10b981';
+    return '#6b7280';
+}
+
+function getRsiBackground(rsi) {
+    if (rsi === null || rsi === undefined) return '#f3f4f6';
+    if (rsi > 70) return '#fef2f2';
+    if (rsi < 30) return '#f0fdf4';
+    return '#f8fafc';
+}
+
 function createMacdTable(data) {
     if (!data || data.length === 0) {
-        return '<p>No MACD data available</p>';
+        return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No MACD data available for this stock.</p></div>';
     }
 
     const limitedData = data.slice(0, 7);
@@ -747,6 +859,13 @@ function createMacdTable(data) {
                 </table>
             </div>
         </div>
+        <div style="margin-top: 15px; padding: 12px; background: #f8fafc; border-radius: 8px;">
+            <p style="font-size: 0.9rem; color: #374151; margin: 0;">
+                <strong>MACD Signals:</strong> 
+                <span style="color: var(--accent-green);">Positive Histogram = Bullish</span> • 
+                <span style="color: #ef4444;">Negative Histogram = Bearish</span>
+            </p>
+        </div>
     `;
 }
 
@@ -764,6 +883,7 @@ function createAnalysisContent(text) {
     htmlContent = htmlContent.replace(/###\s*(.*)/g, '<h3>$1</h3>');
     htmlContent = htmlContent.replace(/####\s*(.*)/g, '<h4>$1</h4>');
     htmlContent = htmlContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    htmlContent = htmlContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
     htmlContent = htmlContent.replace(/---/g, '<hr>');
     htmlContent = htmlContent.replace(/\n\n/g, '</p><p>');
     htmlContent = htmlContent.replace(/\n/g, '<br>');
@@ -774,6 +894,9 @@ function createAnalysisContent(text) {
     }
 
     return `<div class="analysis-content">${htmlContent}</div>`;
-
 }
 
+// Export functions for global access
+window.selectStock = selectStock;
+window.fetchData = fetchData;
+window.toggleCard = toggleCard;
