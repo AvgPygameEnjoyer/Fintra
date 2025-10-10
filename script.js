@@ -128,16 +128,23 @@ function setSidebarCollapsed(collapsed) {
     isSidebarCollapsed = !!collapsed;
 
     if (sidebar) {
-        sidebar.classList.toggle('sidebar-collapsed', isSidebarCollapsed);
+        if (isSidebarCollapsed) {
+            sidebar.classList.add('sidebar-collapsed');
+        } else {
+            sidebar.classList.remove('sidebar-collapsed');
+        }
     }
     if (mainContent) {
-        mainContent.classList.toggle('sidebar-collapsed', isSidebarCollapsed);
+        if (isSidebarCollapsed) {
+            mainContent.classList.add('sidebar-collapsed');
+        } else {
+            mainContent.classList.remove('sidebar-collapsed');
+        }
     }
     if (mobileToggle) {
         mobileToggle.innerHTML = isSidebarCollapsed ? '☰' : '×';
     }
 }
-
 function toggleSidebar() {
     setSidebarCollapsed(!isSidebarCollapsed);
 }
@@ -769,3 +776,4 @@ function createAnalysisContent(text) {
     return `<div class="analysis-content">${htmlContent}</div>`;
 
 }
+
