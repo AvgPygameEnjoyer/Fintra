@@ -547,23 +547,15 @@ body {
 
 @media (max-width: 768px) {
     .sidebar {
-        transform: translateX(-100%);
+        width: 320px;
     }
-
+    
     .sidebar.sidebar-collapsed {
         transform: translateX(-100%);
     }
 
-    .sidebar:not(.sidebar-collapsed) {
-        transform: translateX(0);
-    }
-
     .main-content {
-        margin-left: 0;
-    }
-
-    .main-content.sidebar-collapsed {
-        margin-left: 0;
+        margin-left: 0 !important;
     }
 
     .sidebar-toggle {
