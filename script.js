@@ -105,22 +105,41 @@ function initializeSidebar() {
 
     // Load stocks into sidebar
     loadSidebarStocks();
+
+    // Set initial sidebar state based on viewport (mobile collapsed by default)
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    setSidebarCollapsed(mediaQuery.matches);
+
+    // Keep defaults aligned when crossing breakpoint
+    if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', (e) => setSidebarCollapsed(e.matches));
+    } else if (mediaQuery.addListener) {
+        // Fallback for older browsers
+        mediaQuery.addListener((e) => setSidebarCollapsed(e.matches));
+    }
 }
 
-function toggleSidebar() {
+// Apply collapsed/expanded state safely and update UI bits
+function setSidebarCollapsed(collapsed) {
     const sidebar = document.getElementById('sidebar');
-    const mainContent = document.getElementById('mainContent');
+    const mainContent = document.getElementById('mainContent') || document.querySelector('.main-content') || document.querySelector('.container');
     const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
 
-    isSidebarCollapsed = !isSidebarCollapsed;
+    isSidebarCollapsed = !!collapsed;
 
-    sidebar.classList.toggle('sidebar-collapsed', isSidebarCollapsed);
-    mainContent.classList.toggle('sidebar-collapsed', isSidebarCollapsed);
-
-    // Update mobile toggle icon
+    if (sidebar) {
+        sidebar.classList.toggle('sidebar-collapsed', isSidebarCollapsed);
+    }
+    if (mainContent) {
+        mainContent.classList.toggle('sidebar-collapsed', isSidebarCollapsed);
+    }
     if (mobileToggle) {
         mobileToggle.innerHTML = isSidebarCollapsed ? '☰' : '×';
     }
+}
+
+function toggleSidebar() {
+    setSidebarCollapsed(!isSidebarCollapsed);
 }
 
 function loadSidebarStocks() {
