@@ -874,3 +874,25 @@ body {
         padding: 10px;
     }
 }
+
+/* === STICK FOOTER TO BOTTOM & MAKE IT BLACK === */
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.container {
+    flex: 1; /* takes remaining space so footer stays down */
+}
+
+footer {
+    margin-top: auto; /* pushes footer to bottom */
+    padding: 1rem;
+    border-top: 1px solid #e0e0e0;
+    font-size: 0.8rem;
+    color: black; /* ⚡ black text */
+    text-align: center;
+    background: #fff; /* optional for clean look */
+}
