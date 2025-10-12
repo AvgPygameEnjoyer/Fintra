@@ -15,7 +15,7 @@ app = Flask(__name__)
 dotenv.load_dotenv()
 
 # CORS Configuration
-CORS(app)
+CORS(app, origins=["https://budgetwarrenbuffet.vercel.app"], supports_credentials=True)
 
 # --- Gemini API Initialization ---
 try:
@@ -693,3 +693,4 @@ if __name__ == "__main__":
     print("✅ All data fields properly integrated")
     print("=" * 60)
     app.run(host="0.0.0.0", port=port, debug=True)
+
