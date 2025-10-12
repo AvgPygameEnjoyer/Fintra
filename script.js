@@ -3,6 +3,14 @@ let selectedIndex = -1;
 let filteredStocks = [];
 let isSidebarCollapsed = false;
 
+// Chart instances storage
+let charts = {
+    ohlcv: null,
+    rsi: null,
+    movingAverages: null,
+    macd: null
+};
+
 // DOM Elements
 const symbolInput = document.getElementById('symbol');
 const autocompleteDiv = document.getElementById('autocomplete');
@@ -54,7 +62,7 @@ function initializeEventListeners() {
 
     symbolInput.addEventListener('keydown', function(e) {
         const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
-        
+
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
@@ -85,30 +93,9 @@ function initializeEventListeners() {
             hideAutocomplete();
         }
     });
-
-    // Close sidebar when clicking outside on mobile
-    document.addEventListener('click', function(e) {
-        if (window.matchMedia('(max-width: 768px)').matches) {
-            const sidebar = document.getElementById('sidebar');
-            const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
-            
-            if (!sidebar.contains(e.target) && 
-                !mobileToggle.contains(e.target) && 
-                !isSidebarCollapsed) {
-                setSidebarCollapsed(true);
-            }
-        }
-    });
-
-    // Handle escape key to close sidebar
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && !isSidebarCollapsed) {
-            setSidebarCollapsed(true);
-        }
-    });
 }
 
-// ==================== SIDEBAR FUNCTIONS - COMPLETELY FIXED ====================
+// ==================== SIDEBAR FUNCTIONS ====================
 
 function initializeSidebar() {
     const sidebarToggle = document.getElementById('sidebarToggle');
@@ -122,11 +109,11 @@ function initializeSidebar() {
     mobileToggle.addEventListener('click', toggleSidebar);
     document.body.appendChild(mobileToggle);
 
-    // Create desktop toggle button (always visible on desktop)
+    // Create desktop toggle button (for when sidebar is collapsed)
     const desktopToggle = document.createElement('button');
     desktopToggle.innerHTML = '☰';
     desktopToggle.className = 'desktop-sidebar-toggle';
-    desktopToggle.setAttribute('aria-label', 'Toggle sidebar');
+    desktopToggle.setAttribute('aria-label', 'Open sidebar');
     desktopToggle.addEventListener('click', toggleSidebar);
     document.body.appendChild(desktopToggle);
 
@@ -150,6 +137,27 @@ function initializeSidebar() {
         setSidebarCollapsed(e.matches);
     });
 
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener('click', function(e) {
+        if (window.matchMedia('(max-width: 768px)').matches) {
+            const sidebar = document.getElementById('sidebar');
+            const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
+
+            if (!sidebar.contains(e.target) &&
+                !mobileToggle.contains(e.target) &&
+                !isSidebarCollapsed) {
+                setSidebarCollapsed(true);
+            }
+        }
+    });
+
+    // Handle escape key to close sidebar
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !isSidebarCollapsed) {
+            setSidebarCollapsed(true);
+        }
+    });
+
     console.log('Sidebar initialized - Mobile:', isMobile, 'Collapsed:', isMobile);
 }
 
@@ -169,7 +177,7 @@ function setSidebarCollapsed(collapsed) {
             sidebar.classList.remove('sidebar-collapsed');
         }
     }
-    
+
     // Update main content state
     if (mainContent) {
         if (collapsed) {
@@ -178,10 +186,11 @@ function setSidebarCollapsed(collapsed) {
             mainContent.classList.remove('sidebar-collapsed');
         }
     }
-    
-    // Update toggle buttons
+
+    // Update mobile toggle button (for mobile devices)
     if (mobileToggle) {
         mobileToggle.innerHTML = isSidebarCollapsed ? '☰' : '✕';
+        // Position toggle button based on sidebar state
         if (!isSidebarCollapsed && window.matchMedia('(max-width: 768px)').matches) {
             mobileToggle.style.left = '300px';
         } else {
@@ -189,6 +198,7 @@ function setSidebarCollapsed(collapsed) {
         }
     }
 
+    // Update desktop toggle button
     if (desktopToggle) {
         desktopToggle.innerHTML = isSidebarCollapsed ? '☰' : '✕';
         if (!isSidebarCollapsed && window.matchMedia('(min-width: 769px)').matches) {
@@ -200,6 +210,7 @@ function setSidebarCollapsed(collapsed) {
 
     console.log('Sidebar collapsed:', isSidebarCollapsed);
 }
+
 function toggleSidebar() {
     setSidebarCollapsed(!isSidebarCollapsed);
 }
@@ -243,8 +254,8 @@ function loadSidebarStocks() {
 
     // Add other groups
     const otherGroups = [
-        'kotak', 'icici', 'mirae', 'motilal', 'international', 
-        'sector', 'gold', 'midSmall', 'factor', 'liquid', 
+        'kotak', 'icici', 'mirae', 'motilal', 'international',
+        'sector', 'gold', 'midSmall', 'factor', 'liquid',
         'bond', 'niche', 'bse', 'internationalStocks'
     ];
 
@@ -429,10 +440,10 @@ function filterSidebarStocks(query) {
     groupHeaders.forEach(header => {
         const group = header.parentElement;
         const itemsInGroup = group.querySelectorAll('.sidebar-stock-item');
-        const hasVisibleInGroup = Array.from(itemsInGroup).some(item => 
+        const hasVisibleInGroup = Array.from(itemsInGroup).some(item =>
             item.style.display !== 'none'
         );
-        
+
         group.style.display = hasVisibleInGroup ? 'block' : 'none';
     });
 }
@@ -501,7 +512,7 @@ async function fetchDataForSymbol(symbol) {
     }
 }
 
-// ==================== AUTCOMPLETE FUNCTIONS ====================
+// ==================== AUTOCOMPLETE FUNCTIONS ====================
 
 function showAutocomplete(stocks) {
     selectedIndex = -1;
@@ -597,7 +608,7 @@ async function fetchData(event) {
     }
 }
 
-// Display the fetched data
+// Display the fetched data with charts
 function displayData(data) {
     const companyInfo = stockDatabase.find(s => s.symbol === data.ticker) || { name: 'Technical Analysis Data' };
     const companyName = companyInfo.name;
@@ -612,11 +623,23 @@ function displayData(data) {
     const grid = document.createElement('div');
     grid.className = 'data-grid';
 
-    // 1. Rule-Based Analysis (Primary Analysis - Always Available)
+    // 1. Visualization Card with Charts
+    const visualizationCard = createDataCard({
+        id: 'visualization-card',
+        title: 'Technical Charts & Visualizations',
+        icon: '📊',
+        contentHtml: createVisualizationContent(data),
+        isOpen: true
+    });
+    visualizationCard.classList.add('full-width');
+    visualizationCard.querySelector('.card-header').addEventListener('click', () => toggleCard(visualizationCard));
+    grid.appendChild(visualizationCard);
+
+    // 2. Rule-Based Analysis
     const ruleBasedCard = createDataCard({
         id: 'rule-based-card',
         title: 'Technical Analysis',
-        icon: '📊',
+        icon: '🔍',
         contentHtml: createAnalysisContent(data.Rule_Based_Analysis),
         isOpen: false
     });
@@ -624,7 +647,7 @@ function displayData(data) {
     ruleBasedCard.querySelector('.card-header').addEventListener('click', () => toggleCard(ruleBasedCard));
     grid.appendChild(ruleBasedCard);
 
-    // 2. AI Review (Optional - May be unavailable)
+    // 3. AI Review
     if (data.AI_Review) {
         const aiReviewCard = createDataCard({
             id: 'ai-review-card',
@@ -638,10 +661,10 @@ function displayData(data) {
         grid.appendChild(aiReviewCard);
     }
 
-    // 3. OHLCV Card
+    // 4. Raw Data Tables (Collapsed by default)
     const ohlcvCard = createDataCard({
         id: 'ohlcv-card',
-        title: 'Candlestick Data (OHLCV)',
+        title: 'Raw OHLCV Data',
         icon: '📈',
         contentHtml: createOhlcvTable(data.OHLCV),
         isOpen: false
@@ -650,10 +673,9 @@ function displayData(data) {
     ohlcvCard.querySelector('.card-header').addEventListener('click', () => toggleCard(ohlcvCard));
     grid.appendChild(ohlcvCard);
 
-    // 4. MA & RSI Card
     const maRsiCard = createDataCard({
         id: 'ma-rsi-card',
-        title: 'Moving Averages & RSI',
+        title: 'Raw Technical Indicators',
         icon: '📉',
         contentHtml: createMaRsiContent(data.MA, data.RSI),
         isOpen: false
@@ -662,10 +684,9 @@ function displayData(data) {
     maRsiCard.querySelector('.card-header').addEventListener('click', () => toggleCard(maRsiCard));
     grid.appendChild(maRsiCard);
 
-    // 5. MACD Card
     const macdCard = createDataCard({
         id: 'macd-card',
-        title: 'MACD, Signal & Histogram',
+        title: 'Raw MACD Data',
         icon: '🎯',
         contentHtml: createMacdTable(data.MACD),
         isOpen: false
@@ -676,11 +697,329 @@ function displayData(data) {
 
     outputDiv.appendChild(grid);
 
-    // Auto-expand the first card for better UX
+    // Initialize charts after DOM is updated
     setTimeout(() => {
-        const firstCard = grid.querySelector('.data-card');
-        if (firstCard) toggleCard(firstCard);
+        initializeCharts(data);
     }, 100);
+}
+
+// Create visualization content with tabs
+function createVisualizationContent(data) {
+    return `
+        <div class="chart-tabs">
+            <button class="chart-tab active" onclick="switchChartTab('price', this)">Price & Volume</button>
+            <button class="chart-tab" onclick="switchChartTab('rsi', this)">RSI</button>
+            <button class="chart-tab" onclick="switchChartTab('moving-averages', this)">Moving Averages</button>
+            <button class="chart-tab" onclick="switchChartTab('macd', this)">MACD</button>
+        </div>
+        
+        <div id="price-chart" class="chart-card">
+            <div class="chart-title">OHLC Candlestick Chart with Volume</div>
+            <div class="chart-container">
+                <canvas id="ohlcvChart"></canvas>
+            </div>
+        </div>
+        
+        <div id="rsi-chart" class="chart-card" style="display: none;">
+            <div class="chart-title">Relative Strength Index (RSI)</div>
+            <div class="chart-container">
+                <canvas id="rsiChart"></canvas>
+            </div>
+        </div>
+        
+        <div id="moving-averages-chart" class="chart-card" style="display: none;">
+            <div class="chart-title">Price with Moving Averages</div>
+            <div class="chart-container">
+                <canvas id="movingAveragesChart"></canvas>
+            </div>
+        </div>
+        
+        <div id="macd-chart" class="chart-card" style="display: none;">
+            <div class="chart-title">MACD (Moving Average Convergence Divergence)</div>
+            <div class="chart-container">
+                <canvas id="macdChart"></canvas>
+            </div>
+        </div>
+    `;
+}
+
+// Switch between chart tabs
+function switchChartTab(tabName, button) {
+    // Hide all chart containers
+    document.querySelectorAll('.chart-card').forEach(card => {
+        card.style.display = 'none';
+    });
+
+    // Remove active class from all tabs
+    document.querySelectorAll('.chart-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+
+    // Show selected chart and activate tab
+    document.getElementById(`${tabName}-chart`).style.display = 'block';
+    button.classList.add('active');
+}
+
+// Initialize all charts
+function initializeCharts(data) {
+    destroyExistingCharts();
+
+    if (data.OHLCV && data.OHLCV.length > 0) {
+        createOHLCVChart(data.OHLCV);
+    }
+
+    if (data.RSI && data.RSI.length > 0 && data.OHLCV) {
+        createRSIChart(data.RSI, data.OHLCV);
+    }
+
+    if (data.MA && data.MA.length > 0 && data.OHLCV) {
+        createMovingAveragesChart(data.MA, data.OHLCV);
+    }
+
+    if (data.MACD && data.MACD.length > 0 && data.OHLCV) {
+        createMACDChart(data.MACD, data.OHLCV);
+    }
+}
+
+// Destroy existing charts to prevent memory leaks
+function destroyExistingCharts() {
+    Object.values(charts).forEach(chart => {
+        if (chart) {
+            chart.destroy();
+        }
+    });
+    charts = {
+        ohlcv: null,
+        rsi: null,
+        movingAverages: null,
+        macd: null
+    };
+}
+
+// Create OHLCV Chart - FIXED CHRONOLOGICAL ORDER (7 days)
+function createOHLCVChart(ohlcvData) {
+    const ctx = document.getElementById('ohlcvChart').getContext('2d');
+    const limitedData = ohlcvData; // Already 7 days from backend
+
+    const dates = limitedData.map(item => item.Date?.substring(5) || 'N/A');
+    const closes = limitedData.map(item => item.Close);
+    const volumes = limitedData.map(item => item.Volume);
+
+    charts.ohlcv = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: 'Close Price',
+                    data: closes,
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'Volume',
+                    data: volumes,
+                    yAxisID: 'y1',
+                    backgroundColor: volumes.map((v, i) =>
+                        i > 0 && closes[i] >= closes[i-1] ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)'
+                    ),
+                    borderColor: volumes.map((v, i) =>
+                        i > 0 && closes[i] >= closes[i-1] ? 'rgba(76, 175, 80, 0.8)' : 'rgba(244, 67, 54, 0.8)'
+                    ),
+                    borderWidth: 1,
+                    type: 'bar'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'category',
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y: {
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Price ($)'
+                    }
+                },
+                y1: {
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Volume'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Create RSI Chart - FIXED CHRONOLOGICAL ORDER (7 days)
+function createRSIChart(rsiData, ohlcvData) {
+    const ctx = document.getElementById('rsiChart').getContext('2d');
+    const limitedData = rsiData; // Already 7 days from backend
+    const dates = ohlcvData.map(item => item.Date?.substring(5) || 'N/A');
+
+    charts.rsi = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'RSI',
+                data: limitedData,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    },
+                    grid: {
+                        color: function(context) {
+                            if (context.tick.value === 30 || context.tick.value === 70) {
+                                return 'rgba(255, 0, 0, 0.3)';
+                            }
+                            return 'rgba(0, 0, 0, 0.1)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Create Moving Averages Chart - FIXED CHRONOLOGICAL ORDER (7 days)
+function createMovingAveragesChart(maData, ohlcvData) {
+    const ctx = document.getElementById('movingAveragesChart').getContext('2d');
+    const limitedData = maData; // Already 7 days from backend
+    const limitedOhlcv = ohlcvData; // Already 7 days from backend
+    const dates = limitedOhlcv.map(item => item.Date?.substring(5) || 'N/A');
+
+    charts.movingAverages = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: 'Close Price',
+                    data: limitedOhlcv.map(item => item.Close),
+                    borderColor: '#374151',
+                    backgroundColor: 'rgba(55, 65, 81, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4
+                },
+                {
+                    label: 'MA5',
+                    data: limitedData.map(item => item.MA5),
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    tension: 0.4
+                },
+                {
+                    label: 'MA10',
+                    data: limitedData.map(item => item.MA10),
+                    borderColor: '#10b981',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Price ($)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Create MACD Chart - FIXED CHRONOLOGICAL ORDER (7 days)
+function createMACDChart(macdData, ohlcvData) {
+    const ctx = document.getElementById('macdChart').getContext('2d');
+    const limitedData = macdData; // Already 7 days from backend
+    const dates = ohlcvData.map(item => item.Date?.substring(5) || 'N/A');
+
+    charts.macd = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: 'MACD Line',
+                    data: limitedData.map(item => item.MACD),
+                    borderColor: '#667eea',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    type: 'line',
+                    tension: 0.4
+                },
+                {
+                    label: 'Signal Line',
+                    data: limitedData.map(item => item.Signal),
+                    borderColor: '#ef4444',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    type: 'line',
+                    tension: 0.4
+                },
+                {
+                    label: 'Histogram',
+                    data: limitedData.map(item => item.Histogram),
+                    backgroundColor: limitedData.map(item =>
+                        item.Histogram >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)'
+                    ),
+                    type: 'bar',
+                    order: 3
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: 'MACD Value'
+                    }
+                }
+            }
+        }
+    });
 }
 
 // Card creation and management
@@ -778,29 +1117,27 @@ function createMaRsiContent(maData, rsiData) {
     });
 
     return `
-        <div class="table-scroll-wrapper">
-            <div class="data-table">
-                <table>
-                    <thead>
+        <div class="data-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>MA5 (Short)</th>
+                        <th>MA10 (Long)</th>
+                        <th>RSI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${combinedData.map(item => `
                         <tr>
-                            <th>Date</th>
-                            <th>MA5 (Short)</th>
-                            <th>MA10 (Long)</th>
-                            <th>RSI</th>
+                            <td>${item.Date}</td>
+                            <td>${item.MA5 != null ? '$' + item.MA5.toFixed(2) : 'N/A'}</td>
+                            <td>${item.MA10 != null ? '$' + item.MA10.toFixed(2) : 'N/A'}</td>
+                            <td style="font-weight: 600; color: ${getRsiColor(item.RSI)}">${item.RSI != null ? item.RSI.toFixed(2) : 'N/A'}</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        ${combinedData.map(item => `
-                            <tr>
-                                <td>${item.Date}</td>
-                                <td>${item.MA5 != null ? '$' + item.MA5.toFixed(2) : 'N/A'}</td>
-                                <td>${item.MA10 != null ? '$' + item.MA10.toFixed(2) : 'N/A'}</td>
-                                <td style="font-weight: 600; color: ${getRsiColor(item.RSI)}">${item.RSI != null ? item.RSI.toFixed(2) : 'N/A'}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
+                    `).join('')}
+                </tbody>
+            </table>
         </div>
 
         <div style="padding-top: 20px;">
@@ -825,20 +1162,6 @@ function createMaRsiContent(maData, rsiData) {
             </div>
         </div>
     `;
-}
-
-function getRsiColor(rsi) {
-    if (rsi === null || rsi === undefined) return '#6b7280';
-    if (rsi > 70) return '#ef4444';
-    if (rsi < 30) return '#10b981';
-    return '#6b7280';
-}
-
-function getRsiBackground(rsi) {
-    if (rsi === null || rsi === undefined) return '#f3f4f6';
-    if (rsi > 70) return '#fef2f2';
-    if (rsi < 30) return '#f0fdf4';
-    return '#f8fafc';
 }
 
 function createMacdTable(data) {
@@ -885,6 +1208,21 @@ function createMacdTable(data) {
     `;
 }
 
+// RSI Color Utilities
+function getRsiColor(rsi) {
+    if (rsi === null || rsi === undefined) return '#6b7280';
+    if (rsi > 70) return '#ef4444';
+    if (rsi < 30) return '#10b981';
+    return '#6b7280';
+}
+
+function getRsiBackground(rsi) {
+    if (rsi === null || rsi === undefined) return '#f3f4f6';
+    if (rsi > 70) return '#fef2f2';
+    if (rsi < 30) return '#f0fdf4';
+    return '#f8fafc';
+}
+
 function createAnalysisContent(text) {
     if (!text) {
         return `<div class="unavailable-notice">
@@ -916,4 +1254,4 @@ function createAnalysisContent(text) {
 window.selectStock = selectStock;
 window.fetchData = fetchData;
 window.toggleCard = toggleCard;
-
+window.switchChartTab = switchChartTab;
