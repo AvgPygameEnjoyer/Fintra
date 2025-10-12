@@ -82,212 +82,478 @@ def clean_df(df, columns):
 
 # --- IMPROVED RULE-BASED TECHNICAL ANALYSIS ALGORITHM ---
 
-def generate_rule_based_analysis(symbol, latest_data):
-    """
-    Enhanced rule-based technical analysis with proper data validation,
-    improved logic, and actionable recommendations.
-    """
-    try:
-        if not latest_data or len(latest_data) < 4:
-            return "### ⚠️ Analysis Unavailable\nInsufficient data for multi-day trend analysis."
-
-        # Validate all required fields exist
-        required_fields = ['Close', 'Volume', 'MA5', 'MA10', 'RSI', 'MACD', 'Signal', 'Histogram']
-        latest = latest_data[-1]
-
-        missing_fields = [field for field in required_fields if field not in latest or latest[field] is None]
-        if missing_fields:
-            return f"### ⚠️ Analysis Unavailable\nMissing data fields: {', '.join(missing_fields)}"
-
-        # --- Extract and Round Key Indicators ---
-        close_price = round(latest.get("Close"), 2)
-        rsi = round(latest.get("RSI"), 2)
-        macd = round(latest.get("MACD"), 3)
-        macd_signal = round(latest.get("Signal"), 3)
-        macd_hist = round(latest.get("Histogram"), 3)
-        volume = latest.get("Volume")
-        ma5 = round(latest.get("MA5"), 2)
-        ma10 = round(latest.get("MA10"), 2)
-
-        # --- Volume Analysis ---
-        volume_data = [d.get("Volume", 0) for d in latest_data if d.get("Volume") is not None]
-        avg_vol = np.mean(volume_data) if volume_data else volume
-        volume_trend = "strong" if volume >= avg_vol else "weak"
-
-        # --- RSI Trend Analysis ---
-        rsi_values = [round(d.get("RSI", 0), 2) for d in latest_data]
-        rsi_change = rsi_values[-1] - rsi_values[0]
-
-        if rsi_change > 8:
-            rsi_trend = "strongly increasing"
-        elif rsi_change > 3:
-            rsi_trend = "increasing"
-        elif rsi_change < -8:
-            rsi_trend = "strongly decreasing"
-        elif rsi_change < -3:
-            rsi_trend = "decreasing"
-        else:
-            rsi_trend = "stable"
-
-        # RSI Zone with proper thresholds
-        def get_rsi_zone(rsi_val):
-            if rsi_val < 30:
-                return "oversold", "🟢"
-            elif rsi_val > 70:
-                return "overbought", "🔴"
-            elif rsi_val > 60:
-                return "approaching overbought", "🟡"
-            elif rsi_val < 40:
-                return "approaching oversold", "🟡"
-            else:
-                return "neutral", "⚪"
-
-        rsi_zone, rsi_zone_emoji = get_rsi_zone(rsi)
-
-        # --- MACD Trend Analysis ---
-        macd_diff = macd - macd_signal
-        macd_hist_values = [d.get("Histogram", 0) for d in latest_data]
-        macd_hist_change = macd_hist_values[-1] - macd_hist_values[0]
-
-        # Detect crossovers
-        crossover_info = None
-        for i in range(len(latest_data) - 1):
-            prev_macd = latest_data[i].get("MACD", 0)
-            prev_signal = latest_data[i].get("Signal", 0)
-            curr_macd = latest_data[i + 1].get("MACD", 0)
-            curr_signal = latest_data[i + 1].get("Signal", 0)
-
-            prev_diff = prev_macd - prev_signal
-            curr_diff = curr_macd - curr_signal
-
-            if prev_diff <= 0 and curr_diff > 0:
-                days_ago = len(latest_data) - i - 2
-                crossover_info = f"Bullish crossover occurred {days_ago} days ago"
-                break
-            elif prev_diff >= 0 and curr_diff < 0:
-                days_ago = len(latest_data) - i - 2
-                crossover_info = f"Bearish crossover occurred {days_ago} days ago"
-                break
-
-        # MACD momentum
-        if macd_hist_change > 0.1:
-            macd_momentum = "strengthening bullish momentum"
-        elif macd_hist_change < -0.1:
-            macd_momentum = "strengthening bearish momentum"
-        else:
-            macd_momentum = "relatively stable momentum"
-
-        # --- Moving Average Analysis ---
-        ma_trend = "bullish" if ma5 > ma10 else "bearish"
-        ma_spread = round(abs(ma5 - ma10) / ma10 * 100, 2)
-
-        # --- Sentiment Scoring ---
-        sentiment_score = 0
-
-        # MACD Scoring
-        if crossover_info and "Bullish" in crossover_info:
-            sentiment_score += 2
-        elif crossover_info and "Bearish" in crossover_info:
-            sentiment_score -= 2
-        elif macd_diff > 0:
-            sentiment_score += 1
-        else:
-            sentiment_score -= 1
-
-        # RSI Scoring with context
-        if rsi_zone == "oversold":
-            sentiment_score += 1.5
-        elif rsi_zone == "overbought":
-            sentiment_score -= 1.5
-        elif "increasing" in rsi_trend and rsi_zone != "overbought":
-            sentiment_score += 1
-        elif "decreasing" in rsi_trend and rsi_zone != "oversold":
-            sentiment_score -= 1
-
-        # MA Scoring
-        if ma_trend == "bullish":
-            sentiment_score += 0.5
-        else:
-            sentiment_score -= 0.5
-
-        # Volume Scoring
-        if volume_trend == "strong":
-            sentiment_score += 0.5
-        else:
-            sentiment_score -= 0.3
-
-        # --- Determine Overall Sentiment ---
-        if sentiment_score >= 2.5:
-            overall_sentiment = "**BULLISH**"
-            sentiment_color = "🟢"
-        elif sentiment_score <= -2.5:
-            overall_sentiment = "**BEARISH**"
-            sentiment_color = "🔴"
-        else:
-            overall_sentiment = "**NEUTRAL**"
-            sentiment_color = "🟡"
-
-        # --- Construct Narrative ---
-        rsi_summary = f"RSI is at **{rsi}** ({rsi_zone_emoji} {rsi_zone}), showing **{rsi_trend}** momentum from {rsi_values[0]} to {rsi_values[-1]} over 7 days."
-
-        macd_summary = f"MACD line at **{macd}** vs signal at **{macd_signal}**, histogram at **{macd_hist}**. {macd_momentum}."
-        if crossover_info:
-            macd_summary += f" **{crossover_info}**."
-
-        ma_summary = f"MA5 (**{ma5}**) is **{ma_trend}** vs MA10 (**{ma10}**) with {ma_spread}% spread."
-
-        volume_summary = f"Volume is **{volume_trend}** compared to 7-day average."
-
-        # --- Risk-Aware Recommendation ---
-        if overall_sentiment == "**BULLISH**":
-            if rsi_zone == "overbought":
-                recommendation = f"**Wait for pullback** - Strong bullish signals but RSI overbought. Consider buying on dips near support levels with stop-loss at {ma10}."
-            elif "approaching overbought" in rsi_zone:
-                recommendation = f"**Cautiously buy** - Bullish trend confirmed but approaching overbought. Scale in positions with stop-loss at {ma10}."
-            else:
-                recommendation = f"**Consider buying** - Multiple bullish signals aligned. Entry near {close_price} with stop-loss at {ma10}."
-        elif overall_sentiment == "**BEARISH**":
-            if rsi_zone == "oversold":
-                recommendation = f"**Watch for reversal** - Bearish but oversold. Potential bounce near current levels. Wait for bullish confirmation."
-            else:
-                recommendation = f"**Consider selling/avoid buying** - Bearish signals dominant. Reduce exposure or wait for trend reversal above {ma5}."
-        else:
-            recommendation = f"**Monitor/range trade** - Mixed signals. Consider range-bound strategies between support {ma10} and resistance {ma5}."
-
-        # --- Format Output ---
-        output = f"""### {sentiment_color} Technical Analysis for {symbol}
-
-**Overall Sentiment:** {overall_sentiment}
-
-**Current Price:** ${close_price}
-
-#### 📊 RSI Analysis (Momentum)
-{rsi_summary}
-
-#### 🎯 MACD Analysis (Trend Following)
-{macd_summary}
-
-#### 📈 Moving Average (Trend Confirmation)
-{ma_summary}
-
-#### 📊 Volume Context  
-{volume_summary}
-
-#### 💡 Recommendation
-{recommendation}
-
-#### 🧠 Key Levels to Watch
-- **Support:** ${ma10} (MA10)
-- **Resistance:** ${ma5} (MA5)
-- **RSI Zone:** {rsi_zone.title()}
+"""
+Enhanced Rule-Based Technical Analysis v2
+Author: ChatGPT-for-Dhairya (GPT-5 Thinking mini)
+Purpose: Replace the previous generator with a more robust, confidence-weighted,
+         risk-aware technical analysis engine.
+Inputs:
+ - symbol (str)
+ - latest_data (list of dicts), each dict must contain at least:
+     'Open','High','Low','Close','Volume','MA5','MA10','RSI','MACD','Signal','Histogram'
+   Prefer >= 14 rows (lookback default = 14)
+Output:
+ - Markdown string summarizing analysis, sentiment, recommendation, levels, and confidence.
+Notes:
+ - Avoids hard "tie" decisions by using dynamic weights and "momentum age".
+ - Uses volume as a multiplier to confidence and recommendation aggressiveness.
 """
 
-        return output
+import math
+from typing import List, Dict, Tuple
+import numpy as np
+import statistics
+from datetime import datetime
+
+# -----------------------------
+# Helper functions
+# -----------------------------
+def safe_get(d: Dict, key: str, default=None):
+    v = d.get(key, default)
+    return None if v is None else v
+
+def mean_or(val_list, fallback=0.0):
+    try:
+        return statistics.mean(val_list) if val_list else fallback
+    except Exception:
+        return fallback
+
+def linear_slope(y_values: List[float]) -> float:
+    """
+    Simple linear slope of y_values vs index (ordinary least squares).
+    Returns slope per index.
+    """
+    if not y_values or len(y_values) < 2:
+        return 0.0
+    x = np.arange(len(y_values))
+    y = np.array(y_values, dtype=float)
+    # slope = cov(x,y) / var(x)
+    xv = x - x.mean()
+    yv = y - y.mean()
+    denom = (xv * xv).sum()
+    if denom == 0:
+        return 0.0
+    slope = (xv * yv).sum() / denom
+    return float(slope)
+
+def find_recent_macd_crossover(latest_data: List[Dict], lookback:int=14) -> Tuple[str, int]:
+    """
+    Look for the most recent MACD <-> Signal crossover in the last `lookback` rows.
+    Returns ('bullish'|'bearish'|'none', days_ago)
+    days_ago = 0 means today, 1 means yesterday, etc. If none found, days_ago = -1
+    """
+    n = len(latest_data)
+    upper = max(1, n - lookback)
+    for i in range(n-1, upper-1, -1):
+        if i == 0:
+            continue
+        prev = latest_data[i-1]
+        curr = latest_data[i]
+        prev_diff = safe_get(prev, 'MACD', 0) - safe_get(prev, 'Signal', 0)
+        curr_diff = safe_get(curr, 'MACD', 0) - safe_get(curr, 'Signal', 0)
+        if prev_diff <= 0 and curr_diff > 0:
+            return ('bullish', n - i - 1)
+        if prev_diff >= 0 and curr_diff < 0:
+            return ('bearish', n - i - 1)
+    return ('none', -1)
+
+def fmt_price(x):
+    try:
+        return f"${round(x, 2)}"
+    except Exception:
+        return str(x)
+
+# -----------------------------
+# Core function
+# -----------------------------
+def generate_rule_based_analysis(symbol: str, latest_data: List[Dict], lookback: int = 14) -> str:
+    """
+    Generate a confidence-weighted technical analysis.
+    """
+    try:
+        # Basic validation
+        if not latest_data or len(latest_data) < 7:
+            return "### ⚠️ Analysis Unavailable\nInsufficient data for reliable trend analysis. Need at least 7 rows."
+
+        # Ensure we have numeric lists for lookback period (cap lookback to available rows)
+        n = len(latest_data)
+        lb = min(lookback, n)
+        window = latest_data[-lb:]
+
+        required_fields = ['Close','Volume','MA5','MA10','RSI','MACD','Signal','Histogram','High','Low']
+        missing = set()
+        for row in window:
+            for f in required_fields:
+                if f not in row or row.get(f) is None:
+                    missing.add(f)
+        if missing:
+            return f"### ⚠️ Analysis Unavailable\nMissing required fields in input data: {', '.join(sorted(missing))}"
+
+        # Extract latest row
+        latest = window[-1]
+        close_price = float(latest['Close'])
+        rsi = float(latest['RSI'])
+        macd = float(latest['MACD'])
+        signal = float(latest['Signal'])
+        hist = float(latest['Histogram'])
+        volume = float(latest['Volume']) if latest['Volume'] is not None else 0.0
+        ma5 = float(latest['MA5'])
+        ma10 = float(latest['MA10'])
+        recent_high = round(max([float(d.get('High', -math.inf)) for d in window]),2)
+        recent_low = round(min([float(d.get('Low', math.inf)) for d in window]),2)
+
+        # Build indicator series
+        rsi_series = [float(d['RSI']) for d in window]
+        macd_series = [float(d['MACD']) for d in window]
+        hist_series = [float(d['Histogram']) for d in window]
+        vol_series = [float(d['Volume']) for d in window if d.get('Volume') is not None]
+
+        # --- Derived metrics ---
+        # RSI velocity: points per day over the window
+        rsi_velocity = (rsi_series[-1] - rsi_series[0]) / max(1, (len(rsi_series)-1))
+
+        # MACD slope & histogram slope
+        macd_slope = linear_slope(macd_series)
+        hist_slope = linear_slope(hist_series)
+
+        # MACD diff & recent crossover
+        macd_diff = macd - signal
+        crossover_type, crossover_days_ago = find_recent_macd_crossover(window, lookback=lb)
+
+        # Volume context
+        avg_vol = mean_or(vol_series, fallback=volume if volume>0 else 1.0)
+        volume_ratio = (volume / avg_vol) if avg_vol > 0 else 1.0
+
+        # MA context
+        price_vs_ma5 = "above" if close_price > ma5 else "below"
+        price_vs_ma10 = "above" if close_price > ma10 else "below"
+        ma_trend = "bullish" if ma5 > ma10 else "bearish"
+        ma_spread_pct = abs(ma5 - ma10) / ma10 * 100 if ma10 != 0 else 0.0
+
+        # Momentum age: how fresh is the current MACD crossover? Fresh = higher confidence
+        momentum_age_score = 0.0
+        if crossover_type != 'none' and crossover_days_ago >= 0:
+            # Recent crossovers have higher score; older crossovers give less boost
+            recency_factor = max(0.0, (lb - crossover_days_ago) / lb)  # 1.0 = today, 0 = old
+            momentum_age_score = recency_factor * (1 if crossover_type == 'bullish' else -1)
+
+        # -------------------------
+        # Base scoring from each indicator (bounded)
+        # -------------------------
+        # RSI zone scoring with velocity context (more granular and forgiving)
+        def rsi_zone_score_and_note(rsi_val, rsi_vel):
+            # returns (score, note, emoji)
+            if rsi_val < 30:
+                return (2.0, "Oversold - potential reversal zone", "🟢")
+            if rsi_val < 40:
+                return (1.0, "Lower neutral (bearish pressure)", "🟢")
+            if rsi_val < 60:
+                return (0.5, "Neutral/healthy", "⚪")
+            if rsi_val < 70:
+                # approaching overbought
+                vel_bonus = 0.5 if rsi_vel > 1.5 else 0.0
+                return (0.5 + vel_bonus, "Bullish zone - momentum building", "🟡")
+            if rsi_val < 75:
+                # overbought but if velocity strong with supportive MACD, less negative
+                if rsi_vel > 2.5:
+                    return (0.5, "Overbought with strong continuation momentum", "🟡")
+                return (-1.0, "Overbought - caution (likely pullback)", "🔴")
+            # rsi >= 75
+            # If RSI exploded quickly, it's exhaustion risk; else severely overbought
+            if rsi_vel > 4.0:
+                return (-2.0, "Extremely overbought and fast — exhaustion likely", "🔴")
+            return (-1.5, "Severely overbought — high reversal risk", "🔴")
+
+        rsi_score, rsi_note, rsi_emoji = rsi_zone_score_and_note(rsi, rsi_velocity)
+
+        # MACD scoring (consider both diff and slope & histogram slope)
+        def macd_score_and_note(diff, slope, hist_slope_val, cross_type):
+            # diff sensitivity
+            diff_score = 0.0
+            if diff > 1.0:
+                diff_score = 3.0
+            elif diff > 0.3:
+                diff_score = 2.0
+            elif diff > 0.05:
+                diff_score = 1.0
+            elif diff < -1.0:
+                diff_score = -3.0
+            elif diff < -0.3:
+                diff_score = -2.0
+            elif diff < -0.05:
+                diff_score = -1.0
+            else:
+                diff_score = 0.0
+
+            slope_score = 0.0
+            # slope is per-day-index; scale gently
+            if slope > 0.05:
+                slope_score = 1.0
+            elif slope > 0.01:
+                slope_score = 0.5
+            elif slope < -0.05:
+                slope_score = -1.5
+            elif slope < -0.01:
+                slope_score = -0.5
+
+            hist_score = 0.0
+            if hist_slope_val > 0.05:
+                hist_score = 1.0
+            elif hist_slope_val > 0.01:
+                hist_score = 0.5
+            elif hist_slope_val < -0.05:
+                hist_score = -1.0
+            elif hist_slope_val < -0.01:
+                hist_score = -0.5
+
+            # crossover_respect
+            cross_bonus = 0.0
+            if cross_type == 'bullish':
+                cross_bonus = 0.75
+            elif cross_type == 'bearish':
+                cross_bonus = -0.75
+
+            total_macd = diff_score + slope_score + hist_score + cross_bonus
+            # note
+            note = f"MACD diff={round(diff,3)}, slope={round(slope,4)}, hist_slope={round(hist_slope_val,4)}"
+            return (total_macd, note)
+
+        macd_score_val, macd_note = macd_score_and_note(macd_diff, macd_slope, hist_slope, crossover_type)
+
+        # MA / price position scoring
+        if price_vs_ma5 == "above" and price_vs_ma10 == "above":
+            price_pos_score = 1.5
+            price_context_note = "Strong bullish position above MA5 & MA10"
+        elif price_vs_ma5 == "below" and price_vs_ma10 == "below":
+            price_pos_score = -1.5
+            price_context_note = "Strong bearish position below MA5 & MA10"
+        elif price_vs_ma5 == "above" and price_vs_ma10 == "below":
+            price_pos_score = 0.8
+            price_context_note = "Mixed with bullish bias"
+        else:
+            price_pos_score = -0.8
+            price_context_note = "Mixed with bearish bias"
+
+        # MA trend strength
+        ma_score = 0.0
+        if ma_spread_pct > 2:
+            ma_score = 0.5 if ma_trend == "bullish" else -0.5
+        elif ma_spread_pct > 0.5:
+            ma_score = 0.25 if ma_trend == "bullish" else -0.25
+
+        # Volume score: amplify or dampen confidence
+        volume_score = 0.0
+        if volume_ratio > 1.5:
+            volume_score = 1.0
+        elif volume_ratio > 1.1:
+            volume_score = 0.5
+        elif volume_ratio < 0.7:
+            volume_score = -1.0
+        elif volume_ratio < 0.9:
+            volume_score = -0.5
+
+        # -------------------------
+        # Fusion: dynamic weighting
+        # -------------------------
+        # Base weights (modifiable)
+        w_macd = 1.2
+        w_rsi = 1.0
+        w_price = 0.9
+        w_ma = 0.4
+        w_volume = 0.8  # volume used both as score and multiplier for confidence
+
+        # Boost fresh momentum
+        freshness_boost = 0.0
+        if crossover_type != 'none' and crossover_days_ago >= 0:
+            # give small boost that decays with age
+            freshness_boost = max(0.0, (lb - crossover_days_ago) / lb) * 0.5  # up to +0.5
+
+        # Special cooldown for overbought + weakening MACD histogram
+        cooldown_penalty = 0.0
+        if rsi >= 75 and hist_slope < -0.01:
+            # high chance of pullback; penalize bullishness
+            cooldown_penalty = -2.0
+
+        # Weighted sentiment
+        raw_sentiment = (
+            (macd_score_val * w_macd) +
+            (rsi_score * w_rsi) +
+            (price_pos_score * w_price) +
+            (ma_score * w_ma) +
+            (volume_score * 0.3)  # volume as minor additive
+            + freshness_boost
+            + momentum_age_score * 0.8
+            + cooldown_penalty
+        )
+
+        # Now apply a volume multiplier to the raw sentiment to reflect conviction
+        volume_multiplier = 1.0
+        # dampen extreme signals if volume is weak
+        if volume_ratio < 0.8:
+            volume_multiplier = 0.7
+        elif volume_ratio > 1.4:
+            volume_multiplier = 1.15
+        elif volume_ratio > 2.0:
+            volume_multiplier = 1.3
+
+        sentiment_score = raw_sentiment * volume_multiplier
+
+        # Normalize sentiment into categories using thresholds
+        if sentiment_score >= 4.0:
+            overall_sentiment = "**STRONGLY BULLISH**"
+            sentiment_emoji = "🟢"
+        elif sentiment_score >= 2.0:
+            overall_sentiment = "**BULLISH**"
+            sentiment_emoji = "🟢"
+        elif sentiment_score >= 0.5:
+            overall_sentiment = "**MILDLY BULLISH**"
+            sentiment_emoji = "🟡"
+        elif sentiment_score <= -4.0:
+            overall_sentiment = "**STRONGLY BEARISH**"
+            sentiment_emoji = "🔴"
+        elif sentiment_score <= -2.0:
+            overall_sentiment = "**BEARISH**"
+            sentiment_emoji = "🔴"
+        elif sentiment_score <= -0.5:
+            overall_sentiment = "**MILDLY BEARISH**"
+            sentiment_emoji = "🟡"
+        else:
+            overall_sentiment = "**NEUTRAL**"
+            sentiment_emoji = "⚪"
+
+        # Confidence metric (based on alignment & volume)
+        bullish_signals = 0
+        bearish_signals = 0
+        # count sub-decisions
+        if macd_score_val > 0: bullish_signals += 1
+        if rsi_score > 0: bullish_signals += 1
+        if price_pos_score > 0: bullish_signals += 1
+        if ma_score > 0: bullish_signals += 1
+        if volume_score > 0: bullish_signals += 1
+
+        if macd_score_val < 0: bearish_signals += 1
+        if rsi_score < 0: bearish_signals += 1
+        if price_pos_score < 0: bearish_signals += 1
+        if ma_score < 0: bearish_signals += 1
+        if volume_score < 0: bearish_signals += 1
+
+        alignment = bullish_signals - bearish_signals
+        if abs(alignment) >= 4 and volume_ratio > 1.1:
+            confidence = "high"
+        elif abs(alignment) >= 2:
+            confidence = "medium"
+        else:
+            confidence = "low"
+
+        # -------------------------
+        # Recommendation engine (clearer actionable rules)
+        # -------------------------
+        recommendation = ""
+        risk_note_parts = []
+
+        # compute dynamic stops & scale levels (practical approach)
+        # use conservative stop at max(MA10, recent_low) for bullish entries
+        conservative_stop = max(ma10, recent_low)
+        # trailing stop suggestion (percent)
+        trailing_stop_pct = 0.03 if sentiment_score > 2.0 else 0.06 if sentiment_score > 0.5 else 0.08
+
+        # Entry suggestion logic
+        if "BULLISH" in overall_sentiment:
+            # If overbought & histogram weakening, avoid new aggressive entries
+            if rsi >= 75 and hist_slope < -0.01:
+                recommendation = f"**Wait / Avoid aggressive new entries** — Overbought (RSI {rsi}) and momentum weakening."
+                risk_note_parts.append("High RSI + weakening MACD histogram suggests pullback risk.")
+            else:
+                # If confidence high & volume supportive, recommend buy with stop or trail
+                if confidence == "high" and volume_ratio > 1.1:
+                    recommendation = (f"**Buy** (scale-in allowed) — Trend confirmed. Entry near {fmt_price(close_price)}. "
+                                      f"Use trailing stop ~{int(trailing_stop_pct*100)}% or stop at {fmt_price(conservative_stop)}.")
+                elif confidence == "medium":
+                    recommendation = (f"**Cautiously buy / scale in** — Entry near {fmt_price(close_price)}. "
+                                      f"Place stop at {fmt_price(conservative_stop)}; scale on pullback.")
+                else:  # low confidence
+                    recommendation = (f"**Watch / Wait for cleaner setup** — Mixed signals. Consider buying only on pullback to {fmt_price(ma5)}-{fmt_price(ma10)}.")
+        elif "BEARISH" in overall_sentiment:
+            # bearish recs
+            if rsi <= 30:
+                recommendation = f"**Watch for reversal** — Oversold but bearish. Wait for MACD confirmation above signal."
+                risk_note_parts.append("RSI oversold could limit downside.")
+            else:
+                recommendation = f"**Reduce exposure / consider shorting** (if your strategy allows) — Downtrend signals dominate."
+                risk_note_parts.append("Risk: trend may continue; keep stops tight.")
+        else:
+            # Neutral
+            # Use bias if slight positive or negative numeric
+            if sentiment_score > 0.5:
+                recommendation = (f"**Range-bound with bullish bias** — Trade ranges; buy dips near {fmt_price(conservative_stop)}, target {fmt_price(recent_high)}.")
+            elif sentiment_score < -0.5:
+                recommendation = (f"**Range-bound with bearish bias** — Look to reduce longs; prefer short on failed rallies.")
+            else:
+                recommendation = (f"**Monitor** — Mixed signals. Key triggers: break above {fmt_price(ma5)} for bullish confirmation or below {fmt_price(ma10)} for bearish.")
+
+        # Add volume caution if necessary
+        if volume_ratio < 0.8:
+            risk_note_parts.append("Volume below average — low conviction.")
+        if confidence == "low" and not any("conflicting" in s.lower() for s in risk_note_parts):
+            risk_note_parts.append("Conflicting signals — trade with caution.")
+
+        risk_note = " • ".join(risk_note_parts) if risk_note_parts else ""
+
+        # -------------------------
+        # Format output
+        # -------------------------
+        output_lines = []
+        output_lines.append(f"### {sentiment_emoji} Technical Analysis for {symbol}")
+        output_lines.append("")
+        output_lines.append(f"**Overall Sentiment:** {overall_sentiment} ({confidence} confidence)")
+        output_lines.append("")
+        output_lines.append(f"**Current Price:** {fmt_price(close_price)} ({price_context_note})")
+        output_lines.append("")
+        output_lines.append("#### 📊 Price Position Analysis")
+        output_lines.append(f"- Trading **{price_vs_ma5} MA5 ({fmt_price(ma5)})** and **{price_vs_ma10} MA10 ({fmt_price(ma10)})**")
+        output_lines.append(f"- **MA Alignment:** {ma_trend} (spread {round(ma_spread_pct,2)}%)")
+        output_lines.append("")
+        output_lines.append("#### 🎯 MACD Analysis (Trend Following)")
+        output_lines.append(f"- MACD diff: {round(macd_diff,3)}, slope: {round(macd_slope,4)}, hist slope: {round(hist_slope,4)}")
+        if crossover_type != 'none':
+            output_lines.append(f"- Recent crossover: {crossover_type} {crossover_days_ago} days ago")
+        output_lines.append(f"- Note: {macd_note}")
+        output_lines.append("")
+        output_lines.append("#### 📈 RSI Analysis (Momentum)")
+        output_lines.append(f"- RSI at **{round(rsi,2)}** {rsi_emoji} — {rsi_note} (velocity {round(rsi_velocity,3)} pts/day)")
+        output_lines.append("")
+        output_lines.append("#### 📊 Volume Context")
+        output_lines.append(f"- Volume: {volume_ratio:.2f}x avg → {'strong' if volume_ratio>1.1 else 'weak' if volume_ratio<0.9 else 'average'}")
+        output_lines.append("")
+        output_lines.append("#### 💡 Recommendation")
+        output_lines.append(f"{recommendation}{f' **Note:** {risk_note}' if risk_note else ''}")
+        output_lines.append("")
+        output_lines.append("#### 🧠 Key Levels to Watch")
+        output_lines.append(f"- **Support:** {fmt_price(conservative_stop)} (MA10 or recent low)")
+        # include multiple support lines if present
+        support_lines = []
+        if ma10 < close_price:
+            support_lines.append(f"{fmt_price(ma10)} (MA10)")
+        if ma5 < close_price:
+            support_lines.append(f"{fmt_price(ma5)} (MA5)")
+        if recent_low < close_price:
+            support_lines.append(f"{fmt_price(recent_low)} (Recent Low)")
+        if support_lines:
+            output_lines.append(f"- **Other supports:** {', '.join(support_lines)}")
+        output_lines.append(f"- **Resistance:** {fmt_price(recent_high)} (Recent High)")
+        output_lines.append(f"- **RSI Context:** {rsi_note}")
+        output_lines.append(f"- **Trend Confidence:** {confidence}")
+        output_lines.append("")
+        output_lines.append(f"**Model internals (for debugging):** sentiment_score={round(sentiment_score,3)}, raw={round(raw_sentiment,3)}, volume_ratio={round(volume_ratio,3)}, macd_score={round(macd_score_val,3)}, rsi_score={round(rsi_score,3)}, price_pos_score={round(price_pos_score,3)}")
+
+        return "\n".join(output_lines)
 
     except Exception as e:
-        print(f"Error generating analysis: {e}")
         return f"### ❌ Analysis Generation Failed\nError: {str(e)}"
 
+# -----------------------------
+# End of file
+# -----------------------------
 
 # --- GEMINI AI Function ---
 
@@ -388,7 +654,7 @@ def get_data():
             "MA": clean_df(hist_display, ['MA5', 'MA10']),
             "RSI": [convert_to_serializable(x) for x in hist_display['RSI'].tolist()],
             "MACD": clean_df(hist_display, ['MACD', 'Signal', 'Histogram']),
-            "AI_Review": ai_review_text,
+            "AI_Review": "Coming Soon",
             "Rule_Based_Analysis": rule_based_text
         }
 
