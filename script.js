@@ -629,7 +629,7 @@ function displayData(data) {
         title: 'Technical Charts & Visualizations',
         icon: '📊',
         contentHtml: createVisualizationContent(data),
-        isOpen: true
+        isOpen: false
     });
     visualizationCard.classList.add('full-width');
     visualizationCard.querySelector('.card-header').addEventListener('click', () => toggleCard(visualizationCard));
@@ -647,19 +647,7 @@ function displayData(data) {
     ruleBasedCard.querySelector('.card-header').addEventListener('click', () => toggleCard(ruleBasedCard));
     grid.appendChild(ruleBasedCard);
 
-    // 3. AI Review
-    if (data.AI_Review) {
-        const aiReviewCard = createDataCard({
-            id: 'ai-review-card',
-            title: 'AI Review & Summary',
-            icon: '🤖',
-            contentHtml: createAnalysisContent(data.AI_Review),
-            isOpen: false
-        });
-        aiReviewCard.classList.add('full-width');
-        aiReviewCard.querySelector('.card-header').addEventListener('click', () => toggleCard(aiReviewCard));
-        grid.appendChild(aiReviewCard);
-    }
+   
 
     // 4. Raw Data Tables (Collapsed by default)
     const ohlcvCard = createDataCard({
@@ -694,6 +682,20 @@ function displayData(data) {
     macdCard.classList.add('full-width');
     macdCard.querySelector('.card-header').addEventListener('click', () => toggleCard(macdCard));
     grid.appendChild(macdCard);
+
+     // 3. AI Review
+    if (data.AI_Review) {
+        const aiReviewCard = createDataCard({
+            id: 'ai-review-card',
+            title: 'AI Review & Summary',
+            icon: '🤖',
+            contentHtml: createAnalysisContent(data.AI_Review),
+            isOpen: false
+        });
+        aiReviewCard.classList.add('full-width');
+        aiReviewCard.querySelector('.card-header').addEventListener('click', () => toggleCard(aiReviewCard));
+        grid.appendChild(aiReviewCard);
+    }
 
     outputDiv.appendChild(grid);
 
@@ -1255,3 +1257,4 @@ window.selectStock = selectStock;
 window.fetchData = fetchData;
 window.toggleCard = toggleCard;
 window.switchChartTab = switchChartTab;
+
