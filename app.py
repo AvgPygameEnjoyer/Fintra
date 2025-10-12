@@ -4,27 +4,18 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import os
-from google import genai
-from google.genai.errors import APIError
-from google.api_core.exceptions import ResourceExhausted
 import dotenv
 import json
 from datetime import datetime, timedelta
+import math
+from typing import List, Dict, Tuple
+import statistics
 
 app = Flask(__name__)
 dotenv.load_dotenv()
 
 # CORS Configuration
 CORS(app, origins=["https://budgetwarrenbuffet.vercel.app"], supports_credentials=True)
-
-# --- Gemini API Initialization ---
-try:
-    client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
-    print("Gemini client initialized successfully.")
-except Exception as e:
-    print(f"Warning: Failed to initialize Gemini client. Check GEMINI_API_KEY environment variable. Error: {e}")
-    client = None
-
 
 # --- Helper Functions (RSI, MACD, Serialization) ---
 
@@ -99,15 +90,6 @@ Notes:
  - Uses volume as a multiplier to confidence and recommendation aggressiveness.
 """
 
-import math
-from typing import List, Dict, Tuple
-import numpy as np
-import statistics
-from datetime import datetime
-
-# -----------------------------
-# Helper functions
-# -----------------------------
 def safe_get(d: Dict, key: str, default=None):
     v = d.get(key, default)
     return None if v is None else v
@@ -543,64 +525,11 @@ def generate_rule_based_analysis(symbol: str, latest_data: List[Dict], lookback:
         output_lines.append(f"- **Resistance:** {fmt_price(recent_high)} (Recent High)")
         output_lines.append(f"- **RSI Context:** {rsi_note}")
         output_lines.append(f"- **Trend Confidence:** {confidence}")
-        output_lines.append("")
-        output_lines.append(f"**Model internals (for debugging):** sentiment_score={round(sentiment_score,3)}, raw={round(raw_sentiment,3)}, volume_ratio={round(volume_ratio,3)}, macd_score={round(macd_score_val,3)}, rsi_score={round(rsi_score,3)}, price_pos_score={round(price_pos_score,3)}")
-
+        
         return "\n".join(output_lines)
 
     except Exception as e:
         return f"### ❌ Analysis Generation Failed\nError: {str(e)}"
-
-# -----------------------------
-# End of file
-# -----------------------------
-
-# --- GEMINI AI Function ---
-
-def generate_gemini_review(symbol, latest_data_list):
-    """
-    Connects to the Gemini API to generate a technical analysis review.
-    Returns None if unavailable.
-    """
-    if client is None:
-        return None
-
-    latest_data_json = json.dumps(latest_data_list, indent=2)
-
-    system_instruction = (
-        "You are an expert financial analyst focused solely on technical indicators "
-        "for the last 7 days of trading data. Your goal is to provide a concise, "
-        "professional summary in markdown format."
-    )
-
-    prompt = f"""**Stock Symbol:** {symbol}
-
-**Technical Indicator Data (Last 7 Trading Days):**
-```json
-{latest_data_json}
-```
-
-Instructions:
-- Start with a main heading '### AI Technical Summary for {symbol}'.
-- Provide an 'Overall Sentiment' (BULLISH, BEARISH, or NEUTRAL) based on the MACD crossover and RSI levels.
-- Create separate sub-sections for 'RSI Analysis (Momentum)' and 'MACD Analysis (Trend Following)'.
-- Conclude with a 'Recommendation' (e.g., 'Monitor,' 'Cautiously buy,' 'Hold').
-- Use bold formatting for key figures and sentiment words, but do NOT include the markdown code block in the final output.
-"""
-
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',
-            contents=prompt,
-            config=genai.types.GenerateContentConfig(
-                system_instruction=system_instruction,
-            )
-        )
-        return response.text
-    except Exception as e:
-        print(f"Gemini API Error: {e}")
-        return None
-
 
 # --- API Route ---
 
@@ -635,16 +564,7 @@ def get_data():
             ['Open', 'High', 'Low', 'Close', 'Volume', 'MA5', 'MA10', 'RSI', 'MACD', 'Signal', 'Histogram']
         )
 
-        # Generate BOTH analyses
-        ai_review_text = None
-        if client is not None:
-            try:
-                ai_review_text = generate_gemini_review(symbol, ai_data_for_prompt)
-            except Exception as e:
-                print(f"Could not generate AI review: {e}")
-                ai_review_text = None
-
-        # Always generate rule-based analysis
+        # Generate rule-based analysis only (Gemini removed)
         rule_based_text = generate_rule_based_analysis(symbol, ai_data_for_prompt)
 
         # Prepare JSON response
@@ -672,10 +592,9 @@ def get_data():
 @app.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
-    gemini_status = "available" if client is not None else "unavailable"
     return jsonify({
         "status": "healthy",
-        "gemini_api": gemini_status,
+        "gemini_api": "disabled - coming soon",
         "rule_based_analysis": "always available"
     }), 200
 
@@ -685,12 +604,8 @@ if __name__ == "__main__":
     print("=" * 60)
     print("Stock Analysis Backend Server")
     print("=" * 60)
-    if client is None:
-        print("⚠️ Gemini API not configured - AI analysis will be unavailable")
-    else:
-        print("✅ Gemini AI configured and available")
     print("✅ Rule-Based Analysis always available")
+    print("✅ Gemini API calls disabled to save costs")
     print("✅ All data fields properly integrated")
     print("=" * 60)
     app.run(host="0.0.0.0", port=port, debug=True)
-
