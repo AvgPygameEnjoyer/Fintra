@@ -9,8 +9,10 @@ from sys import stdout
 
 # Import modular components
 from auth import (
-    auth_login, oauth_callback, logout, auth_status,
-    require_auth, cleanup_expired_sessions, user_sessions
+    auth_bp,                     # <-- NEW: The Blueprint object containing all auth routes
+    require_auth,                # Keep: Still used as a decorator for API routes
+    cleanup_expired_sessions,    # Keep: Used in before_request hook
+    user_sessions                # Keep: Used in the /health check
 )
 from analysis import (
     get_data_handler, chat_handler, latest_symbol_data, conversation_context
@@ -50,7 +52,8 @@ if not app.secret_key:
 # Production settings require HTTPS (Secure=True)
 if is_production:
     app.config['SESSION_COOKIE_SECURE'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax' # Safer than 'None', works for OAuth
+    # Setting this on Render is CRITICAL for the OAuth state cookie to work.
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax' 
     logger.info("Running in PRODUCTION mode. Session cookies are Secure and Lax.")
 else:
     # Relaxed settings for localhost (HTTP)
@@ -58,42 +61,28 @@ else:
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     logger.info("Running in DEVELOPMENT mode. Session cookies are NOT Secure.")
 
-app.config['SESSION_COOKIE_HTTPONLY'] = True   # Security best practice
+app.config['SESSION_COOKIE_HTTPONLY'] = True    # Security best practice
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
 # CORS Configuration
 # Adjust origins in production to your actual domain(s)
 CORS(app, supports_credentials=True)
 
+# 3. Register the Blueprint (NEW & CRITICAL STEP)
+# All routes defined in auth.py are now registered to the app instance here.
+app.register_blueprint(auth_bp) 
+
+
 # ==================== REQUEST HOOKS ====================
 @app.before_request
 def before_request():
     """Run before each request to clean up expired sessions"""
-    # Use logger instead of print
     cleanup_expired_sessions()
 
 
-# ==================== AUTHENTICATION ROUTES ====================
-@app.route('/auth/login', methods=['GET'])
-def login():
-    """Initiates the OAuth login flow."""
-    return auth_login()
-
-@app.route('/oauth2callback', methods=['GET'])
-def callback():
-    """Handles the OAuth provider callback."""
-    return oauth_callback()
-
-@app.route('/auth/status', methods=['GET'])
-def status():
-    """Checks the authentication status of the user."""
-    return auth_status()
-
-@app.route('/auth/logout', methods=['POST'])
-@require_auth
-def user_logout():
-    """Logs out the user and clears the session."""
-    return logout()
+# ==================== AUTHENTICATION ROUTES (REMOVED) ====================
+# The authentication routes (/auth/login, /oauth2callback, /auth/status, /auth/logout)
+# are now defined and registered via the 'auth_bp' blueprint.
 
 
 # ==================== API ROUTES ====================
