@@ -1,107 +1,396 @@
-let stockDatabase = [];
-let selectedIndex = -1;
-let filteredStocks = [];
-let isSidebarCollapsed = false;
+// ==================== CONFIGURATION & STATE ====================
+// 🛠️ SMART API URL DETECTION
+// If you are running locally, it points to localhost.
+// If you are on Vercel, it points to your Render Backend.
+const IS_LOCALHOST = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = IS_LOCALHOST ? 'http://localhost:5000' : 'https://stock-dashboard-fqtn.onrender.com';
 
-// Chart instances storage
-let charts = {
-    ohlcv: null,
-    rsi: null,
-    movingAverages: null,
-    macd: null
+const CONFIG = {
+    API_BASE_URL: API_BASE_URL,
+    DEBOUNCE_DELAY: 300,
+    MAX_AUTOCOMPLETE_ITEMS: 8,
+    MAX_CHART_POINTS: 7,
+    SESSION_STORAGE_KEY: 'sessionId',
+    SYMBOL_STORAGE_KEY: 'lastSymbol',
+    THROTTLE_DELAY: 100
 };
 
-// DOM Elements
-const symbolInput = document.getElementById('symbol');
-const autocompleteDiv = document.getElementById('autocomplete');
-const outputDiv = document.getElementById('output');
-const loadingDiv = document.getElementById('loading');
-const errorDiv = document.getElementById('error');
-const searchBtn = document.getElementById('searchBtn');
+console.log(`🚀 App initialized. Backend set to: ${CONFIG.API_BASE_URL}`);
 
-// Initialize the application
-document.addEventListener('DOMContentLoaded', async () => {
-    errorDiv.style.display = 'none';
-    loadingDiv.style.display = 'none';
+const STATE = {
+    stockDatabase: [],
+    selectedIndex: -1,
+    filteredStocks: [],
+    isSidebarCollapsed: false,
+    charts: { ohlcv: null, rsi: null, movingAverages: null, macd: null },
+    currentSessionId: generateSessionId(),
+    currentSymbol: null,
+    isLoading: false,
+    isAuthenticated: false,
+    user: null
+};
+const DOM = {};
 
-    // Load stock database from JSON
+// ==================== UTILITY FUNCTIONS ====================
+function generateSessionId() {
+    return `session_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`;
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+    };
+}
+
+function throttle(func, limit) {
+    let inThrottle;
+    return function(...args) {
+        if (!inThrottle) {
+            func.apply(this, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    };
+}
+
+function formatPrice(price) {
+    return price != null ? `$${price.toFixed(2)}` : 'N/A';
+}
+
+function formatNumber(num) {
+    return num != null ? num.toLocaleString() : 'N/A';
+}
+
+function getRsiColor(rsi) {
+    if (rsi == null) return '#6b7280';
+    if (rsi > 70) return '#ef4444';
+    if (rsi < 30) return '#10b981';
+    return '#6b7280';
+}
+
+function getRsiBackground(rsi) {
+    if (rsi == null) return '#f3f4f6';
+    if (rsi > 70) return '#fef2f2';
+    if (rsi < 30) return '#f0fdf4';
+    return '#f8fafc';
+}
+
+// ==================== OAUTH AUTHENTICATION ====================
+async function handleGoogleLogin() {
     try {
-        const response = await fetch('stock-data.json');
+        // Use CONFIG.API_BASE_URL for absolute path
+        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`);
         const data = await response.json();
-        stockDatabase = data.stocks;
-        console.log('Loaded', stockDatabase.length, 'stocks');
+        if (data.auth_url) {
+            window.location.href = data.auth_url;
+        } else {
+            console.error('No auth URL received');
+        }
     } catch (error) {
-        console.error('Error loading stock data:', error);
-        stockDatabase = []; // Fallback to empty array
+        console.error('Login error:', error);
+        showNotification('Login failed. Please try again.', 'error');
     }
+}
 
+async function checkAuthStatus() {
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/status`, {
+            credentials: 'include'  // ✅ Required for cookies across domains
+        });
+        const data = await response.json();
+
+        STATE.isAuthenticated = data.authenticated;
+        STATE.user = data.user || null;
+
+        updateAuthUI();
+        return data.authenticated;
+    } catch (error) {
+        console.error('Auth check error:', error);
+        STATE.isAuthenticated = false;
+        STATE.user = null;
+        updateAuthUI();
+        return false;
+    }
+}
+
+async function handleLogout() {
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            credentials: 'include' // ✅ Required
+        });
+
+        if (response.ok) {
+            STATE.isAuthenticated = false;
+            STATE.user = null;
+            updateAuthUI();
+            showNotification('Logged out successfully', 'success');
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+}
+
+function updateAuthUI() {
+    const authSection = document.getElementById('auth-section');
+    if (!authSection) return;
+
+    if (STATE.isAuthenticated && STATE.user) {
+        authSection.innerHTML = `
+            <div class="user-info">
+                <img src="${STATE.user.picture || '/default-avatar.png'}" alt="${STATE.user.name}" class="user-avatar">
+                <span class="user-name">${STATE.user.name}</span>
+                <button onclick="handleLogout()" class="logout-btn">Logout</button>
+            </div>
+        `;
+    } else {
+        authSection.innerHTML = `
+            <button onclick="handleGoogleLogin()" class="login-btn">
+                <img src="/google-icon.svg" alt="Google" class="google-icon">
+                Sign in with Google
+            </button>
+        `;
+    }
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed; top: 20px; right: 20px; padding: 12px 20px;
+        background: ${type === 'error' ? '#fef2f2' : type === 'success' ? '#f0fdf4' : '#f0f9ff'};
+        color: ${type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#0369a1'};
+        border: 1px solid ${type === 'error' ? '#fecaca' : type === 'success' ? '#bbf7d0' : '#bae6fd'};
+        border-radius: 8px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    `;
+
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 5000);
+}
+
+// ==================== INITIALIZATION ====================
+document.addEventListener('DOMContentLoaded', init);
+
+async function init() {
+    cacheDOMElements();
+    await loadStockDatabase();
     initializeEventListeners();
     initializeSidebar();
-});
+    initializeChat();
+    loadSessionState();
+    await checkAuthStatus();
+    showWelcomeMessage();
+}
 
+function cacheDOMElements() {
+    DOM.symbolInput = document.getElementById('symbol');
+    DOM.autocompleteDiv = document.getElementById('autocomplete');
+    DOM.outputDiv = document.getElementById('output');
+    DOM.loadingDiv = document.getElementById('loading');
+    DOM.errorDiv = document.getElementById('error');
+    DOM.searchBtn = document.getElementById('searchBtn');
+    DOM.sidebar = document.getElementById('sidebar');
+    DOM.sidebarStocks = document.getElementById('sidebarStocks');
+    DOM.sidebarSearch = document.getElementById('sidebarSearch');
+    DOM.chatToggle = document.getElementById('chat-toggle');
+    DOM.chatWindow = document.getElementById('chat-window');
+    DOM.chatMessages = document.getElementById('chat-messages');
+    DOM.chatInput = document.getElementById('chat-input');
+    DOM.chatSend = document.getElementById('chat-send');
+    DOM.chatClose = document.getElementById('chat-close');
+    DOM.chatRefresh = document.getElementById('chat-refresh');
+
+    if (DOM.errorDiv) DOM.errorDiv.style.display = 'none';
+    if (DOM.loadingDiv) DOM.loadingDiv.style.display = 'none';
+}
+
+async function loadStockDatabase() {
+    try {
+        // Keeps relative path because stock-data.json is on the Frontend server (Vercel)
+        const response = await fetch('stock-data.json');
+        const data = await response.json();
+        STATE.stockDatabase = data.stocks || [];
+        console.log(`✅ Loaded ${STATE.stockDatabase.length} stocks`);
+    } catch (error) {
+        console.error('❌ Error loading stock data:', error);
+        STATE.stockDatabase = [];
+    }
+}
+
+function loadSessionState() {
+    const savedSessionId = localStorage.getItem(CONFIG.SESSION_STORAGE_KEY);
+    const savedSymbol = localStorage.getItem(CONFIG.SYMBOL_STORAGE_KEY);
+
+    STATE.currentSessionId = savedSessionId || STATE.currentSessionId;
+    if (!savedSessionId) {
+        localStorage.setItem(CONFIG.SESSION_STORAGE_KEY, STATE.currentSessionId);
+    }
+
+    if (savedSymbol) {
+        STATE.currentSymbol = savedSymbol;
+        DOM.symbolInput.value = savedSymbol;
+    }
+}
+
+function showWelcomeMessage() {
+    if (!STATE.currentSymbol) {
+        DOM.outputDiv.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px; color: #6b7280;">
+                <div style="font-size: 4rem; margin-bottom: 20px;">📊</div>
+                <h2 style="color: #374151; margin-bottom: 10px;">Welcome to Stock Analysis</h2>
+                <p>Search for a stock symbol or select from the sidebar to get started</p>
+            </div>
+        `;
+    }
+}
+
+// ==================== EVENT LISTENERS ====================
 function initializeEventListeners() {
-    // Autocomplete functionality
-    symbolInput.addEventListener('input', function(e) {
-        const query = e.target.value.trim().toUpperCase();
-        if (query.length === 0) {
-            hideAutocomplete();
-            return;
-        }
+    DOM.symbolInput.addEventListener('input', debounce(handleAutocompleteInput, CONFIG.DEBOUNCE_DELAY));
+    DOM.symbolInput.addEventListener('keydown', handleAutocompleteKeydown);
 
-        filteredStocks = stockDatabase.filter(stock =>
-            stock.symbol.toUpperCase().includes(query) ||
-            stock.name.toUpperCase().includes(query)
-        ).slice(0, 8);
+    const searchForm = document.querySelector('.search-form');
+    if (searchForm) searchForm.addEventListener('submit', handleSearchSubmit);
 
-        if (filteredStocks.length > 0) {
-            showAutocomplete(filteredStocks);
-        } else {
-            hideAutocomplete();
-        }
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.input-wrapper')) hideAutocomplete();
     });
 
-    symbolInput.addEventListener('keydown', function(e) {
-        const items = autocompleteDiv.querySelectorAll('.autocomplete-item');
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-            updateSelection(items);
-        }
-        else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            selectedIndex = Math.max(selectedIndex - 1, -1);
-            updateSelection(items);
-        }
-        else if (e.key === 'Enter') {
-            e.preventDefault();
-            if (selectedIndex >= 0) {
-                items[selectedIndex].click();
-            } else {
-                // Trigger search if no autocomplete item is selected
-                const form = document.querySelector('.search-form');
-                if (form) form.requestSubmit();
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            hideAutocomplete();
+            if (!STATE.isSidebarCollapsed && window.matchMedia('(max-width: 768px)').matches) {
+                setSidebarCollapsed(true);
             }
-        }
-        else if (e.key === 'Escape') {
-            hideAutocomplete();
-        }
-    });
-
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.input-wrapper')) {
-            hideAutocomplete();
         }
     });
 }
 
-// ==================== SIDEBAR FUNCTIONS ====================
+function handleAutocompleteInput(e) {
+    const query = e.target.value.trim().toUpperCase();
 
+    if (!query) {
+        hideAutocomplete();
+        return;
+    }
+
+    STATE.filteredStocks = STATE.stockDatabase
+        .filter(stock =>
+            stock.symbol.toUpperCase().includes(query) ||
+            stock.name.toUpperCase().includes(query)
+        )
+        .slice(0, CONFIG.MAX_AUTOCOMPLETE_ITEMS);
+
+    STATE.filteredStocks.length > 0 ? showAutocomplete(STATE.filteredStocks) : hideAutocomplete();
+}
+
+function handleAutocompleteKeydown(e) {
+    const items = DOM.autocompleteDiv.querySelectorAll('.autocomplete-item');
+    if (!items.length) return;
+
+    switch(e.key) {
+        case 'ArrowDown':
+            e.preventDefault();
+            STATE.selectedIndex = Math.min(STATE.selectedIndex + 1, items.length - 1);
+            updateAutocompleteSelection(items);
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            STATE.selectedIndex = Math.max(STATE.selectedIndex - 1, -1);
+            updateAutocompleteSelection(items);
+            break;
+        case 'Enter':
+            e.preventDefault();
+            if (STATE.selectedIndex >= 0) {
+                items[STATE.selectedIndex].click();
+            } else {
+                document.querySelector('.search-form')?.requestSubmit();
+            }
+            break;
+        case 'Escape':
+            hideAutocomplete();
+            break;
+    }
+}
+
+function handleSearchSubmit(e) {
+    e.preventDefault();
+    fetchData();
+}
+
+// ==================== AUTOCOMPLETE ====================
+function showAutocomplete(stocks) {
+    STATE.selectedIndex = -1;
+    DOM.autocompleteDiv.innerHTML = stocks.map(stock => `
+        <div class="autocomplete-item" onclick="selectStock('${stock.symbol}')">
+            <div class="ticker-symbol">${stock.symbol}</div>
+            <div class="company-name">${stock.name}</div>
+        </div>
+    `).join('');
+    DOM.autocompleteDiv.classList.add('active');
+}
+
+function hideAutocomplete() {
+    DOM.autocompleteDiv.classList.remove('active');
+    STATE.selectedIndex = -1;
+}
+
+function updateAutocompleteSelection(items) {
+    items.forEach((item, index) => {
+        item.classList.toggle('selected', index === STATE.selectedIndex);
+        if (index === STATE.selectedIndex) {
+            item.scrollIntoView({ block: 'nearest' });
+            DOM.symbolInput.value = item.querySelector('.ticker-symbol').textContent;
+        }
+    });
+}
+
+function selectStock(symbol) {
+    DOM.symbolInput.value = symbol;
+    hideAutocomplete();
+    DOM.symbolInput.focus();
+
+    const sidebarItem = document.querySelector(`.sidebar-stock-item[data-symbol="${symbol}"]`);
+    if (sidebarItem) {
+        document.querySelectorAll('.sidebar-stock-item').forEach(item => item.classList.remove('active'));
+        sidebarItem.classList.add('active');
+        sidebarItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+// ==================== SIDEBAR ====================
 function initializeSidebar() {
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebarSearch = document.getElementById('sidebarSearch');
+    createSidebarToggles();
 
-    // Create mobile toggle button (for mobile devices)
+    DOM.sidebarSearch.addEventListener('input', debounce((e) => {
+        filterSidebarStocks(e.target.value.trim());
+    }, CONFIG.DEBOUNCE_DELAY));
+
+    loadSidebarStocks();
+
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    setSidebarCollapsed(isMobile);
+
+    window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
+        setSidebarCollapsed(e.matches);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (window.matchMedia('(max-width: 768px)').matches) {
+            const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
+            if (!DOM.sidebar.contains(e.target) &&
+                !mobileToggle?.contains(e.target) &&
+                !STATE.isSidebarCollapsed) {
+                setSidebarCollapsed(true);
+            }
+        }
+    });
+}
+
+function createSidebarToggles() {
     const mobileToggle = document.createElement('button');
     mobileToggle.innerHTML = '☰';
     mobileToggle.className = 'mobile-sidebar-toggle';
@@ -109,7 +398,6 @@ function initializeSidebar() {
     mobileToggle.addEventListener('click', toggleSidebar);
     document.body.appendChild(mobileToggle);
 
-    // Create desktop toggle button (for when sidebar is collapsed)
     const desktopToggle = document.createElement('button');
     desktopToggle.innerHTML = '☰';
     desktopToggle.className = 'desktop-sidebar-toggle';
@@ -117,257 +405,168 @@ function initializeSidebar() {
     desktopToggle.addEventListener('click', toggleSidebar);
     document.body.appendChild(desktopToggle);
 
-    // Sidebar toggle event
-    sidebarToggle.addEventListener('click', toggleSidebar);
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    if (sidebarToggle) sidebarToggle.addEventListener('click', toggleSidebar);
+}
 
-    // Sidebar search functionality
-    sidebarSearch.addEventListener('input', function(e) {
-        filterSidebarStocks(e.target.value.trim());
-    });
-
-    // Load stocks into sidebar
-    loadSidebarStocks();
-
-    // Set initial sidebar state based on viewport
-    const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    setSidebarCollapsed(isMobile);
-
-    // Handle viewport changes
-    window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
-        setSidebarCollapsed(e.matches);
-    });
-
-    // Close sidebar when clicking outside on mobile
-    document.addEventListener('click', function(e) {
-        if (window.matchMedia('(max-width: 768px)').matches) {
-            const sidebar = document.getElementById('sidebar');
-            const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
-
-            if (!sidebar.contains(e.target) &&
-                !mobileToggle.contains(e.target) &&
-                !isSidebarCollapsed) {
-                setSidebarCollapsed(true);
-            }
-        }
-    });
-
-    // Handle escape key to close sidebar
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && !isSidebarCollapsed) {
-            setSidebarCollapsed(true);
-        }
-    });
-
-    console.log('Sidebar initialized - Mobile:', isMobile, 'Collapsed:', isMobile);
+function toggleSidebar() {
+    setSidebarCollapsed(!STATE.isSidebarCollapsed);
 }
 
 function setSidebarCollapsed(collapsed) {
-    const sidebar = document.getElementById('sidebar');
+    STATE.isSidebarCollapsed = collapsed;
     const mainContent = document.querySelector('.container');
     const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
     const desktopToggle = document.querySelector('.desktop-sidebar-toggle');
 
-    isSidebarCollapsed = collapsed;
+    DOM.sidebar?.classList.toggle('sidebar-collapsed', collapsed);
+    mainContent?.classList.toggle('sidebar-collapsed', collapsed);
 
-    // Update sidebar state
-    if (sidebar) {
-        if (collapsed) {
-            sidebar.classList.add('sidebar-collapsed');
-        } else {
-            sidebar.classList.remove('sidebar-collapsed');
-        }
-    }
-
-    // Update main content state
-    if (mainContent) {
-        if (collapsed) {
-            mainContent.classList.add('sidebar-collapsed');
-        } else {
-            mainContent.classList.remove('sidebar-collapsed');
-        }
-    }
-
-    // Update mobile toggle button (for mobile devices)
     if (mobileToggle) {
-        mobileToggle.innerHTML = isSidebarCollapsed ? '☰' : '✕';
-        // Position toggle button based on sidebar state
-        if (!isSidebarCollapsed && window.matchMedia('(max-width: 768px)').matches) {
-            mobileToggle.style.left = '300px';
-        } else {
-            mobileToggle.style.left = '20px';
-        }
+        mobileToggle.innerHTML = collapsed ? '☰' : '✕';
+        mobileToggle.style.left = !collapsed && window.matchMedia('(max-width: 768px)').matches ? '300px' : '20px';
     }
 
-    // Update desktop toggle button
     if (desktopToggle) {
-        desktopToggle.innerHTML = isSidebarCollapsed ? '☰' : '✕';
-        if (!isSidebarCollapsed && window.matchMedia('(min-width: 769px)').matches) {
-            desktopToggle.style.left = '340px';
-        } else {
-            desktopToggle.style.left = '20px';
-        }
+        desktopToggle.innerHTML = collapsed ? '☰' : '✕';
+        desktopToggle.style.left = !collapsed && window.matchMedia('(min-width: 769px)').matches ? '340px' : '20px';
     }
-
-    console.log('Sidebar collapsed:', isSidebarCollapsed);
-}
-
-function toggleSidebar() {
-    setSidebarCollapsed(!isSidebarCollapsed);
 }
 
 function loadSidebarStocks() {
-    const sidebarStocks = document.getElementById('sidebarStocks');
-
-    if (!stockDatabase || stockDatabase.length === 0) {
-        sidebarStocks.innerHTML = `
+    if (!STATE.stockDatabase.length) {
+        DOM.sidebarStocks.innerHTML = `
             <div style="padding: 30px; text-align: center; color: #6b7280;">
                 <div style="font-size: 2rem; margin-bottom: 10px;">📈</div>
-                <div>Loading stocks database...</div>
+                <div>Loading securities database...</div>
             </div>
         `;
         return;
     }
 
-    // Group stocks by category for better organization
-    const groupedStocks = groupStocksByCategory(stockDatabase);
-    let html = '';
-
-    // Add Most Popular ETFs group
-    if (groupedStocks.mostPopular.length > 0) {
-        html += `
-            <div class="sidebar-stock-group">
-                <div class="sidebar-group-header">🌟 Most Popular ETFs</div>
-                ${groupedStocks.mostPopular.map(stock => createSidebarStockItem(stock)).join('')}
-            </div>
-        `;
-    }
-
-    // Add Major Fund Houses group
-    if (groupedStocks.majorFundHouses.length > 0) {
-        html += `
-            <div class="sidebar-stock-group">
-                <div class="sidebar-group-header">🏦 Major Fund Houses</div>
-                ${groupedStocks.majorFundHouses.map(stock => createSidebarStockItem(stock)).join('')}
-            </div>
-        `;
-    }
-
-    // Add other groups
-    const otherGroups = [
-        'kotak', 'icici', 'mirae', 'motilal', 'international',
-        'sector', 'gold', 'midSmall', 'factor', 'liquid',
-        'bond', 'niche', 'bse', 'internationalStocks'
+    const grouped = groupStocksByCategory(STATE.stockDatabase);
+    const groupOrder = [
+        'mostPopular', 'nifty50', 'usStocks', 'banking', 'tech', 'pharma', 'auto',
+        'energy', 'fmcg', 'metals', 'realty', 'midCap', 'smallCap', 'majorFundHouses',
+        'kotak', 'icici', 'mirae', 'motilal', 'sectorETF', 'thematic', 'international',
+        'gold', 'factor', 'liquid', 'bond', 'bse', 'sensex', 'largeCap', 'other'
     ];
 
-    otherGroups.forEach(group => {
-        if (groupedStocks[group] && groupedStocks[group].length > 0) {
-            const groupName = getGroupDisplayName(group);
+    let html = '';
+    groupOrder.forEach(group => {
+        if (grouped[group]?.length) {
             html += `
                 <div class="sidebar-stock-group">
-                    <div class="sidebar-group-header">${groupName}</div>
-                    ${groupedStocks[group].map(stock => createSidebarStockItem(stock)).join('')}
+                    <div class="sidebar-group-header">${getGroupDisplayName(group)}</div>
+                    ${grouped[group].map(createSidebarStockItem).join('')}
                 </div>
             `;
         }
     });
 
-    sidebarStocks.innerHTML = html;
+    DOM.sidebarStocks.innerHTML = html;
 
-    // Add click events to sidebar items
-    sidebarStocks.querySelectorAll('.sidebar-stock-item').forEach(item => {
+    DOM.sidebarStocks.querySelectorAll('.sidebar-stock-item').forEach(item => {
         item.addEventListener('click', function() {
-            const symbol = this.getAttribute('data-symbol');
-            selectStockFromSidebar(symbol);
+            selectStockFromSidebar(this.getAttribute('data-symbol'));
         });
     });
-
-    console.log('Sidebar stocks loaded:', stockDatabase.length, 'stocks in', Object.keys(groupedStocks).length, 'groups');
 }
 
 function groupStocksByCategory(stocks) {
     const groups = {
-        mostPopular: [],
-        majorFundHouses: [],
-        kotak: [],
-        icici: [],
-        mirae: [],
-        motilal: [],
-        international: [],
-        sector: [],
-        gold: [],
-        midSmall: [],
-        factor: [],
-        liquid: [],
-        bond: [],
-        niche: [],
-        bse: [],
-        internationalStocks: []
+        mostPopular: [], nifty50: [], sensex: [], largeCap: [], banking: [], tech: [],
+        pharma: [], auto: [], energy: [], fmcg: [], metals: [], realty: [], midCap: [],
+        smallCap: [], majorFundHouses: [], kotak: [], icici: [], mirae: [], motilal: [],
+        international: [], sectorETF: [], gold: [], factor: [], liquid: [], bond: [],
+        thematic: [], bse: [], usStocks: [], other: []
     };
 
+    const isETF = (stock) => ['ETF', 'BEES', 'INDEX', 'FUND'].some(kw =>
+        stock.name.toUpperCase().includes(kw) || stock.symbol.toUpperCase().includes(kw)
+    );
+
+    const isUSStock = (stock) => !stock.symbol.includes('.NS') &&
+        !stock.symbol.includes('.BO') && /^[A-Z]{1,5}$/.test(stock.symbol);
+
+    const popularSymbols = ['NIFTYBEES.NS', 'BANKBEES.NS', 'ITBEES.NS', 'GOLDBEES.NS',
+        'RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS'];
+
+    const nifty50Symbols = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS',
+        'HINDUNILVR.NS', 'ITC.NS', 'KOTAKBANK.NS', 'LT.NS', 'SBIN.NS', 'BHARTIARTL.NS',
+        'AXISBANK.NS', 'ASIANPAINT.NS', 'MARUTI.NS', 'BAJFINANCE.NS'];
+
     stocks.forEach(stock => {
-        // Most Popular ETFs
-        if (['NIFTYBEES.NS', 'BANKBEES.NS', 'ITBEES.NS', 'GOLDBEES.NS', 'JUNIORBEES.NS', 'SILVERBEES.NS'].includes(stock.symbol)) {
+        const isStockETF = isETF(stock);
+        const nameUpper = stock.name.toUpperCase();
+        const symbolUpper = stock.symbol.toUpperCase();
+
+        if (popularSymbols.includes(stock.symbol)) {
             groups.mostPopular.push(stock);
-        }
-        // Major Fund Houses
-        else if (stock.symbol.includes('UTI') || stock.symbol.includes('HDFC') || stock.symbol.includes('SBI') || stock.symbol.includes('AXIS') || stock.symbol === 'ICICIB22.NS') {
+        } else if (isUSStock(stock)) {
+            groups.usStocks.push(stock);
+        } else if (!isStockETF && nifty50Symbols.includes(stock.symbol)) {
+            groups.nifty50.push(stock);
+        } else if (!isStockETF && (nameUpper.includes('SENSEX') || symbolUpper.includes('.BO'))) {
+            groups.sensex.push(stock);
+        } else if (nameUpper.includes('BANK') || symbolUpper.includes('BANK')) {
+            (isStockETF ? groups.sectorETF : groups.banking).push(stock);
+        } else if (nameUpper.includes('IT') || nameUpper.includes('TECH') ||
+                   nameUpper.includes('INFO') || nameUpper.includes('SOFTWARE')) {
+            (isStockETF ? groups.sectorETF : groups.tech).push(stock);
+        } else if (nameUpper.includes('PHARMA') || nameUpper.includes('HEALTH') ||
+                   nameUpper.includes('DRUG')) {
+            (isStockETF ? groups.sectorETF : groups.pharma).push(stock);
+        } else if (nameUpper.includes('AUTO') || nameUpper.includes('MOTOR') ||
+                   nameUpper.includes('VEHICLE')) {
+            (isStockETF ? groups.sectorETF : groups.auto).push(stock);
+        } else if (nameUpper.includes('ENERGY') || nameUpper.includes('POWER') ||
+                   nameUpper.includes('OIL')) {
+            (isStockETF ? groups.sectorETF : groups.energy).push(stock);
+        } else if (!isStockETF && (nameUpper.includes('CONSUMER') || nameUpper.includes('FMCG'))) {
+            groups.fmcg.push(stock);
+        } else if (nameUpper.includes('METAL') || nameUpper.includes('STEEL') ||
+                   nameUpper.includes('MINING')) {
+            (isStockETF ? groups.sectorETF : groups.metals).push(stock);
+        } else if (!isStockETF && nameUpper.includes('REAL')) {
+            groups.realty.push(stock);
+        } else if (nameUpper.includes('MIDCAP')) {
+            (isStockETF ? groups.sectorETF : groups.midCap).push(stock);
+        } else if (nameUpper.includes('SMALLCAP')) {
+            (isStockETF ? groups.sectorETF : groups.smallCap).push(stock);
+        } else if (isStockETF && (symbolUpper.includes('UTI') || symbolUpper.includes('HDFC') ||
+                   symbolUpper.includes('SBI') || symbolUpper.includes('AXIS') ||
+                   stock.symbol === 'ICICIB22.NS')) {
             groups.majorFundHouses.push(stock);
-        }
-        // Kotak
-        else if (stock.symbol.includes('1.NS') || stock.name.includes('Kotak')) {
+        } else if (isStockETF && (symbolUpper.includes('1.NS') || nameUpper.includes('KOTAK'))) {
             groups.kotak.push(stock);
-        }
-        // ICICI
-        else if (stock.symbol.includes('IETF') || stock.name.includes('ICICI')) {
+        } else if (isStockETF && (symbolUpper.includes('IETF') || nameUpper.includes('ICICI'))) {
             groups.icici.push(stock);
-        }
-        // Mirae Asset
-        else if (stock.symbol.includes('MA') || stock.name.includes('Mirae')) {
+        } else if (isStockETF && (symbolUpper.includes('MA') || nameUpper.includes('MIRAE'))) {
             groups.mirae.push(stock);
-        }
-        // Motilal Oswal
-        else if (stock.symbol.includes('MO') || stock.name.includes('Motilal')) {
+        } else if (isStockETF && (symbolUpper.includes('MO') || nameUpper.includes('MOTILAL'))) {
             groups.motilal.push(stock);
-        }
-        // International ETFs
-        else if (stock.symbol.includes('HKG') || stock.name.includes('Hang Seng') || stock.name.includes('NASDAQ') || stock.name.includes('S&P')) {
+        } else if (isStockETF && (symbolUpper.includes('HKG') || nameUpper.includes('HANG SENG') ||
+                   nameUpper.includes('NASDAQ') || nameUpper.includes('S&P'))) {
             groups.international.push(stock);
-        }
-        // Sector & Theme ETFs
-        else if (stock.name.includes('IT') || stock.name.includes('Consumption') || stock.name.includes('EV') || stock.name.includes('Manufacturing') || stock.name.includes('Pharma') || stock.name.includes('Infrastructure')) {
-            groups.sector.push(stock);
-        }
-        // Gold & Silver
-        else if (stock.name.includes('Gold') || stock.name.includes('Silver')) {
+        } else if (isStockETF && (nameUpper.includes('GOLD') || nameUpper.includes('SILVER'))) {
             groups.gold.push(stock);
-        }
-        // Mid & Small Cap
-        else if (stock.name.includes('Midcap') || stock.name.includes('Smallcap')) {
-            groups.midSmall.push(stock);
-        }
-        // Factor & Smart Beta
-        else if (stock.name.includes('Alpha') || stock.name.includes('Value') || stock.name.includes('Low Volatility') || stock.name.includes('Momentum') || stock.name.includes('Quality')) {
+        } else if (isStockETF && (nameUpper.includes('ALPHA') || nameUpper.includes('VALUE') ||
+                   nameUpper.includes('LOW VOLATILITY') || nameUpper.includes('MOMENTUM') ||
+                   nameUpper.includes('QUALITY'))) {
             groups.factor.push(stock);
-        }
-        // Liquid & Debt
-        else if (stock.name.includes('Liquid') || stock.name.includes('Debt')) {
+        } else if (isStockETF && (nameUpper.includes('LIQUID') || nameUpper.includes('DEBT'))) {
             groups.liquid.push(stock);
-        }
-        // Bond ETFs
-        else if (stock.name.includes('Bond') || stock.name.includes('Gilt') || stock.symbol.includes('BBETF') || stock.symbol.includes('EBBETF')) {
+        } else if (isStockETF && (nameUpper.includes('BOND') || nameUpper.includes('GILT') ||
+                   symbolUpper.includes('BBETF') || symbolUpper.includes('EBBETF'))) {
             groups.bond.push(stock);
-        }
-        // BSE-specific
-        else if (stock.symbol.includes('.BO') || stock.name.includes('BSE') || stock.name.includes('Sensex')) {
+        } else if (isStockETF && (nameUpper.includes('EV') || nameUpper.includes('MANUFACTURING') ||
+                   nameUpper.includes('INFRASTRUCTURE') || nameUpper.includes('CONSUMPTION'))) {
+            groups.thematic.push(stock);
+        } else if (symbolUpper.includes('.BO')) {
             groups.bse.push(stock);
-        }
-        // International Stocks
-        else if (['AAPL', 'MSFT', 'GOOGL', 'TSLA'].includes(stock.symbol)) {
-            groups.internationalStocks.push(stock);
-        }
-        // Niche ETFs
-        else {
-            groups.niche.push(stock);
+        } else {
+            groups.other.push(stock);
         }
     });
 
@@ -376,24 +575,36 @@ function groupStocksByCategory(stocks) {
 
 function getGroupDisplayName(groupKey) {
     const names = {
-        mostPopular: '🌟 Most Popular ETFs',
+        mostPopular: '🌟 Most Popular',
+        nifty50: '🏆 Nifty 50 Stocks',
+        sensex: '📊 Sensex Stocks',
+        largeCap: '💎 Large Cap Stocks',
+        banking: '🏦 Banking Stocks',
+        tech: '💻 Technology Stocks',
+        pharma: '💊 Pharma Stocks',
+        auto: '🚗 Auto Stocks',
+        energy: '⚡ Energy Stocks',
+        fmcg: '🛒 FMCG Stocks',
+        metals: '⚙️ Metals & Mining',
+        realty: '🏗️ Real Estate',
+        midCap: '📈 Mid Cap Stocks',
+        smallCap: '📉 Small Cap Stocks',
         majorFundHouses: '🏦 Major Fund Houses',
         kotak: '📊 Kotak ETFs',
         icici: '🔷 ICICI Prudential ETFs',
         mirae: '🚀 Mirae Asset ETFs',
         motilal: '📈 Motilal Oswal ETFs',
         international: '🌍 International ETFs',
-        sector: '🏭 Sector & Theme ETFs',
+        sectorETF: '🏭 Sector ETFs',
         gold: '🥇 Gold & Silver ETFs',
-        midSmall: '📊 Mid & Small Cap ETFs',
-        factor: '🎯 Factor & Smart Beta ETFs',
+        factor: '🎯 Factor & Smart Beta',
         liquid: '💧 Liquid & Debt ETFs',
         bond: '📋 Bond & G-Sec ETFs',
-        niche: '🔍 Niche ETFs',
-        bse: '📈 BSE ETFs',
-        internationalStocks: '🌎 International Stocks'
+        thematic: '🎨 Thematic ETFs',
+        bse: '📈 BSE Listed',
+        usStocks: '🇺🇸 US Stocks',
+        other: '📂 Other Securities'
     };
-
     return names[groupKey] || groupKey;
 }
 
@@ -407,305 +618,185 @@ function createSidebarStockItem(stock) {
 }
 
 function filterSidebarStocks(query) {
-    const sidebarStocks = document.getElementById('sidebarStocks');
-    const allItems = sidebarStocks.querySelectorAll('.sidebar-stock-item');
-    const groupHeaders = sidebarStocks.querySelectorAll('.sidebar-group-header');
+    const allItems = DOM.sidebarStocks.querySelectorAll('.sidebar-stock-item');
+    const groupHeaders = DOM.sidebarStocks.querySelectorAll('.sidebar-group-header');
 
     if (!query) {
-        // Show all items and groups if no query
-        allItems.forEach(item => {
-            item.style.display = 'flex';
-        });
-        groupHeaders.forEach(header => {
-            header.parentElement.style.display = 'block';
-        });
+        allItems.forEach(item => item.style.display = 'flex');
+        groupHeaders.forEach(header => header.parentElement.style.display = 'block');
         return;
     }
 
     const lowerQuery = query.toLowerCase();
-
-    // First, hide all items and show only matching ones
     allItems.forEach(item => {
         const symbol = item.querySelector('.sidebar-stock-symbol').textContent.toLowerCase();
         const name = item.querySelector('.sidebar-stock-name').textContent.toLowerCase();
-
-        if (symbol.includes(lowerQuery) || name.includes(lowerQuery)) {
-            item.style.display = 'flex';
-        } else {
-            item.style.display = 'none';
-        }
+        item.style.display = (symbol.includes(lowerQuery) || name.includes(lowerQuery)) ? 'flex' : 'none';
     });
 
-    // Show/hide group headers based on whether they have visible items
     groupHeaders.forEach(header => {
         const group = header.parentElement;
-        const itemsInGroup = group.querySelectorAll('.sidebar-stock-item');
-        const hasVisibleInGroup = Array.from(itemsInGroup).some(item =>
-            item.style.display !== 'none'
-        );
-
-        group.style.display = hasVisibleInGroup ? 'block' : 'none';
+        const hasVisible = Array.from(group.querySelectorAll('.sidebar-stock-item'))
+            .some(item => item.style.display !== 'none');
+        group.style.display = hasVisible ? 'block' : 'none';
     });
 }
 
 function selectStockFromSidebar(symbol) {
-    // Populate the search bar
-    symbolInput.value = symbol;
-
-    // Hide autocomplete if open
+    DOM.symbolInput.value = symbol;
     hideAutocomplete();
+    DOM.outputDiv.innerHTML = '';
+    DOM.errorDiv.style.display = 'none';
 
-    // Clear any existing results
-    outputDiv.innerHTML = '';
-    errorDiv.style.display = 'none';
-
-    // Highlight the selected item in sidebar
-    const allItems = document.querySelectorAll('.sidebar-stock-item');
-    allItems.forEach(item => {
-        item.classList.remove('active');
-        if (item.getAttribute('data-symbol') === symbol) {
-            item.classList.add('active');
-            // Scroll into view
+    document.querySelectorAll('.sidebar-stock-item').forEach(item => {
+        item.classList.toggle('active', item.getAttribute('data-symbol') === symbol);
+        if (item.classList.contains('active')) {
             item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     });
 
-    // Auto-collapse sidebar on mobile after selection
     if (window.matchMedia('(max-width: 768px)').matches) {
         setSidebarCollapsed(true);
     }
 
-    // Auto-fetch data for the selected stock
     fetchDataForSymbol(symbol);
 }
 
-async function fetchDataForSymbol(symbol) {
-    // Show loading state
-    loadingDiv.style.display = 'block';
-    searchBtn.disabled = true;
-    searchBtn.textContent = 'Loading...';
-
-    try {
-        const response = await fetch('https://stock-dashboard-fqtn.onrender.com/get_data', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ symbol: symbol }),
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.error || `Server responded with status ${response.status}`);
-        }
-
-        displayData(result);
-    } catch (error) {
-        errorDiv.textContent = `Error: ${error.message}`;
-        errorDiv.style.display = 'block';
-        console.error('Fetch error:', error);
-    } finally {
-        loadingDiv.style.display = 'none';
-        searchBtn.disabled = false;
-        searchBtn.textContent = 'Get Data';
-    }
-}
-
-// ==================== AUTOCOMPLETE FUNCTIONS ====================
-
-function showAutocomplete(stocks) {
-    selectedIndex = -1;
-    autocompleteDiv.innerHTML = stocks.map((stock) => `
-        <div class="autocomplete-item" onclick="selectStock('${stock.symbol}')">
-            <div class="ticker-symbol">${stock.symbol}</div>
-            <div class="company-name">${stock.name}</div>
-        </div>
-    `).join('');
-    autocompleteDiv.classList.add('active');
-}
-
-function hideAutocomplete() {
-    autocompleteDiv.classList.remove('active');
-    selectedIndex = -1;
-}
-
-function updateSelection(items) {
-    items.forEach((item, index) => {
-        if (index === selectedIndex) {
-            item.classList.add('selected');
-            item.scrollIntoView({ block: 'nearest' });
-        }
-        else {
-            item.classList.remove('selected');
-        }
-    });
-    if (selectedIndex >= 0) {
-        symbolInput.value = items[selectedIndex].querySelector('.ticker-symbol').textContent;
-    }
-}
-
-function selectStock(symbol) {
-    symbolInput.value = symbol;
-    hideAutocomplete();
-    symbolInput.focus();
-
-    // Also highlight in sidebar
-    const sidebarItem = document.querySelector(`.sidebar-stock-item[data-symbol="${symbol}"]`);
-    if (sidebarItem) {
-        const allItems = document.querySelectorAll('.sidebar-stock-item');
-        allItems.forEach(item => item.classList.remove('active'));
-        sidebarItem.classList.add('active');
-        sidebarItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-}
-
-// ==================== DATA DISPLAY FUNCTIONS ====================
-
-// API call to fetch stock data
-async function fetchData(event) {
-    if (event) event.preventDefault();
-
-    const symbol = symbolInput.value.toUpperCase().trim();
+// ==================== DATA FETCHING ====================
+async function fetchData() {
+    const symbol = DOM.symbolInput.value.toUpperCase().trim();
 
     if (!symbol) {
-        errorDiv.textContent = 'Please enter a stock symbol';
-        errorDiv.style.display = 'block';
+        showError('Please enter a stock symbol');
         return;
     }
 
-    outputDiv.innerHTML = '';
-    errorDiv.style.display = 'none';
-    loadingDiv.style.display = 'block';
-    searchBtn.disabled = true;
-    searchBtn.textContent = 'Loading...';
+    await fetchDataForSymbol(symbol);
+}
+
+async function fetchDataForSymbol(symbol) {
+    if (STATE.isLoading) return;
+
+    STATE.isLoading = true;
+    DOM.outputDiv.innerHTML = '';
+    DOM.errorDiv.style.display = 'none';
+    DOM.loadingDiv.style.display = 'block';
+    DOM.searchBtn.disabled = true;
+    DOM.searchBtn.textContent = 'Loading...';
     hideAutocomplete();
 
     try {
-        const response = await fetch('https://stock-dashboard-fqtn.onrender.com/get_data', {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/get_data`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ symbol: symbol }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol, session_id: STATE.currentSessionId }),
+            credentials: 'include' // ✅ Required for cookies
         });
 
         const result = await response.json();
 
         if (!response.ok) {
-            throw new Error(result.error || `Server responded with status ${response.status}`);
+            throw new Error(result.error || `Server error: ${response.status}`);
         }
 
         displayData(result);
+        updateSymbolContext(symbol, result);
+
     } catch (error) {
-        errorDiv.textContent = `Error: ${error.message}`;
-        errorDiv.style.display = 'block';
+        showError(error.message);
         console.error('Fetch error:', error);
     } finally {
-        loadingDiv.style.display = 'none';
-        searchBtn.disabled = false;
-        searchBtn.textContent = 'Get Data';
+        STATE.isLoading = false;
+        DOM.loadingDiv.style.display = 'none';
+        DOM.searchBtn.disabled = false;
+        DOM.searchBtn.textContent = 'Get Data';
     }
 }
 
-// Display the fetched data with charts
-function displayData(data) {
-    const companyInfo = stockDatabase.find(s => s.symbol === data.ticker) || { name: 'Technical Analysis Data' };
-    const companyName = companyInfo.name;
+function showError(message) {
+    DOM.errorDiv.textContent = `Error: ${message}`;
+    DOM.errorDiv.style.display = 'block';
+}
 
-    outputDiv.innerHTML = `
+function updateSymbolContext(symbol, data) {
+    STATE.currentSymbol = symbol;
+    localStorage.setItem(CONFIG.SYMBOL_STORAGE_KEY, symbol);
+    updateChatContextIndicator(symbol);
+
+    // Show a chat notification about the new context
+    if (DOM.chatMessages.children.length === 0) {
+        appendMessage('system', `📊 Stock loaded: ${symbol}. Ask me anything about this stock!`);
+    }
+
+    console.log(`✅ Context updated: ${symbol} (Session: ${STATE.currentSessionId.substring(0, 8)}...)`);
+}
+
+// ==================== DATA DISPLAY ====================
+function displayData(data) {
+    const companyInfo = STATE.stockDatabase.find(s => s.symbol === data.ticker) ||
+        { name: 'Technical Analysis Data' };
+
+    DOM.outputDiv.innerHTML = `
         <div class="ticker-display">
             <div class="ticker-symbol-main">${data.ticker}</div>
-            <div class="ticker-name-main">${companyName}</div>
+            <div class="ticker-name-main">${companyInfo.name}</div>
         </div>
     `;
 
     const grid = document.createElement('div');
     grid.className = 'data-grid';
 
-    // 1. Visualization Card with Charts
-    const visualizationCard = createDataCard({
-        id: 'visualization-card',
-        title: 'Technical Charts & Visualizations',
-        icon: '📊',
-        contentHtml: createVisualizationContent(data),
-        isOpen: false
+    const cards = [
+        { id: 'visualization-card', title: 'Technical Charts & Visualizations', icon: '📊',
+          contentHtml: createVisualizationContent(data), isOpen: false },
+        { id: 'rule-based-card', title: 'Technical Analysis', icon: '🔍',
+          contentHtml: createAnalysisContent(data.Rule_Based_Analysis), isOpen: false },
+        ...(data.AI_Review ? [{ id: 'ai-review-card', title: 'AI Review & Summary', icon: '🤖',
+          contentHtml: createAnalysisContent(data.AI_Review), isOpen: false }] : []),
+        { id: 'ohlcv-card', title: 'Raw OHLCV Data', icon: '📈',
+          contentHtml: createOhlcvTable(data.OHLCV), isOpen: false },
+        { id: 'ma-rsi-card', title: 'Raw Technical Indicators', icon: '📉',
+          contentHtml: createMaRsiContent(data.MA, data.RSI), isOpen: false },
+        { id: 'macd-card', title: 'Raw MACD Data', icon: '🎯',
+          contentHtml: createMacdTable(data.MACD), isOpen: false }
+    ];
+
+    cards.forEach(cardData => {
+        const card = createDataCard(cardData);
+        card.classList.add('full-width');
+        card.querySelector('.card-header').addEventListener('click', () => toggleCard(card));
+        grid.appendChild(card);
     });
-    visualizationCard.classList.add('full-width');
-    visualizationCard.querySelector('.card-header').addEventListener('click', () => toggleCard(visualizationCard));
-    grid.appendChild(visualizationCard);
 
-    // 2. Rule-Based Analysis
-    const ruleBasedCard = createDataCard({
-        id: 'rule-based-card',
-        title: 'Technical Analysis',
-        icon: '🔍',
-        contentHtml: createAnalysisContent(data.Rule_Based_Analysis),
-        isOpen: false
-    });
-    ruleBasedCard.classList.add('full-width');
-    ruleBasedCard.querySelector('.card-header').addEventListener('click', () => toggleCard(ruleBasedCard));
-    grid.appendChild(ruleBasedCard);
+    DOM.outputDiv.appendChild(grid);
 
-   
-
-    // 4. Raw Data Tables (Collapsed by default)
-    const ohlcvCard = createDataCard({
-        id: 'ohlcv-card',
-        title: 'Raw OHLCV Data',
-        icon: '📈',
-        contentHtml: createOhlcvTable(data.OHLCV),
-        isOpen: false
-    });
-    ohlcvCard.classList.add('full-width');
-    ohlcvCard.querySelector('.card-header').addEventListener('click', () => toggleCard(ohlcvCard));
-    grid.appendChild(ohlcvCard);
-
-    const maRsiCard = createDataCard({
-        id: 'ma-rsi-card',
-        title: 'Raw Technical Indicators',
-        icon: '📉',
-        contentHtml: createMaRsiContent(data.MA, data.RSI),
-        isOpen: false
-    });
-    maRsiCard.classList.add('full-width');
-    maRsiCard.querySelector('.card-header').addEventListener('click', () => toggleCard(maRsiCard));
-    grid.appendChild(maRsiCard);
-
-    const macdCard = createDataCard({
-        id: 'macd-card',
-        title: 'Raw MACD Data',
-        icon: '🎯',
-        contentHtml: createMacdTable(data.MACD),
-        isOpen: false
-    });
-    macdCard.classList.add('full-width');
-    macdCard.querySelector('.card-header').addEventListener('click', () => toggleCard(macdCard));
-    grid.appendChild(macdCard);
-
-     // 3. AI Review
-    if (data.AI_Review) {
-        const aiReviewCard = createDataCard({
-            id: 'ai-review-card',
-            title: 'AI Review & Summary',
-            icon: '🤖',
-            contentHtml: createAnalysisContent(data.AI_Review),
-            isOpen: false
-        });
-        aiReviewCard.classList.add('full-width');
-        aiReviewCard.querySelector('.card-header').addEventListener('click', () => toggleCard(aiReviewCard));
-        grid.appendChild(aiReviewCard);
-    }
-
-    outputDiv.appendChild(grid);
-
-    // Initialize charts after DOM is updated
-    setTimeout(() => {
-        initializeCharts(data);
-    }, 100);
+    setTimeout(() => initializeCharts(data), 100);
 }
 
-// Create visualization content with tabs
+function createDataCard({ id, title, icon, contentHtml, isOpen }) {
+    const card = document.createElement('div');
+    card.className = 'data-card';
+    if (id) card.id = id;
+
+    card.innerHTML = `
+        <div class="card-header">
+            <h2><span role="img" aria-label="${title}">${icon}</span> ${title}</h2>
+            <span class="dropdown-icon ${isOpen ? '' : 'collapsed'}">▼</span>
+        </div>
+        <div class="card-content ${isOpen ? '' : 'collapsed'}">
+            ${contentHtml}
+        </div>
+    `;
+    return card;
+}
+
+function toggleCard(cardElement) {
+    const content = cardElement.querySelector('.card-content');
+    const icon = cardElement.querySelector('.dropdown-icon');
+    content.classList.toggle('collapsed');
+    icon.classList.toggle('collapsed');
+}
+
 function createVisualizationContent(data) {
     return `
         <div class="chart-tabs">
@@ -714,100 +805,201 @@ function createVisualizationContent(data) {
             <button class="chart-tab" onclick="switchChartTab('moving-averages', this)">Moving Averages</button>
             <button class="chart-tab" onclick="switchChartTab('macd', this)">MACD</button>
         </div>
-        
         <div id="price-chart" class="chart-card">
             <div class="chart-title">OHLC Candlestick Chart with Volume</div>
-            <div class="chart-container">
-                <canvas id="ohlcvChart"></canvas>
-            </div>
+            <div class="chart-container"><canvas id="ohlcvChart"></canvas></div>
         </div>
-        
         <div id="rsi-chart" class="chart-card" style="display: none;">
             <div class="chart-title">Relative Strength Index (RSI)</div>
-            <div class="chart-container">
-                <canvas id="rsiChart"></canvas>
-            </div>
+            <div class="chart-container"><canvas id="rsiChart"></canvas></div>
         </div>
-        
         <div id="moving-averages-chart" class="chart-card" style="display: none;">
             <div class="chart-title">Price with Moving Averages</div>
-            <div class="chart-container">
-                <canvas id="movingAveragesChart"></canvas>
-            </div>
+            <div class="chart-container"><canvas id="movingAveragesChart"></canvas></div>
         </div>
-        
         <div id="macd-chart" class="chart-card" style="display: none;">
             <div class="chart-title">MACD (Moving Average Convergence Divergence)</div>
-            <div class="chart-container">
-                <canvas id="macdChart"></canvas>
+            <div class="chart-container"><canvas id="macdChart"></canvas></div>
+        </div>
+    `;
+}
+
+function switchChartTab(tabName, button) {
+    document.querySelectorAll('.chart-card').forEach(card => card.style.display = 'none');
+    document.querySelectorAll('.chart-tab').forEach(tab => tab.classList.remove('active'));
+    document.getElementById(`${tabName}-chart`).style.display = 'block';
+    button.classList.add('active');
+}
+
+function createAnalysisContent(text) {
+    if (!text) {
+        return `<div class="unavailable-notice">
+            <strong>⚠️ Analysis Unavailable</strong>
+            <p>This analysis is currently unavailable. Please check the technical data in other sections.</p>
+        </div>`;
+    }
+
+    let html = text
+        .replace(/###\s*(.*)/g, '<h3>$1</h3>')
+        .replace(/####\s*(.*)/g, '<h4>$1</h4>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/---/g, '<hr>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+
+    if (!html.startsWith('<')) html = '<p>' + html + '</p>';
+    return `<div class="analysis-content">${html}</div>`;
+}
+
+function createOhlcvTable(data) {
+    if (!data?.length) {
+        return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No OHLCV data available.</p></div>';
+    }
+
+    return `
+        <div class="table-scroll-wrapper">
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(item => `
+                            <tr>
+                                <td>${item.Date || 'N/A'}</td>
+                                <td>${formatPrice(item.Open)}</td>
+                                <td>${formatPrice(item.High)}</td>
+                                <td>${formatPrice(item.Low)}</td>
+                                <td>${formatPrice(item.Close)}</td>
+                                <td>${formatNumber(item.Volume)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <p style="font-size: 0.9rem; color: #6b7280; margin-top: 10px;">Showing latest ${data.length} trading sessions</p>
+    `;
+}
+
+function createMaRsiContent(maData, rsiData) {
+    if (!maData?.length) {
+        return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No Moving Average data available.</p></div>';
+    }
+
+    const combined = maData.map((ma, i) => ({
+        Date: ma.Date,
+        MA5: ma.MA5,
+        MA10: ma.MA10,
+        RSI: rsiData?.[i] || null
+    }));
+
+    return `
+        <div class="data-table">
+            <table>
+                <thead>
+                    <tr><th>Date</th><th>MA5 (Short)</th><th>MA10 (Long)</th><th>RSI</th></tr>
+                </thead>
+                <tbody>
+                    ${combined.map(item => `
+                        <tr>
+                            <td>${item.Date}</td>
+                            <td>${formatPrice(item.MA5)}</td>
+                            <td>${formatPrice(item.MA10)}</td>
+                            <td style="font-weight: 600; color: ${getRsiColor(item.RSI)}">${item.RSI != null ? item.RSI.toFixed(2) : 'N/A'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div style="padding-top: 20px;">
+            <h3 style="color: var(--primary-purple); font-size: 1.1rem; margin-bottom: 15px;">RSI Overview (Latest ${combined.length} Days)</h3>
+            <div class="rsi-grid">
+                ${combined.map(item => `
+                    <div class="rsi-item">
+                        <strong>${item.Date?.substring(5) || 'N/A'}</strong>
+                        <span class="rsi-value" style="color: ${getRsiColor(item.RSI)}; background: ${getRsiBackground(item.RSI)}">
+                            ${item.RSI != null ? item.RSI.toFixed(2) : 'N/A'}
+                        </span>
+                    </div>
+                `).join('')}
+            </div>
+            <div style="margin-top: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid var(--primary-purple);">
+                <p style="font-size: 0.9rem; color: #374151; margin: 0;">
+                    <strong>RSI Guide:</strong>
+                    <span style="color: #ef4444;">Above 70 = Overbought</span> •
+                    <span style="color: #10b981;">Below 30 = Oversold</span> •
+                    <span style="color: #6b7280;">30-70 = Neutral</span>
+                </p>
             </div>
         </div>
     `;
 }
 
-// Switch between chart tabs
-function switchChartTab(tabName, button) {
-    // Hide all chart containers
-    document.querySelectorAll('.chart-card').forEach(card => {
-        card.style.display = 'none';
-    });
+function createMacdTable(data) {
+    if (!data?.length) {
+        return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No MACD data available.</p></div>';
+    }
 
-    // Remove active class from all tabs
-    document.querySelectorAll('.chart-tab').forEach(tab => {
-        tab.classList.remove('active');
-    });
-
-    // Show selected chart and activate tab
-    document.getElementById(`${tabName}-chart`).style.display = 'block';
-    button.classList.add('active');
+    return `
+        <div class="table-scroll-wrapper">
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr><th>Date</th><th>MACD Line</th><th>Signal Line</th><th>Histogram</th></tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(item => {
+                            const histClass = item.Histogram > 0 ? 'positive-hist' : item.Histogram < 0 ? 'negative-hist' : '';
+                            return `
+                            <tr>
+                                <td>${item.Date || 'N/A'}</td>
+                                <td>${item.MACD != null ? item.MACD.toFixed(3) : 'N/A'}</td>
+                                <td>${item.Signal != null ? item.Signal.toFixed(3) : 'N/A'}</td>
+                                <td class="${histClass}">${item.Histogram != null ? item.Histogram.toFixed(3) : 'N/A'}</td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div style="margin-top: 15px; padding: 12px; background: #f8fafc; border-radius: 8px;">
+            <p style="font-size: 0.9rem; color: #374151; margin: 0;">
+                <strong>MACD Signals:</strong>
+                <span style="color: var(--accent-green);">Positive Histogram = Bullish</span> •
+                <span style="color: #ef4444;">Negative Histogram = Bearish</span>
+            </p>
+        </div>
+    `;
 }
 
-// Initialize all charts
+// ==================== CHART INITIALIZATION ====================
 function initializeCharts(data) {
     destroyExistingCharts();
-
-    if (data.OHLCV && data.OHLCV.length > 0) {
-        createOHLCVChart(data.OHLCV);
-    }
-
-    if (data.RSI && data.RSI.length > 0 && data.OHLCV) {
-        createRSIChart(data.RSI, data.OHLCV);
-    }
-
-    if (data.MA && data.MA.length > 0 && data.OHLCV) {
-        createMovingAveragesChart(data.MA, data.OHLCV);
-    }
-
-    if (data.MACD && data.MACD.length > 0 && data.OHLCV) {
-        createMACDChart(data.MACD, data.OHLCV);
-    }
+    if (data.OHLCV?.length) createOHLCVChart(data.OHLCV);
+    if (data.RSI?.length && data.OHLCV) createRSIChart(data.RSI, data.OHLCV);
+    if (data.MA?.length && data.OHLCV) createMovingAveragesChart(data.MA, data.OHLCV);
+    if (data.MACD?.length && data.OHLCV) createMACDChart(data.MACD, data.OHLCV);
 }
 
-// Destroy existing charts to prevent memory leaks
 function destroyExistingCharts() {
-    Object.values(charts).forEach(chart => {
-        if (chart) {
-            chart.destroy();
-        }
-    });
-    charts = {
-        ohlcv: null,
-        rsi: null,
-        movingAverages: null,
-        macd: null
-    };
+    Object.values(STATE.charts).forEach(chart => chart?.destroy());
+    STATE.charts = { ohlcv: null, rsi: null, movingAverages: null, macd: null };
 }
 
-// Create OHLCV Chart - FIXED CHRONOLOGICAL ORDER (7 days)
 function createOHLCVChart(ohlcvData) {
-    const ctx = document.getElementById('ohlcvChart').getContext('2d');
-    const limitedData = ohlcvData; // Already 7 days from backend
+    const ctx = document.getElementById('ohlcvChart')?.getContext('2d');
+    if (!ctx) return;
 
-    const dates = limitedData.map(item => item.Date?.substring(5) || 'N/A');
-    const closes = limitedData.map(item => item.Close);
-    const volumes = limitedData.map(item => item.Volume);
+    const dates = ohlcvData.map(item => item.Date?.substring(5) || 'N/A');
+    const closes = ohlcvData.map(item => item.Close);
+    const volumes = ohlcvData.map(item => item.Volume);
 
-    charts.ohlcv = new Chart(ctx, {
+    STATE.charts.ohlcv = new Chart(ctx, {
         type: 'line',
         data: {
             labels: dates,
@@ -841,48 +1033,27 @@ function createOHLCVChart(ohlcvData) {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: {
-                    type: 'category',
-                    title: {
-                        display: true,
-                        text: 'Date'
-                    }
-                },
-                y: {
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Price ($)'
-                    }
-                },
-                y1: {
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Volume'
-                    },
-                    grid: {
-                        drawOnChartArea: false
-                    }
-                }
+                x: { type: 'category', title: { display: true, text: 'Date' } },
+                y: { position: 'left', title: { display: true, text: 'Price ($)' } },
+                y1: { position: 'right', title: { display: true, text: 'Volume' }, grid: { drawOnChartArea: false } }
             }
         }
     });
 }
 
-// Create RSI Chart - FIXED CHRONOLOGICAL ORDER (7 days)
 function createRSIChart(rsiData, ohlcvData) {
-    const ctx = document.getElementById('rsiChart').getContext('2d');
-    const limitedData = rsiData; // Already 7 days from backend
+    const ctx = document.getElementById('rsiChart')?.getContext('2d');
+    if (!ctx) return;
+
     const dates = ohlcvData.map(item => item.Date?.substring(5) || 'N/A');
 
-    charts.rsi = new Chart(ctx, {
+    STATE.charts.rsi = new Chart(ctx, {
         type: 'line',
         data: {
             labels: dates,
             datasets: [{
                 label: 'RSI',
-                data: limitedData,
+                data: rsiData,
                 borderColor: '#667eea',
                 backgroundColor: 'rgba(102, 126, 234, 0.1)',
                 borderWidth: 2,
@@ -897,18 +1068,11 @@ function createRSIChart(rsiData, ohlcvData) {
                 y: {
                     min: 0,
                     max: 100,
-                    ticks: {
-                        callback: function(value) {
-                            return value + '%';
-                        }
-                    },
+                    ticks: { callback: value => value + '%' },
                     grid: {
-                        color: function(context) {
-                            if (context.tick.value === 30 || context.tick.value === 70) {
-                                return 'rgba(255, 0, 0, 0.3)';
-                            }
-                            return 'rgba(0, 0, 0, 0.1)';
-                        }
+                        color: context =>
+                            context.tick.value === 30 || context.tick.value === 70 ?
+                            'rgba(255, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.1)'
                     }
                 }
             }
@@ -916,21 +1080,20 @@ function createRSIChart(rsiData, ohlcvData) {
     });
 }
 
-// Create Moving Averages Chart - FIXED CHRONOLOGICAL ORDER (7 days)
 function createMovingAveragesChart(maData, ohlcvData) {
-    const ctx = document.getElementById('movingAveragesChart').getContext('2d');
-    const limitedData = maData; // Already 7 days from backend
-    const limitedOhlcv = ohlcvData; // Already 7 days from backend
-    const dates = limitedOhlcv.map(item => item.Date?.substring(5) || 'N/A');
+    const ctx = document.getElementById('movingAveragesChart')?.getContext('2d');
+    if (!ctx) return;
 
-    charts.movingAverages = new Chart(ctx, {
+    const dates = ohlcvData.map(item => item.Date?.substring(5) || 'N/A');
+
+    STATE.charts.movingAverages = new Chart(ctx, {
         type: 'line',
         data: {
             labels: dates,
             datasets: [
                 {
                     label: 'Close Price',
-                    data: limitedOhlcv.map(item => item.Close),
+                    data: ohlcvData.map(item => item.Close),
                     borderColor: '#374151',
                     backgroundColor: 'rgba(55, 65, 81, 0.1)',
                     borderWidth: 2,
@@ -938,7 +1101,7 @@ function createMovingAveragesChart(maData, ohlcvData) {
                 },
                 {
                     label: 'MA5',
-                    data: limitedData.map(item => item.MA5),
+                    data: maData.map(item => item.MA5),
                     borderColor: '#ef4444',
                     borderWidth: 2,
                     borderDash: [5, 5],
@@ -946,7 +1109,7 @@ function createMovingAveragesChart(maData, ohlcvData) {
                 },
                 {
                     label: 'MA10',
-                    data: limitedData.map(item => item.MA10),
+                    data: maData.map(item => item.MA10),
                     borderColor: '#10b981',
                     borderWidth: 2,
                     borderDash: [5, 5],
@@ -957,32 +1120,25 @@ function createMovingAveragesChart(maData, ohlcvData) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Price ($)'
-                    }
-                }
-            }
+            scales: { y: { title: { display: true, text: 'Price ($)' } } }
         }
     });
 }
 
-// Create MACD Chart - FIXED CHRONOLOGICAL ORDER (7 days)
 function createMACDChart(macdData, ohlcvData) {
-    const ctx = document.getElementById('macdChart').getContext('2d');
-    const limitedData = macdData; // Already 7 days from backend
+    const ctx = document.getElementById('macdChart')?.getContext('2d');
+    if (!ctx) return;
+
     const dates = ohlcvData.map(item => item.Date?.substring(5) || 'N/A');
 
-    charts.macd = new Chart(ctx, {
+    STATE.charts.macd = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: dates,
             datasets: [
                 {
                     label: 'MACD Line',
-                    data: limitedData.map(item => item.MACD),
+                    data: macdData.map(item => item.MACD),
                     borderColor: '#667eea',
                     backgroundColor: 'transparent',
                     borderWidth: 2,
@@ -991,7 +1147,7 @@ function createMACDChart(macdData, ohlcvData) {
                 },
                 {
                     label: 'Signal Line',
-                    data: limitedData.map(item => item.Signal),
+                    data: macdData.map(item => item.Signal),
                     borderColor: '#ef4444',
                     backgroundColor: 'transparent',
                     borderWidth: 2,
@@ -1000,8 +1156,8 @@ function createMACDChart(macdData, ohlcvData) {
                 },
                 {
                     label: 'Histogram',
-                    data: limitedData.map(item => item.Histogram),
-                    backgroundColor: limitedData.map(item =>
+                    data: macdData.map(item => item.Histogram),
+                    backgroundColor: macdData.map(item =>
                         item.Histogram >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)'
                     ),
                     type: 'bar',
@@ -1012,249 +1168,130 @@ function createMACDChart(macdData, ohlcvData) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: {
-                y: {
-                    title: {
-                        display: true,
-                        text: 'MACD Value'
-                    }
-                }
-            }
+            scales: { y: { title: { display: true, text: 'MACD Value' } } }
         }
     });
 }
 
-// Card creation and management
-function createDataCard({ id, title, icon, contentHtml, isOpen = false }) {
-    const card = document.createElement('div');
-    card.className = 'data-card';
-    if (id) {
-        card.id = id;
-    }
-
-    const contentClass = isOpen ? '' : 'collapsed';
-    const iconClass = isOpen ? '' : 'collapsed';
-
-    card.innerHTML = `
-        <div class="card-header">
-            <h2><span role="img" aria-label="${title} icon">${icon}</span> ${title}</h2>
-            <span class="dropdown-icon ${iconClass}">▼</span>
-        </div>
-        <div class="card-content ${contentClass}">
-            ${contentHtml}
-        </div>
+// ==================== CHATBOT ====================
+function initializeChat() {
+    const contextIndicator = document.createElement('div');
+    contextIndicator.id = 'chat-context-indicator';
+    contextIndicator.style.cssText = `
+        padding: 8px 12px; background: #f0f9ff; border-left: 4px solid #667eea;
+        font-size: 0.9rem; color: #374151; margin-bottom: 10px; border-radius: 4px; display: none;
     `;
-    return card;
-}
+    DOM.chatMessages.parentNode.insertBefore(contextIndicator, DOM.chatMessages);
+    DOM.contextIndicator = contextIndicator;
 
-function toggleCard(cardElement) {
-    const content = cardElement.querySelector('.card-content');
-    const icon = cardElement.querySelector('.dropdown-icon');
-
-    const isCurrentlyCollapsed = content.classList.contains('collapsed');
-
-    if (isCurrentlyCollapsed) {
-        content.classList.remove('collapsed');
-        icon.classList.remove('collapsed');
-    } else {
-        content.classList.add('collapsed');
-        icon.classList.add('collapsed');
-    }
-}
-
-// Data table creation functions
-function createOhlcvTable(data) {
-    if (!data || data.length === 0) {
-        return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No OHLCV data available for this stock.</p></div>';
-    }
-
-    const limitedData = data.slice(0, 7);
-    return `
-        <div class="table-scroll-wrapper">
-            <div class="data-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Open</th>
-                            <th>High</th>
-                            <th>Low</th>
-                            <th>Close</th>
-                            <th>Volume</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${limitedData.map(item => `
-                            <tr>
-                                <td>${item.Date || 'N/A'}</td>
-                                <td>${item.Open != null ? '$' + item.Open.toFixed(2) : 'N/A'}</td>
-                                <td>${item.High != null ? '$' + item.High.toFixed(2) : 'N/A'}</td>
-                                <td>${item.Low != null ? '$' + item.Low.toFixed(2) : 'N/A'}</td>
-                                <td>${item.Close != null ? '$' + item.Close.toFixed(2) : 'N/A'}</td>
-                                <td>${item.Volume != null ? item.Volume.toLocaleString() : 'N/A'}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <p style="font-size: 0.9rem; color: #6b7280; margin-top: 10px;">Showing latest ${limitedData.length} trading sessions</p>
-    `;
-}
-
-function createMaRsiContent(maData, rsiData) {
-    if (!maData || maData.length === 0) {
-        return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No Moving Average data available for this stock.</p></div>';
-    }
-
-    const limitedMaData = maData.slice(0, 7);
-    const combinedData = limitedMaData.map((maItem, index) => {
-        const rsiValue = rsiData && rsiData[index] ? rsiData[index] : null;
-        return {
-            Date: maItem.Date,
-            MA5: maItem.MA5,
-            MA10: maItem.MA10,
-            RSI: rsiValue
-        };
+    DOM.chatToggle.addEventListener('click', () => {
+        DOM.chatWindow.style.display = DOM.chatWindow.style.display === 'flex' ? 'none' : 'flex';
     });
 
-    return `
-        <div class="data-table">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>MA5 (Short)</th>
-                        <th>MA10 (Long)</th>
-                        <th>RSI</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${combinedData.map(item => `
-                        <tr>
-                            <td>${item.Date}</td>
-                            <td>${item.MA5 != null ? '$' + item.MA5.toFixed(2) : 'N/A'}</td>
-                            <td>${item.MA10 != null ? '$' + item.MA10.toFixed(2) : 'N/A'}</td>
-                            <td style="font-weight: 600; color: ${getRsiColor(item.RSI)}">${item.RSI != null ? item.RSI.toFixed(2) : 'N/A'}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
+    DOM.chatClose.addEventListener('click', () => {
+        DOM.chatWindow.style.display = 'none';
+    });
 
-        <div style="padding-top: 20px;">
-            <h3 style="color: var(--primary-purple); font-size: 1.1rem; margin-bottom: 15px;">RSI Overview (Latest ${combinedData.length} Days)</h3>
-            <div class="rsi-grid">
-                ${combinedData.map(item => `
-                    <div class="rsi-item">
-                        <strong>${item.Date ? item.Date.substring(5) : 'N/A'}</strong>
-                        <span class="rsi-value" style="color: ${getRsiColor(item.RSI)}; background: ${getRsiBackground(item.RSI)}">
-                            ${item.RSI != null ? item.RSI.toFixed(2) : 'N/A'}
-                        </span>
-                    </div>
-                `).join('')}
-            </div>
-            <div style="margin-top: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid var(--primary-purple);">
-                <p style="font-size: 0.9rem; color: #374151; margin: 0;">
-                    <strong>RSI Guide:</strong> 
-                    <span style="color: #ef4444;">Above 70 = Overbought</span> • 
-                    <span style="color: #10b981;">Below 30 = Oversold</span> • 
-                    <span style="color: #6b7280;">30-70 = Neutral</span>
-                </p>
-            </div>
-        </div>
-    `;
+    DOM.chatRefresh.addEventListener('click', clearChatHistory);
+    DOM.chatSend.addEventListener('click', sendMessage);
+    DOM.chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
 }
 
-function createMacdTable(data) {
-    if (!data || data.length === 0) {
-        return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No MACD data available for this stock.</p></div>';
+async function clearChatHistory() {
+    appendMessage('system', '🔄 Clearing conversation history...');
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/session/clear`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: STATE.currentSessionId }),
+            credentials: 'include' // ✅ Required
+        });
+
+        const msg = response.ok ?
+            '✅ Conversation history cleared. Context maintained for current stock.' :
+            '⚠️ Could not clear history. Continuing with current context.';
+        appendMessage('system', msg);
+    } catch (error) {
+        appendMessage('system', '⚠️ Error clearing history. Continuing with current context.');
+    }
+}
+
+async function sendMessage() {
+    const text = DOM.chatInput.value.trim();
+    if (!text) return;
+
+    appendMessage('user', text);
+    DOM.chatInput.value = '';
+
+    const typingIndicator = appendMessage('bot', '...');
+
+    try {
+        const res = await fetch(`${CONFIG.API_BASE_URL}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                query: text,
+                session_id: STATE.currentSessionId,
+                current_symbol: STATE.currentSymbol
+            }),
+            credentials: 'include' // ✅ Required
+        });
+        const data = await res.json();
+
+        typingIndicator.remove();
+
+        if (data.response) {
+            appendMessage('bot', data.response);
+            if (data.context?.current_symbol) {
+                updateChatContextIndicator(data.context.current_symbol);
+            }
+        } else {
+            appendMessage('bot', data.error || '⚠️ No response from server');
+        }
+    } catch (err) {
+        typingIndicator.remove();
+        appendMessage('bot', '⚠️ Network error. Please try again.');
+        console.error('❌ Chat error:', err);
+    }
+}
+
+function appendMessage(sender, text) {
+    const div = document.createElement('div');
+    div.className = sender === 'user' ? 'msg msg-user' :
+                     sender === 'bot' ? 'msg msg-bot' : 'msg msg-system';
+
+    if (sender === 'bot') {
+        let html = text;
+        html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        html = html.replace(/`(.+?)`/g, '<code>$1</code>');
+        html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+        html = html.replace(/\n\n/g, '</p><p>');
+        html = html.replace(/\n/g, '<br>');
+        if (!html.startsWith('<p>')) html = '<p>' + html + '</p>';
+        div.innerHTML = html;
+    } else {
+        div.textContent = text;
     }
 
-    const limitedData = data.slice(0, 7);
-    return `
-        <div class="table-scroll-wrapper">
-            <div class="data-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>MACD Line</th>
-                            <th>Signal Line</th>
-                            <th>Histogram</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${limitedData.map(item => {
-                            const histClass = item.Histogram > 0 ? 'positive-hist' : (item.Histogram < 0 ? 'negative-hist' : '');
-                            return `
-                            <tr>
-                                <td>${item.Date || 'N/A'}</td>
-                                <td>${item.MACD != null ? item.MACD.toFixed(3) : 'N/A'}</td>
-                                <td>${item.Signal != null ? item.Signal.toFixed(3) : 'N/A'}</td>
-                                <td class="${histClass}">${item.Histogram != null ? item.Histogram.toFixed(3) : 'N/A'}</td>
-                            </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <div style="margin-top: 15px; padding: 12px; background: #f8fafc; border-radius: 8px;">
-            <p style="font-size: 0.9rem; color: #374151; margin: 0;">
-                <strong>MACD Signals:</strong> 
-                <span style="color: var(--accent-green);">Positive Histogram = Bullish</span> • 
-                <span style="color: #ef4444;">Negative Histogram = Bearish</span>
-            </p>
-        </div>
-    `;
+    DOM.chatMessages.appendChild(div);
+    DOM.chatMessages.scrollTop = DOM.chatMessages.scrollHeight;
+    return div;
 }
 
-// RSI Color Utilities
-function getRsiColor(rsi) {
-    if (rsi === null || rsi === undefined) return '#6b7280';
-    if (rsi > 70) return '#ef4444';
-    if (rsi < 30) return '#10b981';
-    return '#6b7280';
-}
-
-function getRsiBackground(rsi) {
-    if (rsi === null || rsi === undefined) return '#f3f4f6';
-    if (rsi > 70) return '#fef2f2';
-    if (rsi < 30) return '#f0fdf4';
-    return '#f8fafc';
-}
-
-function createAnalysisContent(text) {
-    if (!text) {
-        return `<div class="unavailable-notice">
-            <strong>⚠️ Analysis Unavailable</strong>
-            <p>This analysis is currently unavailable. Please check the technical data in other sections.</p>
-        </div>`;
+function updateChatContextIndicator(symbol) {
+    if (DOM.contextIndicator) {
+        DOM.contextIndicator.innerHTML = `💬 Chatting about <strong>${symbol}</strong> - Context active`;
+        DOM.contextIndicator.style.display = 'block';
     }
-
-    let htmlContent = text;
-
-    // Convert markdown to HTML
-    htmlContent = htmlContent.replace(/###\s*(.*)/g, '<h3>$1</h3>');
-    htmlContent = htmlContent.replace(/####\s*(.*)/g, '<h4>$1</h4>');
-    htmlContent = htmlContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    htmlContent = htmlContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    htmlContent = htmlContent.replace(/---/g, '<hr>');
-    htmlContent = htmlContent.replace(/\n\n/g, '</p><p>');
-    htmlContent = htmlContent.replace(/\n/g, '<br>');
-
-    // Wrap in paragraph if not already wrapped
-    if (!htmlContent.startsWith('<')) {
-        htmlContent = '<p>' + htmlContent + '</p>';
-    }
-
-    return `<div class="analysis-content">${htmlContent}</div>`;
 }
 
-// Export functions for global access
+// ==================== GLOBAL EXPORTS ====================
 window.selectStock = selectStock;
 window.fetchData = fetchData;
 window.toggleCard = toggleCard;
 window.switchChartTab = switchChartTab;
-
