@@ -793,7 +793,7 @@ else:
 
 # 3. CORS Configuration
 # Adjust origins to match your frontend URL in production
-CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://localhost:5000", CLIENT_REDIRECT_URL])
+CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://localhost:5000" "https://budgetwarrenbuffet.vercel.app", CLIENT_REDIRECT_URL])
 
 
 # 4. Session Lifetime (Important for authentication state)
@@ -1319,3 +1319,4 @@ if __name__ == "__main__":
     # ==================== END DIAGNOSTICS ====================
     
     app.run(host=host, port=port, debug=not is_production)
+
