@@ -4,7 +4,10 @@ services:
     env: python
     plan: free
     region: oregon
+    # Install all necessary dependencies, including Gunicorn for production
     buildCommand: |
-      pip install flask flask-cors yfinance pandas numpy python-dotenv google-genai google-api-core 
-    startCommand: python app.py
+      pip install gunicorn flask flask-cors yfinance pandas numpy python-dotenv google-genai google-api-core requests PyJWT
+    # Use Gunicorn to start the application, referencing the 'app' instance in 'app.py'
+    # Format is: gunicorn <module_name>:<app_variable_name>
+    startCommand: gunicorn app:app
 
