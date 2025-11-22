@@ -896,3 +896,130 @@ footer {
     text-align: center;
     background: #fff; /* optional for clean look */
 }
+#chatbot {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  z-index: 9999;
+}
+
+#chat-window {
+  display: none;
+  flex-direction: column;
+  width: 340px;
+  height: 480px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: fadeIn 0.3s ease;
+}
+
+#chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #4a47ff;
+  color: #fff;
+  padding: 10px 14px;
+  font-weight: 600;
+}
+
+#chat-header button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  margin-left: 6px;
+  cursor: pointer;
+}
+
+#chat-messages {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.msg {
+  margin: 6px 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  display: inline-block;
+  max-width: 80%;
+  line-height: 1.4;
+}
+
+.msg-user {
+  background: #4a47ff;
+  color: white;
+  align-self: flex-end;
+  border-radius: 16px 16px 4px 16px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  line-height: 1.5;
+  max-width: 80%;
+}
+
+.msg-bot {
+  background: #f5f5f5;
+  color: #222;
+  align-self: flex-start;
+  border-radius: 16px 16px 16px 4px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  line-height: 1.5;
+  max-width: 80%;
+}
+
+
+.msg-system {
+  text-align: center;
+  color: #999;
+  font-size: 0.85rem;
+  padding: 5px;
+}
+
+#chat-input-area {
+  display: flex;
+  border-top: 1px solid #e0e0e0;
+  background: white;
+}
+
+#chat-input {
+  flex: 1;
+  border: none;
+  padding: 10px;
+  outline: none;
+  font-size: 0.9rem;
+}
+
+#chat-send {
+  background: #4a47ff;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+#chat-toggle {
+  background: #4a47ff;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  font-size: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
