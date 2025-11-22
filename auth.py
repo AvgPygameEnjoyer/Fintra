@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from flask import request, jsonify, session, redirect, current_app
+from flask import request, jsonify, session, redirect, current_app, Blueprint
 from functools import wraps
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
@@ -10,6 +10,10 @@ import os
 import dotenv
 
 dotenv.load_dotenv()
+# ==================== BLUEPRINT DEFINITION ====================
+# This object is imported by app.py to register all routes defined below
+auth_bp = Blueprint('auth', __name__)
+
 # ==================== CONFIGURATION ====================
 GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
@@ -30,7 +34,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/generative-language.tuning"
 ]
 
-# Data Storage
+# Data Storage (must remain in auth.py as other files import it)
 user_sessions = {}
 SESSION_TIMEOUT = timedelta(minutes=30)
 
@@ -139,6 +143,7 @@ def refresh_oauth_token(user_id: str) -> bool:
 
 
 # ==================== OAUTH ROUTES ====================
+@auth_bp.route('/auth/login', methods=['GET'])
 def auth_login():
     """Initiate Google OAuth flow (no double-login & no unnecessary prompt=consent)."""
     try:
@@ -178,7 +183,7 @@ def auth_login():
         print(f"❌ OAuth initiation error: {e}")
         return jsonify({"error": f"Failed to initiate OAuth: {str(e)}"}), 500
 
-
+@auth_bp.route('/oauth2callback', methods=['GET'])
 def oauth_callback():
     """Handle OAuth callback safely."""
     try:
@@ -199,7 +204,7 @@ def oauth_callback():
         if not stored_state:
             print("❌ Error: No state found in session. Cookie might have been dropped.")
             # Debug hint:
-            print(f"   Session keys present: {list(session.keys())}")
+            print(f"     Session keys present: {list(session.keys())}")
             return redirect(f'{CLIENT_REDIRECT_URL}?error=invalid_state&reason=missing_session')
 
         if state != stored_state:
@@ -281,7 +286,7 @@ def oauth_callback():
         session.clear()
         return redirect(f'{CLIENT_REDIRECT_URL}?error=callback_error')
 
-
+@auth_bp.route('/auth/token/refresh', methods=['POST'])
 def refresh_token():
     """Refresh access token using refresh token"""
     try:
@@ -333,7 +338,7 @@ def refresh_token():
         print(f"❌ Token refresh error: {e}")
         return jsonify({"error": str(e)}), 500
 
-
+@auth_bp.route('/auth/logout', methods=['POST'])
 def logout():
     """Logout and clear all sessions"""
     try:
@@ -370,7 +375,7 @@ def logout():
         print(f"❌ Logout error: {e}")
         return jsonify({"error": str(e)}), 500
 
-
+@auth_bp.route('/auth/status', methods=['GET'])
 def auth_status():
     """Check authentication via JWT first, fallback to server session."""
     try:
@@ -473,4 +478,5 @@ def cleanup_expired_sessions():
 
     for user_id in expired_users:
         del user_sessions[user_id]
+
         print(f"🧹 Cleaned up expired session for user: {user_id}")
