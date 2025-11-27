@@ -1,7 +1,4 @@
 // ==================== CONFIGURATION & STATE ====================
-// 🛠️ SMART API URL DETECTION
-// If you are running locally, it points to localhost.
-// If you are on Vercel, it points to your Render Backend.
 const IS_LOCALHOST = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const API_BASE_URL = IS_LOCALHOST ? 'http://localhost:5000' : 'https://stock-dashboard-fqtn.onrender.com';
 
@@ -9,9 +6,9 @@ const CONFIG = {
     API_BASE_URL: API_BASE_URL,
     DEBOUNCE_DELAY: 300,
     MAX_AUTOCOMPLETE_ITEMS: 8,
-    MAX_CHART_POINTS: 30, // Increased for better chart history
+    MAX_CHART_POINTS: 30,
     SESSION_STORAGE_KEY: 'userSession',
-    THROTTLE_DELAY: 100
+    OAUTH_STATE_KEY: 'oauthState'
 };
 
 console.log(`🚀 App initialized. Backend set to: ${CONFIG.API_BASE_URL}`);
@@ -19,7 +16,7 @@ console.log(`🚀 App initialized. Backend set to: ${CONFIG.API_BASE_URL}`);
 const STATE = {
     stockDatabase: [],
     selectedIndex: -1,
-    filteredStocks: [], // This is transient, no need to save
+    filteredStocks: [],
     isSidebarCollapsed: false,
     charts: { ohlcv: null, rsi: null, movingAverages: null, macd: null },
     currentSessionId: generateSessionId(),
@@ -30,10 +27,7 @@ const STATE = {
 };
 const DOM = {};
 
-// FIX: Global variables for session management
-let sessionExpiresAt = 0;
 let sessionTimerInterval = null;
-
 
 // ==================== UTILITY FUNCTIONS ====================
 function generateSessionId() {
@@ -48,21 +42,14 @@ function debounce(func, wait) {
     };
 }
 
-function formatPrice(price) {
-    return price != null ? `$${price.toFixed(2)}` : 'N/A';
-}
-
-function formatNumber(num) {
-    return num != null ? num.toLocaleString() : 'N/A';
-}
-
+function formatPrice(price) { return price != null ? `$${price.toFixed(2)}` : 'N/A'; }
+function formatNumber(num) { return num != null ? num.toLocaleString() : 'N/A'; }
 function getRsiColor(rsi) {
     if (rsi == null) return '#6b7280';
     if (rsi > 70) return '#ef4444';
     if (rsi < 30) return '#10b981';
     return '#6b7280';
 }
-
 function getRsiBackground(rsi) {
     if (rsi == null) return '#f3f4f6';
     if (rsi > 70) return '#fef2f2';
@@ -70,87 +57,16 @@ function getRsiBackground(rsi) {
     return '#f8fafc';
 }
 
-// ==================== OAUTH AUTHENTICATION & SESSION TIMER (FIXED) ====================
-
-// FIX: Functions to control the Auth Overlay and User Info Bar
-function showAuthOverlay() {
-    document.getElementById('auth-overlay')?.classList.remove('hidden');
-    document.getElementById('user-info-bar')?.classList.add('hidden');
-    stopSessionTimer();
-}
-
-function hideAuthOverlay() {
-    document.getElementById('auth-overlay')?.classList.add('hidden');
-}
-
-function showUserInfo(user) {
-    const userInfoBar = document.getElementById('user-info-bar');
-    if (!userInfoBar) return;
-
-    document.getElementById('user-name').textContent = user.name;
-    const userAvatar = document.getElementById('user-avatar');
-    if (userAvatar) userAvatar.src = user.picture || '/default-avatar.png';
-
-    userInfoBar.classList.remove('hidden');
-}
-
-function startSessionTimer(expiresInSeconds) {
-    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
-    sessionExpiresAt = Date.now() + (expiresInSeconds * 1000);
-
-    const updateTimer = () => {
-        const remaining = sessionExpiresAt - Date.now();
-        const totalSeconds = Math.max(0, Math.floor(remaining / 1000));
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-
-        const timerElement = document.getElementById('session-timer');
-        if (timerElement) {
-            timerElement.textContent = `Session: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-
-        const warningElement = document.getElementById('session-warning');
-        if (warningElement) {
-            if (totalSeconds > 0 && totalSeconds <= 120) {
-                const warningTimeElement = document.getElementById('warning-time');
-                warningTimeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                warningElement.classList.remove('hidden');
-            } else {
-                warningElement.classList.add('hidden');
-            }
-        }
-
-        if (remaining <= 0) {
-            stopSessionTimer();
-            showNotification('Session expired. Please sign in again.', 'error');
-            handleLogout(false);
-        }
-    };
-
-    sessionTimerInterval = setInterval(updateTimer, 1000);
-    updateTimer();
-}
-
-function stopSessionTimer() {
-    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
-    sessionTimerInterval = null;
-    document.getElementById('session-warning')?.classList.add('hidden');
-    const timerElement = document.getElementById('session-timer');
-    if (timerElement) {
-        timerElement.textContent = 'Session: Expired';
-    }
-}
-
+// ==================== OAUTH AUTHENTICATION (STATELESS FLOW) ====================
 async function handleGoogleLogin() {
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, {
-            credentials: 'include' // 🛠️ FIX: Ensure credentials (cookies) are sent
-        });
+        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, { credentials: 'include' });
         const data = await response.json();
-        if (data.auth_url) {
+        if (data.auth_url && data.state) {
+            localStorage.setItem(CONFIG.OAUTH_STATE_KEY, data.state); // Store state
             window.location.href = data.auth_url;
         } else {
-            console.error('No auth URL received');
+            showNotification('Could not initiate login. Please try again.', 'error');
         }
     } catch (error) {
         console.error('Login error:', error);
@@ -158,22 +74,53 @@ async function handleGoogleLogin() {
     }
 }
 
-async function checkAuthStatus() {
+async function handleOAuthCallback() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    const storedState = localStorage.getItem(CONFIG.OAUTH_STATE_KEY);
+
+    if (!code || !state) {
+        // This is not a callback, just a normal page load
+        return;
+    }
+
+    // Clean the URL
+    window.history.replaceState({}, document.title, "/");
+    localStorage.removeItem(CONFIG.OAUTH_STATE_KEY);
+
+    if (state !== storedState) {
+        showNotification('Authentication failed: State mismatch. Please try again.', 'error');
+        return;
+    }
+
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/status`, {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/oauth2callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, state, stored_state: storedState }),
             credentials: 'include'
         });
-        const data = await response.json();
 
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showNotification('Login successful!', 'success');
+            await checkAuthStatus(); // Refresh user state and UI
+        } else {
+            throw new Error(data.error || 'Callback failed');
+        }
+    } catch (error) {
+        console.error('OAuth callback error:', error);
+        showNotification(`Authentication failed: ${error.message}`, 'error');
+    }
+}
+
+async function checkAuthStatus() {
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/status`, { credentials: 'include' });
+        const data = await response.json();
         STATE.isAuthenticated = data.authenticated;
         STATE.user = data.user || null;
-
-        if (data.authenticated && data.user && data.user.expires_in) {
-            startSessionTimer(data.user.expires_in);
-        } else {
-            stopSessionTimer();
-        }
-
         updateAuthUI();
         return data.authenticated;
     } catch (error) {
@@ -187,29 +134,29 @@ async function checkAuthStatus() {
 
 async function handleLogout(showNotify = true) {
     try {
-        await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, {
-            method: 'POST',
-            credentials: 'include'
-        });
+        await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
     } catch (error) {
         console.error('Logout request failed:', error);
     } finally {
         STATE.isAuthenticated = false;
         STATE.user = null;
-        stopSessionTimer();
         updateAuthUI();
-        if (showNotify) {
-            showNotification('Logged out successfully', 'success');
-        }
+        if (showNotify) showNotification('Logged out successfully', 'success');
     }
 }
 
 function updateAuthUI() {
     if (STATE.isAuthenticated && STATE.user) {
-        hideAuthOverlay();
-        showUserInfo(STATE.user);
+        document.getElementById('auth-overlay')?.classList.add('hidden');
+        const userInfoBar = document.getElementById('user-info-bar');
+        if (userInfoBar) {
+            userInfoBar.classList.remove('hidden');
+            document.getElementById('user-name').textContent = STATE.user.name;
+            document.getElementById('user-avatar').src = STATE.user.picture || `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23e2e8f0'/><text x='50' y='55' font-size='40' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'>👤</text></svg>`;
+        }
     } else {
-        showAuthOverlay();
+        document.getElementById('auth-overlay')?.classList.remove('hidden');
+        document.getElementById('user-info-bar')?.classList.add('hidden');
     }
 }
 
@@ -217,14 +164,6 @@ function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.textContent = message;
-    notification.style.cssText = `
-        position: fixed; top: 20px; right: 20px; padding: 12px 20px;
-        background: ${type === 'error' ? '#fef2f2' : type === 'success' ? '#f0fdf4' : '#f0f9ff'};
-        color: ${type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#0369a1'};
-        border: 1px solid ${type === 'error' ? '#fecaca' : type === 'success' ? '#bbf7d0' : '#bae6fd'};
-        border-radius: 8px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    `;
-
     document.body.appendChild(notification);
     setTimeout(() => notification.remove(), 5000);
 }
@@ -234,6 +173,7 @@ document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
     cacheDOMElements();
+    await handleOAuthCallback(); // Handle redirect before anything else
     await loadStockDatabase();
     initializeEventListeners();
     initializeSidebar();
@@ -244,40 +184,20 @@ async function init() {
 }
 
 function cacheDOMElements() {
-    DOM.symbolInput = document.getElementById('symbol');
-    DOM.autocompleteDiv = document.getElementById('autocomplete');
-    DOM.outputDiv = document.getElementById('output');
-    DOM.loadingDiv = document.getElementById('loading');
-    DOM.errorDiv = document.getElementById('error');
-    DOM.searchBtn = document.getElementById('searchBtn');
-    DOM.sidebar = document.getElementById('sidebar');
-    DOM.sidebarStocks = document.getElementById('sidebarStocks');
-    DOM.sidebarSearch = document.getElementById('sidebarSearch');
-    DOM.chatToggle = document.getElementById('chat-toggle');
-    DOM.chatWindow = document.getElementById('chat-window');
-    DOM.chatMessages = document.getElementById('chat-messages');
-    DOM.chatInput = document.getElementById('chat-input');
-    DOM.chatSend = document.getElementById('chat-send');
-    DOM.chatClose = document.getElementById('chat-close');
-    DOM.chatRefresh = document.getElementById('chat-refresh');
-    DOM.contextSymbol = document.getElementById('context-symbol'); // Ensure this is cached
-
-    if (DOM.errorDiv) DOM.errorDiv.style.display = 'none';
-    if (DOM.loadingDiv) DOM.loadingDiv.style.display = 'none';
+    const ids = ['symbol', 'autocomplete', 'output', 'loading', 'error', 'searchBtn', 'sidebar', 'sidebarStocks', 'sidebarSearch', 'chat-toggle', 'chat-window', 'chat-messages', 'chat-input', 'chat-send', 'chat-close', 'chat-refresh', 'context-symbol'];
+    ids.forEach(id => DOM[id] = document.getElementById(id));
+    if (DOM.error) DOM.error.style.display = 'none';
+    if (DOM.loading) DOM.loading.style.display = 'none';
 }
 
 async function loadStockDatabase() {
     try {
-        // Keeps relative path because stock-data.json is on the Frontend server (Vercel)
-        const response = await fetch('stock-data.json', {
-            credentials: 'include' // 🛠️ FIX: Ensure credentials (cookies) are sent
-        });
+        const response = await fetch('stock-data.json');
         const data = await response.json();
         STATE.stockDatabase = data.stocks || [];
         console.log(`✅ Loaded ${STATE.stockDatabase.length} stocks`);
     } catch (error) {
         console.error('❌ Error loading stock data:', error);
-        STATE.stockDatabase = [];
     }
 }
 
@@ -301,19 +221,17 @@ function loadSessionState() {
             STATE.currentSessionId = savedSession.currentSessionId || STATE.currentSessionId;
             STATE.currentSymbol = savedSession.currentSymbol || null;
             STATE.isSidebarCollapsed = savedSession.isSidebarCollapsed || false;
-
-            if (STATE.currentSymbol) DOM.symbolInput.value = STATE.currentSymbol;
+            if (STATE.currentSymbol) DOM.symbol.value = STATE.currentSymbol;
         }
     } catch (error) {
         console.error('Could not load session state:', error);
-        // If parsing fails, start with a fresh state
     }
-    saveSessionState(); // Save initial state if none exists
+    saveSessionState();
 }
 
 function showWelcomeMessage() {
-    if (!STATE.currentSymbol) {
-        DOM.outputDiv.innerHTML = `
+    if (!STATE.currentSymbol && DOM.output) {
+        DOM.output.innerHTML = `
             <div style="text-align: center; padding: 60px 20px; color: #6b7280;">
                 <div style="font-size: 4rem; margin-bottom: 20px;">📊</div>
                 <h2 style="color: #374151; margin-bottom: 10px;">Welcome to Stock Analysis</h2>
@@ -323,18 +241,14 @@ function showWelcomeMessage() {
     }
 }
 
-// ==================== EVENT LISTENERS ====================
+// ==================== EVENT LISTENERS & UI ====================
 function initializeEventListeners() {
-    DOM.symbolInput.addEventListener('input', debounce(handleAutocompleteInput, CONFIG.DEBOUNCE_DELAY));
-    DOM.symbolInput.addEventListener('keydown', handleAutocompleteKeydown);
-
-    const searchForm = document.querySelector('.search-form');
-    if (searchForm) searchForm.addEventListener('submit', handleSearchSubmit);
-
+    DOM.symbol.addEventListener('input', debounce(handleAutocompleteInput, CONFIG.DEBOUNCE_DELAY));
+    DOM.symbol.addEventListener('keydown', handleAutocompleteKeydown);
+    document.querySelector('.search-form')?.addEventListener('submit', handleSearchSubmit);
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.input-wrapper')) hideAutocomplete();
     });
-
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             hideAutocomplete();
@@ -347,26 +261,19 @@ function initializeEventListeners() {
 
 function handleAutocompleteInput(e) {
     const query = e.target.value.trim().toUpperCase();
-
     if (!query) {
         hideAutocomplete();
         return;
     }
-
     STATE.filteredStocks = STATE.stockDatabase
-        .filter(stock =>
-            stock.symbol.toUpperCase().includes(query) ||
-            stock.name.toUpperCase().includes(query)
-        )
+        .filter(stock => stock.symbol.toUpperCase().includes(query) || stock.name.toUpperCase().includes(query))
         .slice(0, CONFIG.MAX_AUTOCOMPLETE_ITEMS);
-
     STATE.filteredStocks.length > 0 ? showAutocomplete(STATE.filteredStocks) : hideAutocomplete();
 }
 
 function handleAutocompleteKeydown(e) {
-    const items = DOM.autocompleteDiv.querySelectorAll('.autocomplete-item');
+    const items = DOM.autocomplete.querySelectorAll('.autocomplete-item');
     if (!items.length) return;
-
     switch(e.key) {
         case 'ArrowDown':
             e.preventDefault();
@@ -380,15 +287,10 @@ function handleAutocompleteKeydown(e) {
             break;
         case 'Enter':
             e.preventDefault();
-            if (STATE.selectedIndex >= 0) {
-                items[STATE.selectedIndex].click();
-            } else {
-                document.querySelector('.search-form')?.requestSubmit();
-            }
+            if (STATE.selectedIndex >= 0) items[STATE.selectedIndex].click();
+            else document.querySelector('.search-form')?.requestSubmit();
             break;
-        case 'Escape':
-            hideAutocomplete();
-            break;
+        case 'Escape': hideAutocomplete(); break;
     }
 }
 
@@ -397,20 +299,19 @@ function handleSearchSubmit(e) {
     fetchData();
 }
 
-// ==================== AUTOCOMPLETE ====================
 function showAutocomplete(stocks) {
     STATE.selectedIndex = -1;
-    DOM.autocompleteDiv.innerHTML = stocks.map(stock => `
+    DOM.autocomplete.innerHTML = stocks.map(stock => `
         <div class="autocomplete-item" onclick="selectStock('${stock.symbol}')">
             <div class="ticker-symbol">${stock.symbol}</div>
             <div class="company-name">${stock.name}</div>
         </div>
     `).join('');
-    DOM.autocompleteDiv.classList.add('active');
+    DOM.autocomplete.classList.add('active');
 }
 
 function hideAutocomplete() {
-    DOM.autocompleteDiv.classList.remove('active');
+    DOM.autocomplete.classList.remove('active');
     STATE.selectedIndex = -1;
 }
 
@@ -419,16 +320,15 @@ function updateAutocompleteSelection(items) {
         item.classList.toggle('selected', index === STATE.selectedIndex);
         if (index === STATE.selectedIndex) {
             item.scrollIntoView({ block: 'nearest' });
-            DOM.symbolInput.value = item.querySelector('.ticker-symbol').textContent;
+            DOM.symbol.value = item.querySelector('.ticker-symbol').textContent;
         }
     });
 }
 
 function selectStock(symbol) {
-    DOM.symbolInput.value = symbol;
+    DOM.symbol.value = symbol;
     hideAutocomplete();
-    DOM.symbolInput.focus();
-
+    DOM.symbol.focus();
     const sidebarItem = document.querySelector(`.sidebar-stock-item[data-symbol="${symbol}"]`);
     if (sidebarItem) {
         document.querySelectorAll('.sidebar-stock-item').forEach(item => item.classList.remove('active'));
@@ -705,9 +605,9 @@ function filterSidebarStocks(query) {
 
 function selectStockFromSidebar(symbol) {
     // 1. Update the search input
-    DOM.symbolInput.value = symbol;
+    DOM.symbol.value = symbol;
     hideAutocomplete();
-    DOM.symbolInput.focus();
+    DOM.symbol.focus();
 
     // 2. Update the active state in the sidebar
     document.querySelectorAll('.sidebar-stock-item').forEach(item => item.classList.remove('active'));
@@ -733,7 +633,7 @@ async function fetchData() {
 
     showLoading();
     hideError();
-    DOM.outputDiv.innerHTML = '';
+    DOM.output.innerHTML = '';
 
    try {
     const response = await fetch(`${CONFIG.API_BASE_URL}/api/get_data`, {
@@ -749,7 +649,7 @@ async function fetchData() {
 
     if (!response.ok) {
         if (response.status === 401) {
-            showError('Authentication Required. Please sign in with Google to view data.');
+            showError('Authentication Required. Please sign in to view data.');
             updateAuthUI();
             return;
         }
@@ -774,27 +674,27 @@ async function fetchData() {
 }
 
 function showLoading() {
-    DOM.loadingDiv.style.display = 'block';
+    DOM.loading.style.display = 'block';
 }
 
 function hideLoading() {
-    DOM.loadingDiv.style.display = 'none';
+    DOM.loading.style.display = 'none';
 }
 
 function hideError() {
-    DOM.errorDiv.style.display = 'none';
+    DOM.error.style.display = 'none';
 }
 
 function showError(message) {
-    DOM.errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
-    DOM.errorDiv.style.display = 'block';
+    DOM.error.innerHTML = `<strong>Error:</strong> ${message}`;
+    DOM.error.style.display = 'block';
 }
 
 // ==================== DATA DISPLAY & CHARTS ====================
 
 function displayData(data) {
     const companyInfo = STATE.stockDatabase.find(s => s.symbol === data.ticker) || { name: 'Technical Analysis Data' };
-    DOM.outputDiv.innerHTML = `
+    DOM.output.innerHTML = `
         <div class="ticker-display">
             <div class="ticker-symbol-main">${data.ticker}</div>
             <div class="ticker-name-main">${companyInfo.name}</div>
@@ -832,7 +732,7 @@ function displayData(data) {
         grid.appendChild(card);
     });
 
-    DOM.outputDiv.appendChild(grid);
+    DOM.output.appendChild(grid);
     renderCharts(data);
 }
 
