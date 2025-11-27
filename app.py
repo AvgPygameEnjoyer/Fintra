@@ -5,7 +5,7 @@ from sys import stdout
 from flask import Flask, request, jsonify, session, redirect, current_app
 from flask_cors import CORS
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 import requests
 import secrets
@@ -16,7 +16,7 @@ import numpy as np
 import statistics
 import math
 import re
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 # Load environment variables (from .env or deployment environment)
 dotenv.load_dotenv()
@@ -70,13 +70,13 @@ def generate_jwt_token(user_data: dict, secret: str, expires_in: str) -> str:
         'user_id': user_data['user_id'],
         'email': user_data['email'],
         'name': user_data.get('name', ''),
-        'exp': datetime.utcnow() + timedelta(seconds=expiry_seconds),
-        'iat': datetime.utcnow()
+        'exp': datetime.now(timezone.utc) + timedelta(seconds=expiry_seconds),
+        'iat': datetime.now(timezone.utc)
     }
     return jwt.encode(payload, secret, algorithm='HS256')
 
 
-def verify_jwt_token(token: str, secret: str) -> dict:
+def verify_jwt_token(token: str, secret: str) -> Optional[dict]:
     """Verify JWT token"""
     try:
         return jwt.decode(token, secret, algorithms=['HS256'])
@@ -142,7 +142,7 @@ def refresh_oauth_token(user_id: str) -> bool:
         if response.status_code == 200:
             tokens = response.json()
             user_session['oauth_token'] = tokens['access_token']
-            user_session['token_expiry'] = datetime.now() + timedelta(seconds=tokens.get('expires_in', 3600))
+            user_session['token_expiry'] = datetime.now(timezone.utc) + timedelta(seconds=tokens.get('expires_in', 3600))
             print(f"✅ OAuth token refreshed for user {user_id}")
             return True
         else:
@@ -169,9 +169,9 @@ def require_auth(f):
                 if user_id in user_sessions:
                     # User authenticated via valid JWT Access Token
                     user_session = user_sessions[user_id]
-                    user_session['expires_at'] = datetime.now() + SESSION_TIMEOUT
+                    user_session['expires_at'] = datetime.now(timezone.utc) + SESSION_TIMEOUT
                     # Check if Google token needs a refresh
-                    if datetime.now() > user_session['token_expiry'] - timedelta(minutes=5):
+                    if datetime.now(timezone.utc) > user_session['token_expiry'] - timedelta(minutes=5):
                         refresh_oauth_token(user_id)
                     session['user_id'] = user_id
                     return f(*args, **kwargs)
@@ -189,7 +189,7 @@ def require_auth(f):
                     session['user_id'] = user_id
 
                     # Check if Google token needs a refresh
-                    if datetime.now() > user_data['token_expiry'] - timedelta(minutes=5):
+                    if datetime.now(timezone.utc) > user_data['token_expiry'] - timedelta(minutes=5):
                         if not refresh_oauth_token(user_id):
                             return jsonify({"error": "Token refresh failed"}), 401
 
@@ -208,14 +208,14 @@ def require_auth(f):
 
         user_session = user_sessions[user_id]
 
-        if datetime.now() > user_session['expires_at']:
+        if datetime.now(timezone.utc) > user_session['expires_at']:
             del user_sessions[user_id]
             session.clear()
             return jsonify({"error": "Session expired. Please sign in again."}), 401
 
-        user_session['expires_at'] = datetime.now() + SESSION_TIMEOUT
+        user_session['expires_at'] = datetime.now(timezone.utc) + SESSION_TIMEOUT
 
-        if datetime.now() > user_session['token_expiry']:
+        if datetime.now(timezone.utc) > user_session['token_expiry']:
             if not refresh_oauth_token(user_id):
                 del user_sessions[user_id]
                 session.clear()
@@ -229,7 +229,7 @@ def require_auth(f):
 # ==================== SESSION CLEANUP ====================
 def cleanup_expired_sessions():
     """Clean up expired user sessions"""
-    current_time = datetime.now()
+    current_time = datetime.now(timezone.utc)
     expired_users = [
         user_id for user_id, session_data in user_sessions.items()
         if current_time > session_data['expires_at']
@@ -251,7 +251,7 @@ def convert_to_serializable(value):
         if np.isnan(value) or np.isinf(value):
             return None
         return float(value)
-    if isinstance(value, (np.bool_)):
+    if isinstance(value, np.bool_):
         return bool(value)
     return value
 
@@ -289,6 +289,7 @@ def compute_macd(series):
     histogram = macd - signal
     return macd, signal, histogram
 
+
 def safe_get(d: Dict, key: str, default=None):
     v = d.get(key, default)
     return None if v is None else v
@@ -325,10 +326,10 @@ def find_recent_macd_crossover(latest_data: List[Dict], lookback: int = 14) -> T
         prev_diff = safe_get(prev, 'MACD', 0) - safe_get(prev, 'Signal', 0)
         curr_diff = safe_get(curr, 'MACD', 0) - safe_get(curr, 'Signal', 0)
         if prev_diff <= 0 and curr_diff > 0:
-            return ('bullish', n - i - 1)
+            return 'bullish', n - i - 1
         if prev_diff >= 0 and curr_diff < 0:
-            return ('bearish', n - i - 1)
-    return ('none', -1)
+            return 'bearish', n - i - 1
+    return 'none', -1
 
 def fmt_price(x):
     try:
@@ -513,21 +514,21 @@ def generate_rule_based_analysis(symbol: str, latest_data: List[Dict], lookback:
 
         def rsi_zone_score_and_note(rsi_val, rsi_vel):
             if rsi_val < 30:
-                return (2.0, "Oversold - potential reversal zone", "🟢")
+                return 2.0, "Oversold - potential reversal zone", "🟢"
             if rsi_val < 40:
-                return (1.0, "Lower neutral (bearish pressure)", "🟢")
+                return 1.0, "Lower neutral (bearish pressure)", "🟢"
             if rsi_val < 60:
-                return (0.5, "Neutral/healthy", "⚪")
+                return 0.5, "Neutral/healthy", "⚪"
             if rsi_val < 70:
                 vel_bonus = 0.5 if rsi_vel > 1.5 else 0.0
-                return (0.5 + vel_bonus, "Bullish zone - momentum building", "🟡")
+                return 0.5 + vel_bonus, "Bullish zone - momentum building", "🟡"
             if rsi_val < 75:
                 if rsi_vel > 2.5:
-                    return (0.5, "Overbought with strong continuation momentum", "🟡")
-                return (-1.0, "Overbought - caution (likely pullback)", "🔴")
+                    return 0.5, "Overbought with strong continuation momentum", "🟡"
+                return -1.0, "Overbought - caution (likely pullback)", "🔴"
             if rsi_vel > 4.0:
-                return (-2.0, "Extremely overbought - exhaustion likely", "🔴")
-            return (-1.5, "Severely overbought - high reversal risk", "🔴")
+                return -2.0, "Extremely overbought - exhaustion likely", "🔴"
+            return -1.5, "Severely overbought - high reversal risk", "🔴"
 
         rsi_score, rsi_note, rsi_emoji = rsi_zone_score_and_note(rsi, rsi_velocity)
 
@@ -574,7 +575,7 @@ def generate_rule_based_analysis(symbol: str, latest_data: List[Dict], lookback:
 
             total_macd = diff_score + slope_score + hist_score + cross_bonus
             note = f"MACD diff={round(diff, 3)}, slope={round(slope, 4)}, hist_slope={round(hist_slope_val, 4)}"
-            return (total_macd, note)
+            return total_macd, note
 
         macd_score_val, macd_note = macd_score_and_note(macd_diff, macd_slope, hist_slope, crossover_type)
 
@@ -872,7 +873,10 @@ def oauth_callback():
             return redirect(f'{CLIENT_REDIRECT_URL}?error=invalid_state&reason=missing_session')
 
         if state != stored_state:
-            print(f"❌ State mismatch! Received: {state[:10]}... | Stored: {stored_state[:10]}...")
+            # 🛠️ FIX: Safely log state values, which could be None
+            state_preview = f"{state[:10]}..." if state else "None"
+            stored_state_preview = f"{stored_state[:10]}..." if stored_state else "None"
+            print(f"❌ State mismatch! Received: {state_preview} | Stored: {stored_state_preview}")
             return redirect(f'{CLIENT_REDIRECT_URL}?error=invalid_state&reason=state_mismatch')
 
         # 1. Exchange authorization code for tokens
@@ -908,6 +912,7 @@ def oauth_callback():
         user_id = user_info.get('sub')
         user_email = user_info.get('email')
         user_name = user_info.get('name')
+        user_picture = user_info.get('picture')
         granted_scopes = tokens.get('scope', '').split(' ')
 
         if not user_id:
@@ -918,10 +923,11 @@ def oauth_callback():
             'user_id': user_id,
             'email': user_email,
             'name': user_name,
+            'picture': user_picture,
             'oauth_token': oauth_token,
             'refresh_token': refresh_token,
-            'token_expiry': datetime.now() + timedelta(seconds=expires_in),
-            'expires_at': datetime.now() + SESSION_TIMEOUT,
+            'token_expiry': datetime.now(timezone.utc) + timedelta(seconds=expires_in),
+            'expires_at': datetime.now(timezone.utc) + SESSION_TIMEOUT,
             'granted_scopes': granted_scopes
         }
 
@@ -963,7 +969,7 @@ def refresh_token():
         # Check if we need to refresh Google Access Token too
         if user_data.get('refresh_token'):
             # Check expiry before force refreshing
-            if datetime.now() > user_data['token_expiry'] - timedelta(minutes=5):
+            if datetime.now(timezone.utc) > user_data['token_expiry'] - timedelta(minutes=5):
                 refresh_oauth_token(user_id) # OAuth token refreshed in user_sessions
 
         new_access_token = generate_jwt_token(user_data, ACCESS_TOKEN_JWT_SECRET, ACCESS_TOKEN_EXPIRETIME)
@@ -1020,9 +1026,10 @@ def auth_status():
                 return jsonify({
                     "authenticated": True,
                     "user": {
-                        "email": user_session['email'],
-                        "name": user_session['name'],
-                        "expires_in": int((user_session['expires_at'] - datetime.now()).total_seconds())
+                        "email": user_session.get('email'),
+                        "name": user_session.get('name'),
+                        "picture": user_session.get('picture'),
+                        "expires_in": int((user_session['expires_at'] - datetime.now(timezone.utc)).total_seconds())
                     }
                 }), 200
 
@@ -1082,12 +1089,12 @@ def get_data():
             conversation_context[user_id] = {
                 "current_symbol": symbol,
                 "conversation_history": [],
-                "last_active": datetime.now().isoformat(),
+                "last_active": datetime.now(timezone.utc).isoformat(),
                 "user_positions": {}
             }
         else:
             conversation_context[user_id]["current_symbol"] = symbol
-            conversation_context[user_id]["last_active"] = datetime.now().isoformat()
+            conversation_context[user_id]["last_active"] = datetime.now(timezone.utc).isoformat()
 
         # 5. Format and return response
         response = {
@@ -1124,7 +1131,7 @@ def chat():
             conversation_context[user_id] = {
                 "current_symbol": None,
                 "conversation_history": [],
-                "last_active": datetime.now().isoformat(),
+                "last_active": datetime.now(timezone.utc).isoformat(),
                 "user_positions": {}
             }
         
@@ -1133,7 +1140,7 @@ def chat():
         if "user_positions" not in session_ctx:
             session_ctx["user_positions"] = {}
         
-        session_ctx["last_active"] = datetime.now().isoformat()
+        session_ctx["last_active"] = datetime.now(timezone.utc).isoformat()
 
         # 2. Determine current symbol context
         matched_symbol = None
@@ -1171,7 +1178,7 @@ def chat():
                 entry_price = float(position_match.group(1))
                 session_ctx["user_positions"][matched_symbol] = {
                     "entry_price": entry_price,
-                    "date": datetime.now().isoformat()
+                    "date": datetime.now(timezone.utc).isoformat()
                 }
                 position_info = f"The user just updated their position: they are **long** {matched_symbol} with an **entry price of ${entry_price}**."
             
@@ -1238,7 +1245,7 @@ Respond now:"""
         session_ctx["conversation_history"].append({
             "user": query,
             "assistant": assistant_response,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
         if len(session_ctx["conversation_history"]) > 15:
@@ -1319,6 +1326,3 @@ if __name__ == "__main__":
     # ==================== END DIAGNOSTICS ====================
     
     app.run(host=host, port=port, debug=not is_production)
-
-
-

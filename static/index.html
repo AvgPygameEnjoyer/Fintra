@@ -203,17 +203,11 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
-
-        #session-warning strong {
-            color: #92400e;
-            display: block;
-            margin-bottom: 5px;
-        }
     </style>
 </head>
 <body>
     
-    <div id="auth-overlay">
+    <div id="auth-overlay" class="hidden">
         <div class="auth-card">
             <h1>📊 Stock Analysis</h1>
             <p>Sign in with Google to unlock AI-powered analysis</p>
@@ -237,8 +231,8 @@
         </div>
     </div>
     
-    <div id="user-info-bar">
-        <img id="user-avatar" src="/default-avatar.png" alt="User Avatar" class="user-avatar">
+    <div id="user-info-bar" class="hidden">
+        <img id="user-avatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23e2e8f0'/><text x='50' y='55' font-size='40' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'>👤</text></svg>" alt="User Avatar" class="user-avatar">
         <div class="user-details">
             <div class="user-name" id="user-name">Loading...</div>
             <div class="session-timer" id="session-timer">Session: 10:00</div>
@@ -246,7 +240,7 @@
         <button class="logout-btn" onclick="handleLogout()">Logout</button>
     </div>
     
-    <div class="session-warning" id="session-warning">
+    <div id="session-warning" class="hidden">
         <strong>⚠️ Session Expiring Soon</strong>
         <p>Your session will expire in <span id="warning-time">2 minutes</span>. Please save your work.</p>
     </div>
@@ -276,7 +270,7 @@
                     <input type="text" id="symbol" class="search-input" placeholder="Enter stock symbol (e.g., AAPL, RELIANCE)">
                     <div id="autocomplete" class="autocomplete-dropdown"></div>
                 </div>
-                <button id="searchBtn" class="search-btn" type="submit" disabled>Search</button>
+                <button id="searchBtn" class="search-btn" type="submit">Search</button>
             </form>
         </div>
 

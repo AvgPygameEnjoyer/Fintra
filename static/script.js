@@ -76,7 +76,7 @@ function getRsiBackground(rsi) {
 // FIX: Functions to control the Auth Overlay and User Info Bar
 function showAuthOverlay() {
     document.getElementById('auth-overlay')?.classList.remove('hidden');
-    document.getElementById('user-info-bar')?.classList.remove('visible');
+    document.getElementById('user-info-bar')?.classList.add('hidden');
     stopSessionTimer();
 }
 
@@ -92,11 +92,12 @@ function showUserInfo(user) {
     const userAvatar = document.getElementById('user-avatar');
     if (userAvatar) userAvatar.src = user.picture || '/default-avatar.png';
 
-    userInfoBar.classList.add('visible');
+    userInfoBar.classList.remove('hidden');
 }
 
-function startSessionTimer() {
+function startSessionTimer(expiresInSeconds) {
     if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+    sessionExpiresAt = Date.now() + (expiresInSeconds * 1000);
 
     const updateTimer = () => {
         const remaining = sessionExpiresAt - Date.now();
@@ -109,34 +110,32 @@ function startSessionTimer() {
             timerElement.textContent = `Session: ${minutes}:${seconds.toString().padStart(2, '0')}`;
         }
 
-        // Show warning when under 2 minutes (120 seconds)
         const warningElement = document.getElementById('session-warning');
         if (warningElement) {
             if (totalSeconds > 0 && totalSeconds <= 120) {
                 const warningTimeElement = document.getElementById('warning-time');
                 warningTimeElement.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-                warningElement.classList.add('visible');
+                warningElement.classList.remove('hidden');
             } else {
-                warningElement.classList.remove('visible');
+                warningElement.classList.add('hidden');
             }
         }
 
-        // Session expired
         if (remaining <= 0) {
             stopSessionTimer();
             showNotification('Session expired. Please sign in again.', 'error');
-            handleLogout(false); // Logout without showing another notification
+            handleLogout(false);
         }
     };
 
     sessionTimerInterval = setInterval(updateTimer, 1000);
-    updateTimer(); // Call immediately to avoid 1-second delay
+    updateTimer();
 }
 
 function stopSessionTimer() {
     if (sessionTimerInterval) clearInterval(sessionTimerInterval);
     sessionTimerInterval = null;
-    document.getElementById('session-warning')?.classList.remove('visible');
+    document.getElementById('session-warning')?.classList.add('hidden');
     const timerElement = document.getElementById('session-timer');
     if (timerElement) {
         timerElement.textContent = 'Session: Expired';
@@ -168,10 +167,8 @@ async function checkAuthStatus() {
         STATE.isAuthenticated = data.authenticated;
         STATE.user = data.user || null;
 
-        // FIX: Start session timer if authenticated and expiration is provided
-        if (data.authenticated && data.expires_in_seconds) {
-            sessionExpiresAt = Date.now() + (data.expires_in_seconds * 1000);
-            startSessionTimer();
+        if (data.authenticated && data.user && data.user.expires_in) {
+            startSessionTimer(data.user.expires_in);
         } else {
             stopSessionTimer();
         }
@@ -187,29 +184,25 @@ async function checkAuthStatus() {
     }
 }
 
-// FIX: Updated handleLogout to include timer management and optional notification
 async function handleLogout(showNotify = true) {
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, {
+        await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, {
             method: 'POST',
             credentials: 'include'
         });
-
-        if (response.ok) {
-            STATE.isAuthenticated = false;
-            STATE.user = null;
-            stopSessionTimer(); // Stop timer on successful logout
-            updateAuthUI();
-            if (showNotify) {
-                showNotification('Logged out successfully', 'success');
-            }
-        }
     } catch (error) {
-        console.error('Logout error:', error);
+        console.error('Logout request failed:', error);
+    } finally {
+        STATE.isAuthenticated = false;
+        STATE.user = null;
+        stopSessionTimer();
+        updateAuthUI();
+        if (showNotify) {
+            showNotification('Logged out successfully', 'success');
+        }
     }
 }
 
-// FIX: New updateAuthUI to control index.html's fixed UI elements
 function updateAuthUI() {
     if (STATE.isAuthenticated && STATE.user) {
         hideAuthOverlay();
@@ -245,7 +238,6 @@ async function init() {
     initializeSidebar();
     initializeChat();
     loadSessionState();
-    // FIX: checkAuthStatus now handles starting the timer/showing the correct UI
     await checkAuthStatus();
     showWelcomeMessage();
 }
@@ -1463,5 +1455,3 @@ function updateChatContextIndicator(symbol) {
         DOM.contextSymbol.style.color = symbol ? '#667eea' : '#ef4444';
     }
 }
-
-
