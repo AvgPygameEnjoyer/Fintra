@@ -1,5 +1,5 @@
-import { deps, log } from './config.js';
-import { handleGoogleLogin, handleOAuthCallback, checkAuthStatus, handleLogout, updateAuthUI, loadSessionState, saveSessionState, showWelcomeMessage } from './auth.js';
+import { deps } from './config.js';
+import { handleGoogleLogin, handleOAuthCallback, checkAuthStatus, handleLogout, updateAuthUI, loadSessionState, saveSessionState, showWelcomeMessage, log } from './auth.js';
 import { initialize as initializeDOM } from './dom.js';
 import { initialize as initializeEvents } from './events.js';
 import { setupSidebar } from './sidebar.js';
@@ -17,6 +17,8 @@ async function init() {
 
     log.debug('Step 3: Caching DOM elements...');
     initializeDOM();
+    // Populate the dependency container
+    deps.log = log;
     deps.updateAuthUI = updateAuthUI; // Add auth UI updater to deps
 
     log.debug('Step 4: Initializing event listeners...');

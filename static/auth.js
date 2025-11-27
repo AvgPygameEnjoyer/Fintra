@@ -2,10 +2,36 @@
 import { deps } from './config.js';
 import { showNotification } from './notifications.js';
 
+// ==================== LOGGER (MOVED) ====================
+const IS_LOCALHOST = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3,
+};
+const CURRENT_LOG_LEVEL = IS_LOCALHOST ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
+
+export const log = {
+    debug: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.DEBUG) console.log('%c🐛 DEBUG', 'color: #9ca3af;', ...args);
+    },
+    info: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.INFO) console.log('%cℹ️ INFO', 'color: #3b82f6; font-weight: bold;', ...args);
+    },
+    warn: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.WARN) console.warn('%c⚠️ WARN', 'color: #f97316; font-weight: bold;', ...args);
+    },
+    error: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.ERROR) console.error('%c❌ ERROR', 'color: #ef4444; font-weight: bold;', ...args);
+    }
+};
+
 const { STATE, DOM, CONFIG } = deps;
 
 export async function handleGoogleLogin() {
     try {
+        log.debug('Initiating Google login...');
         const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, { credentials: 'include' });
         const data = await response.json();
         if (data.auth_url && data.state) {
@@ -13,10 +39,11 @@ export async function handleGoogleLogin() {
             window.location.href = data.auth_url;
         } else {
             showNotification('Could not initiate login. Please try again.', 'error');
+            log.error('Failed to get auth URL from backend.', data);
         }
     } catch (error) {
-        console.error('Login error:', error);
-        showNotification('Login failed. Please try again.', 'error');
+        log.error('Login error:', error);
+        showNotification('Login failed due to a network or server error.', 'error');
     }
 }
 
@@ -27,6 +54,7 @@ export async function handleOAuthCallback() {
     const storedState = localStorage.getItem(CONFIG.OAUTH_STATE_KEY);
 
     if (!code || !state) {
+        log.debug('No OAuth code or state in URL, continuing normally.');
         return;
     }
 
@@ -34,7 +62,8 @@ export async function handleOAuthCallback() {
     localStorage.removeItem(CONFIG.OAUTH_STATE_KEY);
 
     if (state !== storedState) {
-        showNotification('Authentication failed: State mismatch. Please try again.', 'error');
+        log.error('OAuth state mismatch. Aborting authentication.');
+        showNotification('Authentication failed: Security token mismatch. Please try again.', 'error');
         return;
     }
 
@@ -54,8 +83,8 @@ export async function handleOAuthCallback() {
             throw new Error(data.error || 'Callback failed');
         }
     } catch (error) {
-        console.error('OAuth callback error:', error);
-        showNotification(`Authentication failed: ${error.message}`, 'error');
+        log.error('OAuth callback error:', error);
+        showNotification(`Authentication failed: ${error.message}.`, 'error');
     }
 }
 
@@ -68,7 +97,7 @@ export async function checkAuthStatus() {
         updateAuthUI();
         return data.authenticated;
     } catch (error) {
-        console.error('Auth check error:', error);
+        log.error('Auth check error:', error);
         STATE.isAuthenticated = false;
         STATE.user = null;
         updateAuthUI();
@@ -79,8 +108,8 @@ export async function checkAuthStatus() {
 export async function handleLogout(showNotify = true) {
     try {
         await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
-    } catch (error) {
-        console.error('Logout request failed:', error);
+    } catch (error) { // Log the error but proceed with UI logout regardless
+        log.warn('Logout request to backend failed, but logging out on client-side anyway.', error);
     } finally {
         STATE.isAuthenticated = false;
         STATE.user = null;
@@ -120,7 +149,7 @@ export function saveSessionState() {
         };
         localStorage.setItem(CONFIG.SESSION_STORAGE_KEY, JSON.stringify(sessionToSave));
     } catch (error) {
-        console.error('Could not save session state:', error);
+        log.error('Could not save session state:', error);
     }
 }
 
@@ -134,7 +163,7 @@ export function loadSessionState() {
             if (STATE.currentSymbol && DOM.symbol) DOM.symbol.value = STATE.currentSymbol;
         }
     } catch (error) {
-        console.error('Could not load session state:', error);
+        log.error('Could not load session state:', error);
     }
     saveSessionState();
 }
