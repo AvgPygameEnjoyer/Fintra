@@ -507,18 +507,22 @@ app = Flask(__name__, static_folder="static")
 app.secret_key = os.getenv('FLASK_SECRET_KEY')
 if not app.secret_key:
     if is_production:
-        logger.critical("FATAL: FLASK_SECRET_KEY is required in production.")
-        raise EnvironmentError("FLASK_SECRET_KEY is required in production.")
+        logger.critical("FATAL: FLASK_SECRET_KEY is required in production environment.")
+        raise EnvironmentError("FLASK_SECRET_KEY is required in production environment.")
     else:
         app.secret_key = 'dev_fixed_key_for_local_testing_only'
         logger.warning("Using development fallback FLASK_SECRET_KEY.")
 
 if is_production:
-    app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='Lax')
-    logger.info("Running in PRODUCTION mode. Session cookies are Secure and Lax.")
+    # FIX: Set SameSite to 'None' for cross-domain OAuth to work with browsers' modern security policies.
+    # This is necessary because the frontend (Vercel) and backend (Render) are on different domains.
+    # 'None' requires the 'Secure' flag to be True, which is correctly set here for HTTPS.
+    app.config.update(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE='None')
+    logger.info("Running in PRODUCTION mode. Session cookies are Secure and SameSite=None.")
 else:
+    # For local development (HTTP), 'Lax' is sufficient and correct.
     app.config.update(SESSION_COOKIE_SECURE=False, SESSION_COOKIE_SAMESITE='Lax')
-    logger.info("Running in DEVELOPMENT mode. Session cookies are Insecure (HTTP) and Lax.")
+    logger.info("Running in DEVELOPMENT mode. Session cookies are Insecure and SameSite=Lax.")
 
 CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://localhost:5000", "https://budgetwarrenbuffet.vercel.app", CLIENT_REDIRECT_URL], methods=["GET", "POST", "OPTIONS"])
 app.permanent_session_lifetime = timedelta(days=7)
