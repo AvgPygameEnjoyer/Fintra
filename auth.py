@@ -46,7 +46,7 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         access_token,
         httponly=True,
         secure=is_production,
-        samesite='Lax',
+        samesite='None' if is_production else 'Lax',
         max_age=Config.parse_time_to_seconds(Config.ACCESS_TOKEN_EXPIRETIME),
         domain=cookie_domain
     )
@@ -56,7 +56,7 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         refresh_token,
         httponly=True,
         secure=is_production,
-        samesite='Lax',
+        samesite='None' if is_production else 'Lax',
         max_age=Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME),
         domain=cookie_domain
     )

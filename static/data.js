@@ -3,15 +3,15 @@ import { deps } from './config.js';
 import { showLoading, hideLoading, hideError, showError } from './dom.js';
 import { displayData } from './display.js';
 import { updateAuthUI } from './auth.js';
-
-const { CONFIG, STATE, log } = deps;
+ 
+const { CONFIG, STATE } = deps;
 
 export async function loadStockDatabase() {
     try {
         const response = await fetch('stock-data.json');
         const data = await response.json();
         STATE.stockDatabase = data.stocks || [];
-        log.info(`Loaded ${STATE.stockDatabase.length} stocks into database.`);
+        deps.log.info(`Loaded ${STATE.stockDatabase.length} stocks into database.`);
     } catch (error) {
         console.error('❌ Error loading stock data:', error);
     }
@@ -19,7 +19,7 @@ export async function loadStockDatabase() {
 
 export async function fetchData() {
     if (!STATE.currentSymbol) return;
-    log.debug(`Fetching data for symbol: ${STATE.currentSymbol}`);
+    deps.log.debug(`Fetching data for symbol: ${STATE.currentSymbol}`);
 
     showLoading();
     hideError();
@@ -50,14 +50,14 @@ export async function fetchData() {
 
         if (data.error) {
             showError(data.error);
-            log.warn(`API returned an error for ${STATE.currentSymbol}:`, data.error);
+            deps.log.warn(`API returned an error for ${STATE.currentSymbol}:`, data.error);
         } else {
             displayData(data);
-            log.debug(`Successfully displayed data for ${STATE.currentSymbol}`);
+            deps.log.debug(`Successfully displayed data for ${STATE.currentSymbol}`);
         }
 
     } catch (error) {
-        log.error('Fetch error:', error);
+        deps.log.error('Fetch error:', error);
         showError(`Failed to fetch data for ${STATE.currentSymbol}. Please try another symbol.`);
     } finally {
         hideLoading();

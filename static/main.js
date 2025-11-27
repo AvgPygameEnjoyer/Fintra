@@ -10,6 +10,10 @@ import { hideAutocomplete } from './autocomplete.js';
 async function init() {
     log.info('Initializing application...');
 
+    // Step 1: Populate the dependency container immediately.
+    deps.log = log;
+    deps.updateAuthUI = updateAuthUI;
+
     log.debug('Step 1: Handling OAuth callback...');
     await handleOAuthCallback();
     log.debug('Step 2: Loading stock database...');
@@ -17,9 +21,6 @@ async function init() {
 
     log.debug('Step 3: Caching DOM elements...');
     initializeDOM();
-    // Populate the dependency container
-    deps.log = log;
-    deps.updateAuthUI = updateAuthUI; // Add auth UI updater to deps
 
     log.debug('Step 4: Initializing event listeners...');
     initializeEvents();

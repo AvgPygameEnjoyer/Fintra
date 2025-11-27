@@ -51,7 +51,7 @@ def auth_login():
         }
         auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(auth_params)}"
 
-        resp = jsonify(success=True, auth_url=auth_url)
+        resp = jsonify(success=True, auth_url=auth_url, state=state)
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return resp, 200
     except Exception as e:
