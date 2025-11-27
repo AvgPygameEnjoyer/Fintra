@@ -15,8 +15,8 @@ export function setupSidebar() {
     }
 
     // Attach events to the toggles that now exist in the HTML
-    DOM['mobile-sidebar-toggle']?.addEventListener('click', toggleSidebar);
-    DOM['desktop-sidebar-toggle']?.addEventListener('click', toggleSidebar);
+    DOM.mobileSidebarToggle?.addEventListener('click', toggleSidebar);
+    DOM.desktopSidebarToggle?.addEventListener('click', toggleSidebar);
 
     loadSidebarStocks();
 
@@ -51,15 +51,15 @@ export function setSidebarCollapsed(collapsed) {
     DOM.sidebar?.classList.toggle('sidebar-collapsed', collapsed);
     mainContent?.classList.toggle('sidebar-collapsed', collapsed);
 
-    if (DOM['mobile-sidebar-toggle']) {
-        DOM['mobile-sidebar-toggle'].innerHTML = collapsed ? '☰' : '✕';
-        DOM['mobile-sidebar-toggle'].style.left = !collapsed && window.matchMedia('(max-width: 768px)').matches ? '300px' : '20px';
-        DOM['mobile-sidebar-toggle'].style.display = window.matchMedia('(max-width: 768px)').matches ? 'block' : 'none';
+    if (DOM.mobileSidebarToggle) {
+        DOM.mobileSidebarToggle.innerHTML = collapsed ? '☰' : '✕';
+        DOM.mobileSidebarToggle.style.left = !collapsed && window.matchMedia('(max-width: 768px)').matches ? '300px' : '20px';
+        DOM.mobileSidebarToggle.style.display = window.matchMedia('(max-width: 768px)').matches ? 'block' : 'none';
     }
-    if (DOM['desktop-sidebar-toggle']) {
-        DOM['desktop-sidebar-toggle'].innerHTML = collapsed ? '☰' : '✕';
-        DOM['desktop-sidebar-toggle'].style.left = !collapsed && window.matchMedia('(min-width: 769px)').matches ? '340px' : '20px';
-        DOM['desktop-sidebar-toggle'].style.display = window.matchMedia('(min-width: 769px)').matches ? 'block' : 'none';
+    if (DOM.desktopSidebarToggle) {
+        DOM.desktopSidebarToggle.innerHTML = collapsed ? '☰' : '✕';
+        DOM.desktopSidebarToggle.style.left = !collapsed && window.matchMedia('(min-width: 769px)').matches ? '340px' : '20px';
+        DOM.desktopSidebarToggle.style.display = window.matchMedia('(min-width: 769px)').matches ? 'block' : 'none';
     }
 }
 

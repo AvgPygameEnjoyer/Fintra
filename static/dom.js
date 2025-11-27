@@ -9,7 +9,10 @@ export function initialize() {
         'mobile-sidebar-toggle', 'desktop-sidebar-toggle',
         'context-symbol'
     ];
-    ids.forEach(id => DOM[id] = document.getElementById(id));
+    ids.forEach(id => {
+        const camelCaseId = id.replace(/-(\w)/g, (_, c) => c.toUpperCase());
+        DOM[camelCaseId] = document.getElementById(id);
+    });
     if (DOM.error) DOM.error.style.display = 'none';
     if (DOM.loading) DOM.loading.style.display = 'none';
 }
