@@ -1,0 +1,66 @@
+// ==================== CONFIGURATION & CONSTANTS ====================
+const IS_LOCALHOST = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = IS_LOCALHOST ? 'http://localhost:5000' : 'https://stock-dashboard-fqtn.onrender.com';
+
+export const CONFIG = {
+    API_BASE_URL: API_BASE_URL,
+    DEBOUNCE_DELAY: 300,
+    MAX_AUTOCOMPLETE_ITEMS: 8,
+    MAX_CHART_POINTS: 30,
+    SESSION_STORAGE_KEY: 'userSession',
+    OAUTH_STATE_KEY: 'oauthState'
+};
+
+console.log(`🚀 App initialized. Backend set to: ${CONFIG.API_BASE_URL}`);
+
+export const STATE = {
+    stockDatabase: [],
+    selectedIndex: -1,
+    filteredStocks: [],
+    isSidebarCollapsed: false,
+    charts: { ohlcv: null, rsi: null, movingAverages: null, macd: null },
+    currentSessionId: generateSessionId(),
+    currentSymbol: null,
+    isLoading: false,
+    isAuthenticated: false,
+    user: null
+};
+
+export const DOM = {};
+
+export let sessionTimerInterval = null;
+
+// ==================== UTILITY FUNCTIONS ====================
+export function generateSessionId() {
+    return `session_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`;
+}
+
+export function debounce(func, wait) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func(...args), wait);
+    };
+}
+
+export function formatPrice(price) { 
+    return price != null ? `$${price.toFixed(2)}` : 'N/A'; 
+}
+
+export function formatNumber(num) { 
+    return num != null ? num.toLocaleString() : 'N/A'; 
+}
+
+export function getRsiColor(rsi) {
+    if (rsi == null) return '#6b7280';
+    if (rsi > 70) return '#ef4444';
+    if (rsi < 30) return '#10b981';
+    return '#6b7280';
+}
+
+export function getRsiBackground(rsi) {
+    if (rsi == null) return '#f3f4f6';
+    if (rsi > 70) return '#fef2f2';
+    if (rsi < 30) return '#f0fdf4';
+    return '#f8fafc';
+}
