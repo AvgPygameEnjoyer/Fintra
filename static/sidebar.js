@@ -1,20 +1,14 @@
+import { deps, debounce } from './config.js';
 import { groupStocksByCategory, getGroupName, createSidebarStockItem } from './sidebar-helpers.js';
+import { saveSessionState } from './session.js';
+import { hideAutocomplete } from './autocomplete.js';
+import { fetchData } from './data.js';
+import { updateChatContextIndicator } from './chat.js';
 
-// Module-level variables to hold dependencies
-let STATE, DOM, CONFIG, debounce, saveSessionState, hideAutocomplete, fetchData, updateChatContextIndicator;
+const { STATE, DOM, CONFIG } = deps;
 
 // The main initialization function that receives dependencies
-export function initialize(dependencies) {
-    // Assign dependencies to module-level variables
-    STATE = dependencies.STATE;
-    DOM = dependencies.DOM;
-    CONFIG = dependencies.CONFIG;
-    debounce = dependencies.debounce;
-    saveSessionState = dependencies.saveSessionState;
-    hideAutocomplete = dependencies.hideAutocomplete;
-    fetchData = dependencies.fetchData;
-    updateChatContextIndicator = dependencies.updateChatContextIndicator;
-
+export function initialize() {
     // This function now ONLY creates the dynamic elements and returns them.
     return createSidebarToggles();
 }

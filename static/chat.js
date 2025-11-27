@@ -1,10 +1,17 @@
 // ==================== CHATBOT ====================
-import { CONFIG, STATE, DOM, generateSessionId } from './config.js';
+import { deps, generateSessionId, checkDependencies } from './config.js';
 import { saveSessionState } from './session.js';
 import { showNotification } from './notifications.js';
 import { showAuthOverlay } from './auth.js';
 
+const { STATE, DOM, CONFIG } = deps;
+
 export function initializeChat() {
+    // Defensively check that all required DOM elements are available before proceeding.
+    checkDependencies('initializeChat', [
+        'chatToggle', 'chatClose', 'chatSend', 'chatInput', 'chatRefresh', 'chatMessages'
+    ]);
+
     DOM.chatToggle.addEventListener('click', toggleChatWindow);
     DOM.chatClose.addEventListener('click', toggleChatWindow);
     DOM.chatSend.addEventListener('click', handleChatSubmit);

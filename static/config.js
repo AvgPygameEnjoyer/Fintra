@@ -30,9 +30,32 @@ export const DOM = {};
 
 export let sessionTimerInterval = null;
 
+// ==================== DEPENDENCY CONTAINER ====================
+// This object will hold all shared state and functions, acting as a
+// centralized service locator to simplify dependency management.
+export const deps = {
+    STATE,
+    DOM,
+    CONFIG
+};
+
 // ==================== UTILITY FUNCTIONS ====================
 export function generateSessionId() {
     return `session_${Math.random().toString(36).substr(2, 9)}_${Date.now()}`;
+}
+
+/**
+ * Checks if required DOM elements exist in the DOM container.
+ * Throws a detailed error if a dependency is missing.
+ * @param {string} moduleName - The name of the module checking its dependencies.
+ * @param {string[]} requiredDomElements - An array of keys to check for in the DOM object.
+ */
+export function checkDependencies(moduleName, requiredDomElements) {
+    for (const key of requiredDomElements) {
+        if (!DOM[key]) {
+            throw new Error(`[${moduleName}] Missing DOM dependency: 'DOM.${key}'. Check if the element with id="${key}" exists in the HTML or is created before this module is initialized.`);
+        }
+    }
 }
 
 export function debounce(func, wait) {

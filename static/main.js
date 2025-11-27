@@ -1,5 +1,5 @@
-import { STATE, DOM, CONFIG, debounce } from './config.js';
-import { handleGoogleLogin, handleOAuthCallback, checkAuthStatus, handleLogout } from './auth.js';
+import { deps } from './config.js';
+import { handleGoogleLogin, handleOAuthCallback, checkAuthStatus, handleLogout, updateAuthUI } from './auth.js';
 import { initialize as initializeDOM } from './dom.js';
 import { initialize as initializeEvents } from './events.js';
 import { initialize as initializeSidebar, setupSidebar } from './sidebar.js';
@@ -13,19 +13,11 @@ async function init() {
     await loadStockDatabase();
 
     // Step 1: Create dynamic sidebar elements
-    initializeSidebar({
-        STATE,
-        DOM,
-        CONFIG,
-        debounce,
-        saveSessionState,
-        hideAutocomplete,
-        fetchData,
-        updateChatContextIndicator
-    });
+    initializeSidebar();
 
     // Step 2: Cache ALL DOM elements, including the new ones
     initializeDOM();
+    deps.updateAuthUI = updateAuthUI; // Add auth UI updater to deps
 
     // Step 3: Initialize all other modules that depend on the DOM
     initializeEvents();
