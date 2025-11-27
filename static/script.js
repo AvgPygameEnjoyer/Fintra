@@ -724,34 +724,42 @@ async function fetchData() {
     hideError();
     DOM.outputDiv.innerHTML = '';
 
-    try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/analyze?symbol=${STATE.currentSymbol}`, {
-            credentials: 'include'
-        });
+   try {
+    const response = await fetch(`${CONFIG.API_BASE_URL}/get_data`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            symbol: STATE.currentSymbol
+        })
+    });
 
-        if (!response.ok) {
-            if (response.status === 401) {
-                showError('Authentication Required. Please sign in with Google to view data.');
-                updateAuthUI(); // Show login overlay
-                return;
-            }
-            throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+        if (response.status === 401) {
+            showError('Authentication Required. Please sign in with Google to view data.');
+            updateAuthUI();
+            return;
         }
-
-        const data = await response.json();
-
-        if (data.error) {
-            showError(data.error);
-        } else {
-            displayData(data);
-        }
-
-    } catch (error) {
-        console.error('Fetch error:', error);
-        showError(`Failed to fetch data for ${STATE.currentSymbol}. Please try another symbol.`);
-    } finally {
-        hideLoading();
+        throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const data = await response.json();
+
+    if (data.error) {
+        showError(data.error);
+    } else {
+        displayData(data);
+    }
+
+} catch (error) {
+    console.error('Fetch error:', error);
+    showError(`Failed to fetch data for ${STATE.currentSymbol}. Please try another symbol.`);
+} finally {
+    hideLoading();
+}
+
 }
 
 function showLoading() {
@@ -1455,3 +1463,4 @@ function updateChatContextIndicator(symbol) {
         DOM.contextSymbol.style.color = symbol ? '#667eea' : '#ef4444';
     }
 }
+
