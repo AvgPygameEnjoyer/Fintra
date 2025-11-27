@@ -1,17 +1,28 @@
-// ==================== SIDEBAR MANAGEMENT ====================
-import { STATE, DOM, CONFIG, debounce } from './config.js';
-import { saveSessionState } from './session.js';
-import { hideAutocomplete } from './autocomplete.js';
-import { fetchData } from './data.js';
-import { updateChatContextIndicator } from './chat.js';
 import { groupStocksByCategory, getGroupName, createSidebarStockItem } from './sidebar-helpers.js';
 
-export function initializeSidebar() {
+// Module-level variables to hold dependencies
+let STATE, DOM, CONFIG, debounce, saveSessionState, hideAutocomplete, fetchData, updateChatContextIndicator;
+
+// The main initialization function that receives dependencies
+export function initialize(dependencies) {
+    // Assign dependencies to module-level variables
+    STATE = dependencies.STATE;
+    DOM = dependencies.DOM;
+    CONFIG = dependencies.CONFIG;
+    debounce = dependencies.debounce;
+    saveSessionState = dependencies.saveSessionState;
+    hideAutocomplete = dependencies.hideAutocomplete;
+    fetchData = dependencies.fetchData;
+    updateChatContextIndicator = dependencies.updateChatContextIndicator;
+
+    // Now, the rest of the original functions can run, using these module-level variables
     createSidebarToggles();
 
-    DOM.sidebarSearch.addEventListener('input', debounce((e) => {
-        filterSidebarStocks(e.target.value.trim());
-    }, CONFIG.DEBOUNCE_DELAY));
+    if (DOM.sidebarSearch) {
+        DOM.sidebarSearch.addEventListener('input', debounce((e) => {
+            filterSidebarStocks(e.target.value.trim());
+        }, CONFIG.DEBOUNCE_DELAY));
+    }
 
     loadSidebarStocks();
 
@@ -75,7 +86,7 @@ function toggleSidebar() {
     setSidebarCollapsed(!STATE.isSidebarCollapsed);
 }
 
-export function setSidebarCollapsed(collapsed) {
+function setSidebarCollapsed(collapsed) {
     STATE.isSidebarCollapsed = collapsed;
     saveSessionState();
     const mainContent = document.querySelector('.container');
@@ -99,12 +110,14 @@ export function setSidebarCollapsed(collapsed) {
 
 function loadSidebarStocks() {
     if (!STATE.stockDatabase.length) {
-        DOM.sidebarStocks.innerHTML = `
-            <div style="padding: 30px; text-align: center; color: #6b7280;">
-                <div style="font-size: 2rem; margin-bottom: 10px;">📈</div>
-                <div>Loading securities database...</div>
-            </div>
-        `;
+        if (DOM.sidebarStocks) {
+            DOM.sidebarStocks.innerHTML = `
+                <div style="padding: 30px; text-align: center; color: #6b7280;">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">📈</div>
+                    <div>Loading securities database...</div>
+                </div>
+            `;
+        }
         return;
     }
 
@@ -129,16 +142,18 @@ function loadSidebarStocks() {
         }
     });
 
-    DOM.sidebarStocks.innerHTML = html;
+    if (DOM.sidebarStocks) {
+        DOM.sidebarStocks.innerHTML = html;
 
-    DOM.sidebarStocks.querySelectorAll('.sidebar-stock-item').forEach(item => {
-        item.addEventListener('click', function() {
-            selectStockFromSidebar(this.dataset.symbol);
-            if (window.matchMedia('(max-width: 768px)').matches) {
-                setSidebarCollapsed(true);
-            }
+        DOM.sidebarStocks.querySelectorAll('.sidebar-stock-item').forEach(item => {
+            item.addEventListener('click', function() {
+                selectStockFromSidebar(this.dataset.symbol);
+                if (window.matchMedia('(max-width: 768px)').matches) {
+                    setSidebarCollapsed(true);
+                }
+            });
         });
-    });
+    }
 
     if (STATE.currentSymbol) {
         selectStockFromSidebar(STATE.currentSymbol);
@@ -172,10 +187,14 @@ function filterSidebarStocks(query) {
     });
 }
 
-export function selectStockFromSidebar(symbol) {
-    DOM.symbol.value = symbol;
+function selectStockFromSidebar(symbol) {
+    if (DOM.symbolInput) {
+        DOM.symbolInput.value = symbol;
+    }
     hideAutocomplete();
-    DOM.symbol.focus();
+    if (DOM.symbolInput) {
+        DOM.symbolInput.focus();
+    }
 
     document.querySelectorAll('.sidebar-stock-item').forEach(item => item.classList.remove('active'));
     const sidebarItem = document.querySelector(`.sidebar-stock-item[data-symbol="${symbol}"]`);
