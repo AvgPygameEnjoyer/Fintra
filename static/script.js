@@ -9,9 +9,8 @@ const CONFIG = {
     API_BASE_URL: API_BASE_URL,
     DEBOUNCE_DELAY: 300,
     MAX_AUTOCOMPLETE_ITEMS: 8,
-    MAX_CHART_POINTS: 7,
-    SESSION_STORAGE_KEY: 'sessionId',
-    SYMBOL_STORAGE_KEY: 'lastSymbol',
+    MAX_CHART_POINTS: 30, // Increased for better chart history
+    SESSION_STORAGE_KEY: 'userSession',
     THROTTLE_DELAY: 100
 };
 
@@ -20,7 +19,7 @@ console.log(`🚀 App initialized. Backend set to: ${CONFIG.API_BASE_URL}`);
 const STATE = {
     stockDatabase: [],
     selectedIndex: -1,
-    filteredStocks: [],
+    filteredStocks: [], // This is transient, no need to save
     isSidebarCollapsed: false,
     charts: { ohlcv: null, rsi: null, movingAverages: null, macd: null },
     currentSessionId: generateSessionId(),
@@ -278,19 +277,34 @@ async function loadStockDatabase() {
     }
 }
 
+function saveSessionState() {
+    try {
+        const sessionToSave = {
+            currentSessionId: STATE.currentSessionId,
+            currentSymbol: STATE.currentSymbol,
+            isSidebarCollapsed: STATE.isSidebarCollapsed,
+        };
+        localStorage.setItem(CONFIG.SESSION_STORAGE_KEY, JSON.stringify(sessionToSave));
+    } catch (error) {
+        console.error('Could not save session state:', error);
+    }
+}
+
 function loadSessionState() {
-    const savedSessionId = localStorage.getItem(CONFIG.SESSION_STORAGE_KEY);
-    const savedSymbol = localStorage.getItem(CONFIG.SYMBOL_STORAGE_KEY);
+    try {
+        const savedSession = JSON.parse(localStorage.getItem(CONFIG.SESSION_STORAGE_KEY));
+        if (savedSession) {
+            STATE.currentSessionId = savedSession.currentSessionId || STATE.currentSessionId;
+            STATE.currentSymbol = savedSession.currentSymbol || null;
+            STATE.isSidebarCollapsed = savedSession.isSidebarCollapsed || false;
 
-    STATE.currentSessionId = savedSessionId || STATE.currentSessionId;
-    if (!savedSessionId) {
-        localStorage.setItem(CONFIG.SESSION_STORAGE_KEY, STATE.currentSessionId);
+            if (STATE.currentSymbol) DOM.symbolInput.value = STATE.currentSymbol;
+        }
+    } catch (error) {
+        console.error('Could not load session state:', error);
+        // If parsing fails, start with a fresh state
     }
-
-    if (savedSymbol) {
-        STATE.currentSymbol = savedSymbol;
-        DOM.symbolInput.value = savedSymbol;
-    }
+    saveSessionState(); // Save initial state if none exists
 }
 
 function showWelcomeMessage() {
@@ -495,6 +509,7 @@ function toggleSidebar() {
 
 function setSidebarCollapsed(collapsed) {
     STATE.isSidebarCollapsed = collapsed;
+    saveSessionState(); // Persist sidebar state
     const mainContent = document.querySelector('.container');
     const mobileToggle = document.querySelector('.mobile-sidebar-toggle');
     const desktopToggle = document.querySelector('.desktop-sidebar-toggle');
@@ -701,7 +716,7 @@ function selectStockFromSidebar(symbol) {
     // 3. Set the current symbol and fetch data
     if (STATE.currentSymbol !== symbol) {
         STATE.currentSymbol = symbol;
-        localStorage.setItem(CONFIG.SYMBOL_STORAGE_KEY, symbol);
+        saveSessionState(); // Persist the new symbol
         updateChatContextIndicator(symbol); // Update chat context
         fetchData();
     }
@@ -1345,6 +1360,7 @@ function toggleChatWindow() {
 
 function refreshChatContext() {
     STATE.currentSessionId = generateSessionId();
+    saveSessionState(); // Persist the new chat session ID
     updateChatContextIndicator(STATE.currentSymbol);
     DOM.chatMessages.innerHTML = `
         <div style="padding: 10px; text-align: center; color: #6b7280; font-size: 0.9rem;">
