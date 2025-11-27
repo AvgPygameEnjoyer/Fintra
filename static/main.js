@@ -24,3 +24,4 @@ async function init() {
 // Make selectStock available globally for inline onclick handlers
 import { selectStock } from './autocomplete.js';
 window.selectStock = selectStock;
+console.log("working")
