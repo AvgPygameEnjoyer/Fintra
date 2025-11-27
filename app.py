@@ -88,11 +88,11 @@ def create_app():
 
     return app
 
-
+app = create_app()
 # ==================== APPLICATION STARTUP ====================
 def main():
     """Main entry point"""
-    app = create_app()
+    
     port = int(os.environ.get("PORT", 5000))
     host = '0.0.0.0'
 
@@ -123,4 +123,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
