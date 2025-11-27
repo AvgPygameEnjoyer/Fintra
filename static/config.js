@@ -2,6 +2,31 @@
 const IS_LOCALHOST = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const API_BASE_URL = IS_LOCALHOST ? 'http://localhost:5000' : 'https://stock-dashboard-fqtn.onrender.com';
 
+// ==================== LOGGER ====================
+const LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3,
+};
+
+const CURRENT_LOG_LEVEL = IS_LOCALHOST ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
+
+export const log = {
+    debug: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.DEBUG) console.log('%c🐛 DEBUG', 'color: #9ca3af;', ...args);
+    },
+    info: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.INFO) console.log('%cℹ️ INFO', 'color: #3b82f6; font-weight: bold;', ...args);
+    },
+    warn: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.WARN) console.warn('%c⚠️ WARN', 'color: #f97316; font-weight: bold;', ...args);
+    },
+    error: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.ERROR) console.error('%c❌ ERROR', 'color: #ef4444; font-weight: bold;', ...args);
+    }
+};
+
 export const CONFIG = {
     API_BASE_URL: API_BASE_URL,
     DEBOUNCE_DELAY: 300,
@@ -11,7 +36,7 @@ export const CONFIG = {
     OAUTH_STATE_KEY: 'oauthState'
 };
 
-console.log(`🚀 App initialized. Backend set to: ${CONFIG.API_BASE_URL}`);
+log.info(`App initialized. Backend set to: ${CONFIG.API_BASE_URL}`);
 
 export const STATE = {
     stockDatabase: [],
@@ -37,7 +62,8 @@ export let sessionTimerInterval = null;
 export const deps = {
     STATE,
     DOM,
-    CONFIG
+    CONFIG,
+    log
 };
 
 // ==================== UTILITY FUNCTIONS ====================

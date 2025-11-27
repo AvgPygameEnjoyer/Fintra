@@ -1,4 +1,4 @@
-import { deps } from './config.js';
+import { deps, log } from './config.js';
 import { handleGoogleLogin, handleOAuthCallback, checkAuthStatus, handleLogout, updateAuthUI, loadSessionState, saveSessionState, showWelcomeMessage } from './auth.js';
 import { initialize as initializeDOM } from './dom.js';
 import { initialize as initializeEvents } from './events.js';
@@ -8,21 +8,31 @@ import { fetchData, loadStockDatabase } from './data.js';
 import { hideAutocomplete } from './autocomplete.js';
 
 async function init() {
+    log.info('Initializing application...');
+
+    log.debug('Step 1: Handling OAuth callback...');
     await handleOAuthCallback();
+    log.debug('Step 2: Loading stock database...');
     await loadStockDatabase();
 
-    // Step 1: Cache ALL DOM elements from the HTML
+    log.debug('Step 3: Caching DOM elements...');
     initializeDOM();
     deps.updateAuthUI = updateAuthUI; // Add auth UI updater to deps
 
-    // Step 2: Initialize all modules that depend on the DOM
+    log.debug('Step 4: Initializing event listeners...');
     initializeEvents();
+    log.debug('Step 5: Setting up sidebar...');
     setupSidebar();
+    log.debug('Step 6: Initializing chat...');
     initializeChat();
 
+    log.debug('Step 7: Loading session state...');
     loadSessionState();
+    log.debug('Step 8: Checking authentication status...');
     await checkAuthStatus();
     showWelcomeMessage();
+
+    log.info('✅ Application initialized successfully.');
 }
 
 // Make logout function global for onclick attribute
