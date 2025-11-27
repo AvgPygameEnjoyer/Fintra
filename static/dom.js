@@ -7,7 +7,8 @@ export function initialize() {
         'sidebar', 'sidebarStocks', 'sidebarSearch', 'chat-toggle', 'chat-window', 
         'chat-messages', 'chat-input', 'chat-send', 'chat-close', 'chat-refresh',
         'mobile-sidebar-toggle', 'desktop-sidebar-toggle',
-        'context-symbol'
+        'context-symbol',
+        'google-signin-btn'
     ];
     ids.forEach(id => {
         const camelCaseId = id.replace(/-(\w)/g, (_, c) => c.toUpperCase());

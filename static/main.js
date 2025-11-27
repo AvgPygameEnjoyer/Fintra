@@ -25,8 +25,7 @@ async function init() {
     showWelcomeMessage();
 }
 
-// Make login function global for onclick attribute
-window.handleGoogleLogin = handleGoogleLogin;
+// Make logout function global for onclick attribute
 window.handleLogout = handleLogout;
 
 document.addEventListener('DOMContentLoaded', init);
