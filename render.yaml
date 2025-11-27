@@ -1,11 +1,7 @@
 services:
   - type: web
     name: stock-dashboard
-    env: python
     plan: free
     region: oregon
-    buildCommand: |
-      # Upgrade pip and use a cache folder
-      pip install --upgrade pip
-      pip install --cache-dir /tmp/pip-cache gunicorn flask flask-cors yfinance pandas numpy python-dotenv google-genai google-api-core requests PyJWT
-    startCommand: gunicorn app:app
+    dockerfilePath: ./Dockerfile
+    startCommand: gunicorn app:app --bind 0.0.0.0:10000 --workers 3
