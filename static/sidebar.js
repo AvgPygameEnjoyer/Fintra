@@ -15,9 +15,12 @@ export function initialize(dependencies) {
     fetchData = dependencies.fetchData;
     updateChatContextIndicator = dependencies.updateChatContextIndicator;
 
-    // Now, the rest of the original functions can run, using these module-level variables
-    createSidebarToggles();
+    // This function now ONLY creates the dynamic elements and returns them.
+    return createSidebarToggles();
+}
 
+// This new function will set up the rest of the sidebar logic AFTER the DOM is cached.
+export function setupSidebar() {
     if (DOM.sidebarSearch) {
         DOM.sidebarSearch.addEventListener('input', debounce((e) => {
             filterSidebarStocks(e.target.value.trim());
@@ -190,12 +193,12 @@ function filterSidebarStocks(query) {
 }
 
 function selectStockFromSidebar(symbol) {
-    if (DOM.symbolInput) {
-        DOM.symbolInput.value = symbol;
+    if (DOM.symbol) {
+        DOM.symbol.value = symbol;
     }
     hideAutocomplete();
-    if (DOM.symbolInput) {
-        DOM.symbolInput.focus();
+    if (DOM.symbol) {
+        DOM.symbol.focus();
     }
 
     document.querySelectorAll('.sidebar-stock-item').forEach(item => item.classList.remove('active'));

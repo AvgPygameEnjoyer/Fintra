@@ -2,7 +2,7 @@ import { STATE, DOM, CONFIG, debounce } from './config.js';
 import { handleGoogleLogin, handleOAuthCallback, checkAuthStatus, handleLogout } from './auth.js';
 import { initialize as initializeDOM } from './dom.js';
 import { initialize as initializeEvents } from './events.js';
-import { initialize as initializeSidebar } from './sidebar.js';
+import { initialize as initializeSidebar, setupSidebar } from './sidebar.js';
 import { initializeChat, updateChatContextIndicator } from './chat.js';
 import { fetchData, loadStockDatabase } from './data.js';
 import { loadSessionState, saveSessionState, showWelcomeMessage } from './session.js';
@@ -12,7 +12,8 @@ async function init() {
     await handleOAuthCallback();
     await loadStockDatabase();
 
-    const sidebarToggles = initializeSidebar({
+    // Step 1: Create dynamic sidebar elements
+    initializeSidebar({
         STATE,
         DOM,
         CONFIG,
@@ -23,9 +24,12 @@ async function init() {
         updateChatContextIndicator
     });
 
-    initializeDOM(); // Now call DOM initialization AFTER sidebar creates its elements
+    // Step 2: Cache ALL DOM elements, including the new ones
+    initializeDOM();
 
+    // Step 3: Initialize all other modules that depend on the DOM
     initializeEvents();
+    setupSidebar();
     initializeChat();
 
     loadSessionState();
