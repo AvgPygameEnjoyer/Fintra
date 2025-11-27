@@ -1,6 +1,6 @@
 // ==================== CHATBOT ====================
 import { deps, generateSessionId, checkDependencies } from './config.js';
-import { saveSessionState } from './session.js';
+import { saveSessionState } from './auth.js';
 import { showNotification } from './notifications.js';
 import { showAuthOverlay } from './auth.js';
 
@@ -27,6 +27,7 @@ export function initializeChat() {
         </div>
     `;
     updateChatContextIndicator(STATE.currentSymbol);
+    STATE.chatHistory = []; // Clear history on initialization
 }
 
 function toggleChatWindow() {
@@ -37,6 +38,7 @@ function refreshChatContext() {
     STATE.currentSessionId = generateSessionId();
     saveSessionState();
     updateChatContextIndicator(STATE.currentSymbol);
+    STATE.chatHistory = []; // Clear history on refresh
     DOM.chatMessages.innerHTML = `
         <div style="padding: 10px; text-align: center; color: #6b7280; font-size: 0.9rem;">
             Chat context refreshed. Session ID: ${STATE.currentSessionId}.
@@ -50,20 +52,20 @@ function handleChatSubmit() {
     if (!text) return;
 
     if (!STATE.isAuthenticated) {
-        appendMessage('system', 'Please sign in to use the AI Chatbot.');
+        appendMessage({ role: 'system', content: 'Please sign in to use the AI Chatbot.' });
         showAuthOverlay();
         return;
     }
 
     if (!STATE.currentSymbol) {
-        appendMessage('system', 'Please search or select a stock first to set the chat context.');
+        appendMessage({ role: 'system', content: 'Please search or select a stock first to set the chat context.' });
         return;
     }
 
     appendMessage('user', text);
     DOM.chatInput.value = '';
 
-    const typingIndicator = appendMessage('bot', '...');
+    const typingIndicator = appendMessage({ role: 'bot', content: '...' });
 
     try {
         fetch(`${CONFIG.API_BASE_URL}/chat`, {
@@ -76,12 +78,7 @@ function handleChatSubmit() {
                 query: text,
                 session_id: STATE.currentSessionId,
                 current_symbol: STATE.currentSymbol,
-                history: Array.from(DOM.chatMessages.children)
-                    .filter(el => el.classList.contains('msg'))
-                    .map(el => ({
-                        role: el.classList.contains('msg-user') ? 'user' : 'bot',
-                        content: el.textContent
-                    }))
+                history: STATE.chatHistory // Use the state array for history
             }),
             credentials: 'include'
         })
@@ -98,41 +95,46 @@ function handleChatSubmit() {
         .then(data => {
             typingIndicator.remove();
             if (data.response) {
-                appendMessage('bot', data.response);
+                appendMessage({ role: 'bot', content: data.response });
             } else {
-                appendMessage('system', 'Sorry, I couldn\'t get a response. Try rephrasing or refreshing the context.');
+                appendMessage({ role: 'system', content: 'Sorry, I couldn\'t get a response. Try rephrasing or refreshing the context.' });
             }
         })
         .catch(err => {
             typingIndicator.remove();
-            appendMessage('system', `An error occurred: ${err.message}.`);
+            appendMessage({ role: 'system', content: `An error occurred: ${err.message}.` });
             console.error('❌ Chat error:', err);
         });
     } catch (err) {
         typingIndicator.remove();
-        appendMessage('system', 'A connection error occurred. Please check your network.');
+        appendMessage({ role: 'system', content: 'A connection error occurred. Please check your network.' });
         console.error('❌ Chat error:', err);
     }
 }
 
-function appendMessage(sender, text) {
-    const div = document.createElement('div');
-    div.className = sender === 'user' ? 'msg msg-user' :
-                     sender === 'bot' ? 'msg msg-bot' : 'msg msg-system';
+function appendMessage(message) {
+    const { role, content } = message;
 
-    if (sender === 'bot') {
-        let html = text;
+    // Add to state, unless it's a temporary typing indicator
+    if (content !== '...') {
+        STATE.chatHistory.push({ role, content });
+    }
+
+    const div = document.createElement('div');
+    div.className = `msg msg-${role}`;
+
+    if (role === 'bot' || role === 'system') {
+        let html = content;
         html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
         html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
         html = html.replace(/`(.+?)`/g, '<code>$1</code>');
         html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
-        html = html.replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>');
+        html = html.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
         if (!html.startsWith('<p>')) html = '<p>' + html + '</p>';
         div.innerHTML = html;
     } else {
-        div.textContent = text;
+        div.textContent = content;
     }
 
     DOM.chatMessages.appendChild(div);

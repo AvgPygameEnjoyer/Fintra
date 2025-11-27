@@ -23,7 +23,8 @@ export const STATE = {
     currentSymbol: null,
     isLoading: false,
     isAuthenticated: false,
-    user: null
+    user: null,
+    chatHistory: [] // Add chat history to the global state
 };
 
 export const DOM = {};
