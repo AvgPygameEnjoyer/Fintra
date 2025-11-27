@@ -9,11 +9,10 @@ import { loadSessionState, saveSessionState, showWelcomeMessage } from './sessio
 import { hideAutocomplete } from './autocomplete.js';
 
 async function init() {
-    initializeDOM();
     await handleOAuthCallback();
     await loadStockDatabase();
-    initializeEvents();
-    initializeSidebar({
+
+    const sidebarToggles = initializeSidebar({
         STATE,
         DOM,
         CONFIG,
@@ -23,7 +22,12 @@ async function init() {
         fetchData,
         updateChatContextIndicator
     });
+
+    initializeDOM(); // Now call DOM initialization AFTER sidebar creates its elements
+
+    initializeEvents();
     initializeChat();
+
     loadSessionState();
     await checkAuthStatus();
     showWelcomeMessage();

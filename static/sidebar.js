@@ -45,7 +45,7 @@ export function initialize(dependencies) {
     });
 }
 
-function createSidebarToggles() {
+function createSidebarToggles() { // This function will now return the elements it creates
     const mainContent = document.querySelector('.container');
 
     let mobileToggle = document.querySelector('.mobile-sidebar-toggle');
@@ -80,6 +80,8 @@ function createSidebarToggles() {
 
     const sidebarToggle = document.getElementById('sidebarToggle');
     if (sidebarToggle) sidebarToggle.addEventListener('click', toggleSidebar);
+
+    return { mobileToggle, desktopToggle };
 }
 
 function toggleSidebar() {
