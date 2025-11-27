@@ -143,7 +143,9 @@ function stopSessionTimer() {
 
 async function handleGoogleLogin() {
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`);
+        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, {
+            credentials: 'include' // 🛠️ FIX: Ensure credentials (cookies) are sent
+        });
         const data = await response.json();
         if (data.auth_url) {
             window.location.href = data.auth_url;
@@ -267,7 +269,9 @@ function cacheDOMElements() {
 async function loadStockDatabase() {
     try {
         // Keeps relative path because stock-data.json is on the Frontend server (Vercel)
-        const response = await fetch('stock-data.json');
+        const response = await fetch('stock-data.json', {
+            credentials: 'include' // 🛠️ FIX: Ensure credentials (cookies) are sent
+        });
         const data = await response.json();
         STATE.stockDatabase = data.stocks || [];
         console.log(`✅ Loaded ${STATE.stockDatabase.length} stocks`);
@@ -1452,8 +1456,8 @@ function appendMessage(sender, text) {
         html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
         html = html.replace(/`(.+?)`/g, '<code>$1</code>');
         html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
-        html = html.replace(/\n\n/g, '</p><p>');
-        html = html.replace(/\n/g, '<br>');
+        html = html.replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
         if (!html.startsWith('<p>')) html = '<p>' + html + '</p>';
         div.innerHTML = html;
     } else {
