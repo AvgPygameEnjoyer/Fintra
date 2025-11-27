@@ -87,6 +87,7 @@ function toggleSidebar() {
 }
 
 function setSidebarCollapsed(collapsed) {
+export function setSidebarCollapsed(collapsed){
     STATE.isSidebarCollapsed = collapsed;
     saveSessionState();
     const mainContent = document.querySelector('.container');
@@ -106,7 +107,7 @@ function setSidebarCollapsed(collapsed) {
         desktopToggle.style.left = !collapsed && window.matchMedia('(min-width: 769px)').matches ? '340px' : '20px';
         desktopToggle.style.display = window.matchMedia('(min-width: 769px)').matches ? 'block' : 'none';
     }
-}
+}}
 
 function loadSidebarStocks() {
     if (!STATE.stockDatabase.length) {
