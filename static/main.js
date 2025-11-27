@@ -1,19 +1,18 @@
-// ==================== MAIN ENTRY POINT ====================
-import { cacheDOMElements } from './dom.js';
-import { handleOAuthCallback, checkAuthStatus } from './auth.js';
+import { API_BASE_URL, OAUTH_STATE_KEY } from './config.js';
+import { handleGoogleLogin, handleOAuthCallback, checkAuthStatus, handleLogout } from './auth.js';
+import { initialize as initializeDOM } from './dom.js';
+import { initialize as initializeEvents } from './events.js';
+import { initialize as initializeSidebar } from './sidebar.js';
+import { initialize as initializeChat } from './chat.js';
 import { loadStockDatabase } from './data.js';
-import { initializeEventListeners } from './events.js';
-import { initializeSidebar } from './sidebar.js';
-import { initializeChat } from './chat.js';
-import { loadSessionState, showWelcomeMessage } from './session.js';
-
-document.addEventListener('DOMContentLoaded', init);
+import { showWelcomeMessage } from './display.js';
+import { loadSessionState } from './session.js';
 
 async function init() {
-    cacheDOMElements();
+    initializeDOM();
     await handleOAuthCallback();
     await loadStockDatabase();
-    initializeEventListeners();
+    initializeEvents();
     initializeSidebar();
     initializeChat();
     loadSessionState();
@@ -21,7 +20,8 @@ async function init() {
     showWelcomeMessage();
 }
 
-// Make selectStock available globally for inline onclick handlers
-import { selectStock } from './autocomplete.js';
-window.selectStock = selectStock;
-console.log("working")
+// Make login function global for onclick attribute
+window.handleGoogleLogin = handleGoogleLogin;
+window.handleLogout = handleLogout;
+
+document.addEventListener('DOMContentLoaded', init);
