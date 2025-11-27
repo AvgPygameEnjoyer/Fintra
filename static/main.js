@@ -3,10 +3,9 @@ import { handleGoogleLogin, handleOAuthCallback, checkAuthStatus, handleLogout }
 import { initialize as initializeDOM } from './dom.js';
 import { initialize as initializeEvents } from './events.js';
 import { initialize as initializeSidebar } from './sidebar.js';
-import { initialize as initializeChat, updateChatContextIndicator } from './chat.js';
+import { initializeChat, updateChatContextIndicator } from './chat.js';
 import { fetchData, loadStockDatabase } from './data.js';
-import { showWelcomeMessage } from './display.js';
-import { loadSessionState, saveSessionState } from './session.js';
+import { loadSessionState, saveSessionState, showWelcomeMessage } from './session.js';
 import { hideAutocomplete } from './autocomplete.js';
 
 async function init() {

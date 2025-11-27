@@ -1,7 +1,7 @@
 // ==================== DOM MANAGEMENT ====================
 import { DOM } from './config.js';
 
-export function cacheDOMElements() {
+export function initialize() {
     const ids = [
         'symbol', 'autocomplete', 'output', 'loading', 'error', 'searchBtn', 
         'sidebar', 'sidebarStocks', 'sidebarSearch', 'chat-toggle', 'chat-window', 

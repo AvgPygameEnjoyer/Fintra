@@ -4,7 +4,7 @@ import { handleAutocompleteInput, handleAutocompleteKeydown, hideAutocomplete } 
 import { fetchData } from './data.js';
 import { setSidebarCollapsed } from './sidebar.js';
 
-export function initializeEventListeners() {
+export function initialize() {
     DOM.symbol.addEventListener('input', debounce(handleAutocompleteInput, CONFIG.DEBOUNCE_DELAY));
     DOM.symbol.addEventListener('keydown', handleAutocompleteKeydown);
     document.querySelector('.search-form')?.addEventListener('submit', handleSearchSubmit);
