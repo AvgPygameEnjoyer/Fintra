@@ -26,7 +26,7 @@ export async function fetchData() {
     document.getElementById('output').innerHTML = '';
 
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/api/get_data`, {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/get_data`, {
             method: "POST",
             credentials: "include",
             headers: {

@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: .
+    command: gunicorn app:app --bind 0.0.0.0:10000 --workers 1 --reload
+    ports:
+      - "5000:10000"
+    # Add a reliable DNS server to prevent network resolution issues inside the container
+    dns:
+      - 8.8.8.8
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=development

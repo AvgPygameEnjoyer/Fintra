@@ -2,7 +2,7 @@
 import { DOM, debounce, CONFIG, STATE } from './config.js';
 import { handleAutocompleteInput, handleAutocompleteKeydown, hideAutocomplete } from './autocomplete.js';
 import { fetchData } from './data.js';
-import { handleGoogleLogin } from './auth.js';
+import { handleGoogleLogin, handleLogout } from './auth.js';
 import { setSidebarCollapsed } from './sidebar.js';
 
 export function initialize() {
@@ -10,6 +10,7 @@ export function initialize() {
     DOM.symbol.addEventListener('keydown', handleAutocompleteKeydown);
     document.querySelector('.search-form')?.addEventListener('submit', handleSearchSubmit);
     DOM.googleSigninBtn?.addEventListener('click', handleGoogleLogin);
+    DOM.logoutBtn?.addEventListener('click', handleLogout);
     
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.input-wrapper')) hideAutocomplete();

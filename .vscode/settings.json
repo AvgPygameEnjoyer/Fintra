@@ -1,0 +1,13 @@
+{
+    "liveServer.settings.proxy": {
+        "enable": true,
+        "baseUri": "/api",
+        "proxyUri": "http://localhost:5000"
+    },
+    "liveServer.settings.port": 5500,
+    "liveServer.settings.NoBrowser": true,
+    "liveServer.settings.wait": 1000,
+    "liveServer.settings.mount": [
+        ["/", "./static"]
+    ]
+}

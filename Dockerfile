@@ -1,21 +1,35 @@
-# 1️⃣ Base Python image
-FROM python:3.12-slim
+# ==================== STAGE 1: BUILDER ====================
+# This stage installs dependencies into a virtual environment.
+FROM python:3.12-slim as builder
 
-# 2️⃣ Set working directory inside the container
+# Set working directory and create a virtual environment
 WORKDIR /app
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# 3️⃣ Copy only dependency file first to enable caching
+# Upgrade pip and install dependencies
 COPY requirements.txt .
-
-# 4️⃣ Upgrade pip and install dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-# 5️⃣ Copy the rest of your code
+
+# ==================== STAGE 2: FINAL IMAGE ====================
+# This stage creates the final, lean production image.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Copy the virtual environment from the builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy the application code
 COPY . .
 
-# 6️⃣ Expose port (optional for Render, usually 10000+ auto assigned)
+# Activate the virtual environment
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Expose the port the app runs on
 EXPOSE 10000
 
-# 7️⃣ Start your app using Gunicorn
+# Start the application using Gunicorn
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:10000", "--workers", "3"]

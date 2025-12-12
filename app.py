@@ -6,7 +6,7 @@ import os
 import logging
 import traceback
 from sys import stdout
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import Config
@@ -25,27 +25,15 @@ logger = logging.getLogger(__name__)
 # ==================== APPLICATION FACTORY ====================
 def create_app():
     """Application factory pattern"""
-    app = Flask(__name__, static_folder="static")
+    # Define the static folder using an absolute path for reliability, especially in Docker.
+    # This ensures Flask knows exactly where to find files like main.js and styles.css.
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+    app = Flask(__name__, 
+                static_folder=static_dir, 
+                static_url_path='')
 
     # Load configuration
     app.config.from_object(Config)
-    app.secret_key = Config.SECRET_KEY
-
-    # Session configuration
-    if Config.IS_PRODUCTION:
-        app.config.update(
-            SESSION_COOKIE_SECURE=True,
-            SESSION_COOKIE_SAMESITE='None'
-        )
-        logger.info("Running in PRODUCTION mode. Session cookies are Secure and SameSite=None.")
-    else:
-        app.config.update(
-            SESSION_COOKIE_SECURE=False,
-            SESSION_COOKIE_SAMESITE='Lax'
-        )
-        logger.info("Running in DEVELOPMENT mode. Session cookies are Insecure and SameSite=Lax.")
-
-    # CORS configuration
     CORS(
         app,
         supports_credentials=True,
@@ -53,23 +41,43 @@ def create_app():
         methods=["GET", "POST", "OPTIONS"]
     )
 
-    app.permanent_session_lifetime = Config.PERMANENT_SESSION_LIFETIME
-
     # Register blueprints
-    app.register_blueprint(api)
+    app.register_blueprint(api, url_prefix='/api')
 
     # Request hooks
     @app.before_request
-    def cleanup_and_session_setup():
-        """Run before every request to clean up expired sessions."""
+    def before_request_logging():
+        """Log preflight requests for easier CORS debugging."""
+        if request.method == 'OPTIONS':
+            logger.info(f"Received PREFLIGHT {request.method} request for {request.path}")
+
+    @app.after_request
+    def cleanup_sessions(response):
+        """Run after every request to clean up expired sessions."""
         cleanup_expired_sessions()
+        return response
 
     # Error handlers
     @app.errorhandler(Exception)
     def handle_exception(e):
-        """Global exception handler."""
+        """Global exception handler with enhanced logging."""
         tb_str = traceback.format_exc()
-        logger.error(f"Unhandled Exception: {e}\n{tb_str}")
+        
+        request_details = {}
+        try:
+            request_details = {
+                "method": request.method,
+                "path": request.path,
+                "headers": dict(request.headers),
+            }
+        except Exception as req_exc:
+            logger.error(f"Could not extract request details during exception handling: {req_exc}")
+
+        logger.error(f"--- Unhandled Exception ---")
+        logger.error(f"Request: {request_details}")
+        logger.error(f"Exception: {e}\n{tb_str}")
+        logger.error(f"--- End Exception ---")
+        
         response = jsonify(
             error="An internal server error occurred.",
             details=str(e) if not Config.IS_PRODUCTION else None
@@ -77,51 +85,26 @@ def create_app():
         response.status_code = 500
         return response
 
-    # Static file routes
-    @app.route('/')
-    def home():
-        return app.send_static_file("index.html")
+    @app.errorhandler(404)
+    def not_found(e):
+        # If the path starts with /api, it's a genuine API 404 error.
+        if request.path.startswith('/api/'):
+            return jsonify(error="API endpoint not found"), 404
+        else:
+            # Otherwise, it's a frontend route; serve the main app.
+            return app.send_static_file("index.html")
 
-    @app.route('/<path:path>')
-    def serve_static(path):
-        return app.send_static_file(path)
+    # Add a startup log to display critical configuration
+    with app.app_context():
+        logger.info("=" * 70)
+        logger.info(" 🚀 BACKEND SERVER STARTING UP")
+        logger.info(f" 🌍 Environment: {'Production' if Config.IS_PRODUCTION else 'Development'}")
+        logger.info(f" 🔐 Google Client ID: {Config.GOOGLE_CLIENT_ID[:10] if Config.GOOGLE_CLIENT_ID else 'NOT SET'}{'...' if Config.GOOGLE_CLIENT_ID else ''}")
+        logger.info(f" ↪️ Google Redirect URI: {Config.REDIRECT_URI}")
+        logger.info(f" 🌐 Frontend Redirect URL: {Config.CLIENT_REDIRECT_URL}")
+        logger.info(f" 🔑 JWT Secrets Loaded: {'✅' if Config.ACCESS_TOKEN_JWT_SECRET and Config.REFRESH_TOKEN_JWT_SECRET else '❌ NOT FOUND'}")
+        logger.info("=" * 70)
 
     return app
-
-app = create_app()
-# ==================== APPLICATION STARTUP ====================
-def main():
-    """Main entry point"""
     
-    port = int(os.environ.get("PORT", 5000))
-    host = '0.0.0.0'
-
-    print("=" * 70)
-    print(" 📊 STOCK ANALYSIS BACKEND v4.0 (MODULAR)")
-    print("=" * 70)
-    print(f" 🚀 Server running on: http://{host}:{port}")
-    print(f" 🔐 OAuth Status: {'✅ Configured' if Config.GOOGLE_CLIENT_ID else '⚠️ Missing credentials'}")
-    print(f" 🌍 Environment: {'Production (HTTPS required)' if Config.IS_PRODUCTION else 'Development (HTTP OK)'}")
-    print(
-        f" 📦 Secret Key Set: {'✅' if app.secret_key and app.secret_key != 'dev_fixed_key_for_local_testing_only' else '⚠️ Development Key'}")
-    print("-" * 70)
-    print(" 🔍 REGISTERED ROUTES:")
-    with app.app_context():
-        for rule in app.url_map.iter_rules():
-            if 'static' not in str(rule):
-                print(f"    ✅ {str(rule):40} | Endpoint: {rule.endpoint}")
-    print("-" * 70)
-    print(f" 📁 Module Structure:")
-    print(f"    ✅ config.py - Configuration management")
-    print(f"    ✅ auth.py - Authentication & sessions")
-    print(f"    ✅ analysis.py - Stock analysis & AI")
-    print(f"    ✅ routes.py - API endpoints")
-    print(f"    ✅ app.py - Main application")
-    print("=" * 70)
-
-    app.run(host=host, port=port, debug=not Config.IS_PRODUCTION)
-
-
-if __name__ == "__main__":
-
-    main()
+app = create_app()

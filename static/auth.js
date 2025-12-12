@@ -34,8 +34,8 @@ export async function handleGoogleLogin() {
         deps.log.debug('Initiating Google login...');
         const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, { credentials: 'include' });
         const data = await response.json();
-        if (response.ok && data.success && data.auth_url && data.state) {
-            localStorage.setItem(CONFIG.OAUTH_STATE_KEY, data.state);
+        if (response.ok && data.success && data.auth_url && data.state_token) {
+            localStorage.setItem(CONFIG.OAUTH_STATE_KEY, data.state_token);
             window.location.href = data.auth_url;
         } else {
             showNotification('Could not initiate login. Please try again.', 'error');
@@ -44,47 +44,6 @@ export async function handleGoogleLogin() {
     } catch (error) {
         deps.log.error('Login error:', error);
         showNotification('Login failed due to a network or server error.', 'error');
-    }
-}
-
-export async function handleOAuthCallback() {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    const state = params.get('state');
-    const storedState = localStorage.getItem(CONFIG.OAUTH_STATE_KEY);
-
-    if (!code || !state) {
-        deps.log.debug('No OAuth code or state in URL, continuing normally.');
-        return;
-    }
-
-    window.history.replaceState({}, document.title, "/");
-    localStorage.removeItem(CONFIG.OAUTH_STATE_KEY);
-
-    if (state !== storedState) {
-        deps.log.error('OAuth state mismatch. Aborting authentication.');
-        showNotification('Authentication failed: Security token mismatch. Please try again.', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/oauth2callback`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, state, stored_state: storedState }),
-            credentials: 'include'
-        });
-
-        const data = await response.json();
-        if (response.ok && data.success) {
-            showNotification('Login successful!', 'success');
-            await checkAuthStatus();
-        } else {
-            throw new Error(data.error || 'Callback failed');
-        }
-    } catch (error) {
-        deps.log.error('OAuth callback error:', error);
-        showNotification(`Authentication failed: ${error.message}.`, 'error');
     }
 }
 

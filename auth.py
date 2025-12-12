@@ -39,7 +39,7 @@ def verify_jwt_token(token: str, secret: str) -> Optional[dict]:
 def set_token_cookies(response, access_token: str, refresh_token: str):
     """Set cookies safely so browser actually stores them."""
     is_production = current_app.config.get('SESSION_COOKIE_SECURE', False)
-    cookie_domain = Config.COOKIE_DOMAIN
+    cookie_domain = Config.COOKIE_DOMAIN if is_production else "localhost"
 
     response.set_cookie(
         'access_token',
@@ -102,63 +102,63 @@ def refresh_oauth_token(user_id: str) -> bool:
         logger.error(f"❌ Exception during OAuth token refresh: {e}")
         return False
 
-def require_auth(f):
-    """Authentication middleware decorator"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        access_token = request.cookies.get('access_token')
+def require_auth():
+    """
+    Authentication check function.
+    Returns a Flask Response object if auth fails, otherwise returns None.
+    """
+    logger.debug("--- Auth check initiated ---")
+    access_token = request.cookies.get('access_token')
 
-        # Try access token first
-        if access_token:
-            payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
-            if payload:
-                user_id = payload['user_id']
-                if user_id in user_sessions:
-                    user_session = user_sessions[user_id]
-                    user_session['expires_at'] = datetime.now(timezone.utc) + Config.SESSION_TIMEOUT
-                    if datetime.now(timezone.utc) > user_session['token_expiry'] - timedelta(minutes=5):
-                        refresh_oauth_token(user_id)
-                    session['user_id'] = user_id
-                    return f(*args, **kwargs)
+    # Try access token first
+    if access_token:
+        logger.debug("Found access_token cookie. Verifying...")
+        payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
+        if payload:
+            logger.debug("Access token is valid.")
+            user_id = payload['user_id']
+            if user_id in user_sessions:
+                logger.debug(f"User session found for user_id: {user_id}. Granting access.")
+                user_session = user_sessions[user_id]
+                if datetime.now(timezone.utc) > user_session['token_expiry'] - timedelta(minutes=5):
+                    refresh_oauth_token(user_id)
+                return None  # Success!
+            else:
+                logger.warning(f"Access token valid, but no active session found for user_id: {user_id}. Denying access.")
+        else:
+            logger.warning("Access token found but it is invalid or expired.")
+    else:
+        logger.debug("No access_token cookie found.")
 
-        # Try refresh token
-        refresh_token_cookie = request.cookies.get('refresh_token')
-        if refresh_token_cookie:
-            payload = verify_jwt_token(refresh_token_cookie, Config.REFRESH_TOKEN_JWT_SECRET)
-            if payload:
-                user_id = payload['user_id']
-                if user_id in user_sessions:
-                    user_data = user_sessions[user_id]
-                    new_access_token = generate_jwt_token(user_data, Config.ACCESS_TOKEN_JWT_SECRET, Config.ACCESS_TOKEN_EXPIRETIME)
-                    session['user_id'] = user_id
-                    if datetime.now(timezone.utc) > user_data['token_expiry'] - timedelta(minutes=5):
-                        if not refresh_oauth_token(user_id):
-                            return jsonify({"error": "Token refresh failed"}), 401
-                    response = jsonify({"error": "Access token refreshed. Please try the request again."})
-                    set_token_cookies(response, new_access_token, refresh_token_cookie)
-                    return f(*args, **kwargs)
+    # Try refresh token
+    logger.debug("Attempting to use refresh_token...")
+    refresh_token_cookie = request.cookies.get('refresh_token')
+    if refresh_token_cookie:
+        logger.debug("Found refresh_token cookie. Verifying...")
+        payload = verify_jwt_token(refresh_token_cookie, Config.REFRESH_TOKEN_JWT_SECRET)
+        if payload:
+            logger.debug("Refresh token is valid.")
+            user_id = payload['user_id']
+            if user_id in user_sessions:
+                logger.info(f"User session found for user_id: {user_id}. Issuing new access token.")
+                user_data = user_sessions[user_id]
+                new_access_token = generate_jwt_token(user_data, Config.ACCESS_TOKEN_JWT_SECRET, Config.ACCESS_TOKEN_EXPIRETIME)
+                if datetime.now(timezone.utc) > user_data['token_expiry'] - timedelta(minutes=5):
+                    if not refresh_oauth_token(user_id):
+                        logger.error("Failed to refresh the underlying OAuth token. Denying access.")
+                        return jsonify({"error": "Token refresh failed"}), 401
+                response = jsonify({"error": "Access token refreshed. Please retry the request."})
+                set_token_cookies(response, new_access_token, refresh_token_cookie)
+                return response, 401  # Use 401 to signal the client needs to retry with the new token.
+            else:
+                logger.warning(f"Refresh token valid, but no active session found for user_id: {user_id}.")
+        else:
+            logger.warning("Refresh token found but it is invalid or expired.")
+    else:
+        logger.debug("No refresh_token cookie found.")
 
-        # Fallback to session-based auth
-        user_id = session.get('user_id')
-        if not user_id or user_id not in user_sessions:
-            return jsonify({"error": "Not authenticated. Please sign in."}), 401
-
-        user_session = user_sessions[user_id]
-        if datetime.now(timezone.utc) > user_session['expires_at']:
-            del user_sessions[user_id]
-            session.clear()
-            return jsonify({"error": "Session expired. Please sign in again."}), 401
-
-        user_session['expires_at'] = datetime.now(timezone.utc) + Config.SESSION_TIMEOUT
-        if datetime.now(timezone.utc) > user_session['token_expiry']:
-            if not refresh_oauth_token(user_id):
-                del user_sessions[user_id]
-                session.clear()
-                return jsonify({"error": "Authentication expired. Please sign in again."}), 401
-
-        return f(*args, **kwargs)
-
-    return decorated_function
+    logger.error("--- Auth check failed: No valid tokens or sessions found. Denying access. ---")
+    return jsonify({"error": "Not authenticated. Please sign in."}), 401
 
 def cleanup_expired_sessions():
     """Clean up expired user sessions"""

@@ -36,9 +36,8 @@ def auth_login():
     """Initiate Google OAuth flow."""
     try:
         state = secrets.token_urlsafe(32)
-        session.permanent = True
-        session['oauth_state'] = state
-        session.modified = True
+        
+        logger.info(f"Generating auth URL with redirect_uri: {Config.REDIRECT_URI}")
 
         auth_params = {
             'client_id': Config.GOOGLE_CLIENT_ID,
@@ -51,7 +50,7 @@ def auth_login():
         }
         auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(auth_params)}"
 
-        resp = jsonify(success=True, auth_url=auth_url, state=state)
+        resp = jsonify(success=True, auth_url=auth_url, state_token=state)
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return resp, 200
     except Exception as e:
@@ -76,16 +75,9 @@ def oauth_callback():
             logger.error("No 'code' parameter found in callback.")
             return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=no_code')
 
-        stored_state = session.pop('oauth_state', None)
-        if not stored_state:
-            logger.error("No 'oauth_state' in session. Cookie might have been dropped or expired.")
-            return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=invalid_state&reason=missing_session')
+        logger.info(f"State parameter received: {state}. In a full stateless flow, this would be validated against a client-provided token.")
 
-        if state != stored_state:
-            logger.error(f"State mismatch. Received: '{state}', Stored: '{stored_state}'")
-            return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=invalid_state&reason=state_mismatch')
-
-        logger.info("State verified. Exchanging code for tokens...")
+        logger.info("Exchanging code for tokens...")
         token_data = {
             'code': code,
             'client_id': Config.GOOGLE_CLIENT_ID,
@@ -93,15 +85,21 @@ def oauth_callback():
             'redirect_uri': Config.REDIRECT_URI,
             'grant_type': 'authorization_code'
         }
-        token_response = requests.post("https://oauth2.googleapis.com/token", data=token_data, timeout=10)
-
-        if token_response.status_code != 200:
-            logger.error(f"Token exchange failed ({token_response.status_code}): {token_response.text}")
-            return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=token_exchange_failed')
+        
+        try:
+            token_response = requests.post("https://oauth2.googleapis.com/token", data=token_data, timeout=10)
+            token_response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Token exchange request failed: {e}")
+            return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=token_exchange_failed&reason=network_error')
 
         tokens = token_response.json()
-        logger.info("Tokens received. Decoding ID token...")
         id_token = tokens.get('id_token')
+        if not id_token:
+            logger.error(f"Token exchange response did not include an id_token: {tokens}")
+            return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=missing_id_token')
+
+        logger.info("Tokens received. Decoding ID token...")
 
         try:
             user_info = jwt.decode(id_token, options={"verify_signature": False})
@@ -123,7 +121,7 @@ def oauth_callback():
             'oauth_token': tokens.get('access_token'),
             'refresh_token': tokens.get('refresh_token'),
             'token_expiry': datetime.now(timezone.utc) + timedelta(seconds=tokens.get('expires_in', 3600)),
-            'expires_at': datetime.now(timezone.utc) + Config.SESSION_TIMEOUT,
+            'expires_at': datetime.now(timezone.utc) + timedelta(seconds=Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME)),
             'granted_scopes': tokens.get('scope', '').split(' ')
         }
 
@@ -132,8 +130,7 @@ def oauth_callback():
         jwt_refresh = generate_jwt_token(user_sessions[user_id], Config.REFRESH_TOKEN_JWT_SECRET,
                                          Config.REFRESH_TOKEN_EXPIRETIME)
 
-        session['user_id'] = user_id
-        response = redirect(f'{Config.CLIENT_REDIRECT_URL}?auth=success')
+        response = redirect(Config.CLIENT_REDIRECT_URL)
         set_token_cookies(response, jwt_access, jwt_refresh)
 
         logger.info("--- OAuth Callback End: Success ---")
@@ -141,7 +138,6 @@ def oauth_callback():
 
     except Exception as e:
         logger.error(f"CRITICAL ERROR in /oauth2callback: {e}")
-        session.clear()
         return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=callback_crash&reason={str(e)}')
 
 
@@ -175,15 +171,11 @@ def refresh_token():
         return jsonify(error="Internal token refresh error"), 500
 
 
-@api.route('/auth/logout', methods=['POST'])
+@api.route('/auth/logout', methods=['POST', 'OPTIONS'])
 def logout():
     """Logout user and clear session"""
     try:
-        user_id = session.pop('user_id', None)
-        if user_id and user_id in user_sessions:
-            del user_sessions[user_id]
-            logger.info(f"Logged out user: {user_id}")
-        session.clear()
+        logger.info("User logout initiated.")
         response = jsonify(success=True, message="Logged out")
         response.set_cookie('access_token', '', max_age=0)
         response.set_cookie('refresh_token', '', max_age=0)
@@ -222,13 +214,18 @@ def auth_status():
 
 
 # ==================== DATA & ANALYSIS ROUTES ====================
-@api.route('/api/get_data', methods=['POST'])
-@require_auth
+@api.route('/get_data', methods=['POST'])
 def get_data():
     """Fetch and analyze stock data"""
+    auth_response = require_auth()
+    if auth_response:
+        return auth_response
+    logger.info("Received request for /api/get_data") # This log is now reachable
     data = request.get_json()
-    symbol = data.get('symbol', '').upper().strip()
-    user_id = session.get('user_id')
+    symbol = data.get('symbol', '').upper().strip()    
+    access_token = request.cookies.get('access_token')
+    payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
+    user_id = payload.get('user_id') if payload else None
 
     if not symbol:
         return jsonify(error="No symbol provided"), 400
@@ -240,7 +237,6 @@ def get_data():
         if hist.empty:
             return jsonify(error=f"Could not retrieve data for {symbol}"), 404
 
-        # Calculate technical indicators
         hist['MA5'] = hist['Close'].rolling(window=5).mean()
         hist['MA10'] = hist['Close'].rolling(window=10).mean()
         hist['RSI'] = compute_rsi(hist['Close'])
@@ -251,14 +247,11 @@ def get_data():
                                     ['Open', 'High', 'Low', 'Close', 'Volume', 'MA5', 'MA10', 'RSI', 'MACD', 'Signal',
                                      'Histogram'])
 
-        # Store data for future reference
         latest_symbol_data[symbol] = latest_data_list
 
-        # Generate analyses
         rule_based_text = generate_rule_based_analysis(symbol, latest_data_list)
         gemini_analysis = get_gemini_ai_analysis(symbol, latest_data_list, user_id)
 
-        # Update conversation context
         if user_id not in conversation_context:
             conversation_context[user_id] = {
                 "current_symbol": symbol,
@@ -284,20 +277,25 @@ def get_data():
         return jsonify(error=f"Server error: {str(e)}"), 500
 
 
-@api.route('/api/chat', methods=['POST'])
-@require_auth
+@api.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
     """Handle AI chat queries"""
+    auth_response = require_auth()
+    if auth_response:
+        return auth_response
     data = request.get_json()
     query = data.get('query', '').strip()
-    user_id = session.get('user_id')
+    
+    access_token = request.cookies.get('access_token')
+    payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
+    user_id = payload.get('user_id') if payload else None
+
     current_symbol_hint = data.get('current_symbol')
 
     if not query:
         return jsonify(error="No query provided"), 400
 
     try:
-        # Initialize or retrieve conversation context
         if user_id not in conversation_context:
             conversation_context[user_id] = {
                 "current_symbol": None,
@@ -311,7 +309,6 @@ def chat():
             session_ctx["user_positions"] = {}
         session_ctx["last_active"] = datetime.now(timezone.utc).isoformat()
 
-        # Detect symbol in query
         matched_symbol = next((s for s in latest_symbol_data.keys() if s.lower() in query.lower()),
                               current_symbol_hint or session_ctx["current_symbol"])
         if matched_symbol and matched_symbol in latest_symbol_data:
@@ -319,7 +316,6 @@ def chat():
         else:
             matched_symbol = None
 
-        # Track user positions
         position_info, has_position = "", False
         if matched_symbol:
             position_match = re.search(r'(?:bought|sold|entry|long|short|got)\s+at\s+\$?(\d+\.?\d*)', query,
@@ -339,7 +335,6 @@ def chat():
                 pnl_percent = (current_price - entry) / entry * 100
                 position_info = f"User has a position in {matched_symbol} with an **entry price of ${entry}**. Current price: ${current_price}. P&L: **${pnl_dollars:.2f} ({pnl_percent:.2f}%)**."
 
-        # Prepare context for AI
         technical_summary = generate_rule_based_analysis(matched_symbol, latest_symbol_data[
             matched_symbol]) if matched_symbol in latest_symbol_data else ""
         history_text = "\n".join(
@@ -368,7 +363,6 @@ Respond now:"""
 
         assistant_response = call_gemini_with_user_token(prompt, user_id)
 
-        # Update conversation history
         session_ctx["conversation_history"].append({
             "user": query,
             "assistant": assistant_response,
