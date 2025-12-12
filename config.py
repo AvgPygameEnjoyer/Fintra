@@ -16,7 +16,8 @@ class Config:
 
     # Environment
     ENV = os.getenv('FLASK_ENV', 'development')
-    IS_PRODUCTION = ENV == 'production'
+    # Check for Render's built-in env var for a more robust production check.
+    IS_PRODUCTION = ENV == 'production' or os.getenv('RENDER') == 'true'
 
     # Flask Settings
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'a_default_secret_key_for_jwt_signing')
