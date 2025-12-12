@@ -280,6 +280,11 @@ def get_data():
 @api.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
     """Handle AI chat queries"""
+    # For complex requests, the browser sends a preflight OPTIONS request first.
+    # We must allow this request to pass through without authentication checks.
+    if request.method == 'OPTIONS':
+        return jsonify(success=True), 200
+
     auth_response = require_auth()
     if auth_response:
         return auth_response
