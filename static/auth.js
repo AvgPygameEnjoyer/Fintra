@@ -72,6 +72,7 @@ export async function handleLogout(showNotify = true) {
     } finally {
         STATE.isAuthenticated = false;
         STATE.user = null;
+        localStorage.removeItem(CONFIG.SESSION_STORAGE_KEY); // Clear the persisted session
         updateAuthUI();
         if (showNotify) showNotification('Logged out successfully', 'success');
     }
