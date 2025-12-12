@@ -139,6 +139,9 @@ def call_gemini_with_user_token(prompt: str, user_id: str, retry_count: int = 0)
             timeout=30
         )
 
+        # Log the raw response from Gemini for debugging
+        logger.info(f"Gemini API Response: {response.status_code} - {response.text}")
+
         if response.status_code == 401 and retry_count < 1:
             if refresh_oauth_token(user_id):
                 return call_gemini_with_user_token(prompt, user_id, retry_count + 1)
