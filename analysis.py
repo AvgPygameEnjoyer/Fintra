@@ -140,11 +140,8 @@ def call_gemini_with_user_token(prompt: str, user_id: str, retry_count: int = 0)
             scopes=granted_scopes
         )
 
-        # Configure the SDK with the user's credentials
-        genai.configure(credentials=creds)
-
         # Create the model and generate content
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash', client_options={"credentials": creds})
         response = model.generate_content(prompt)
 
         return response.text
