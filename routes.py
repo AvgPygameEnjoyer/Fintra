@@ -397,5 +397,5 @@ def health():
         },
         version="4.0-Modular",
         active_sessions=len(user_sessions),
-        env="production" if Config.IS_PRODUCTION else "development"
+        env="production" # Hardcoded for production
     ), 200

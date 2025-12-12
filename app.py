@@ -80,7 +80,7 @@ def create_app():
         
         response = jsonify(
             error="An internal server error occurred.",
-            details=str(e) if not Config.IS_PRODUCTION else None
+            details=None # In production, do not expose internal error details
         )
         response.status_code = 500
         return response
@@ -98,7 +98,7 @@ def create_app():
     with app.app_context():
         logger.info("=" * 70)
         logger.info(" 🚀 BACKEND SERVER STARTING UP")
-        logger.info(f" 🌍 Environment: {'Production' if Config.IS_PRODUCTION else 'Development'}")
+        logger.info(f" 🌍 Environment: Production")
         logger.info(f" 🔐 Google Client ID: {Config.GOOGLE_CLIENT_ID[:10] if Config.GOOGLE_CLIENT_ID else 'NOT SET'}{'...' if Config.GOOGLE_CLIENT_ID else ''}")
         logger.info(f" ↪️ Google Redirect URI: {Config.REDIRECT_URI}")
         logger.info(f" 🌐 Frontend Redirect URL: {Config.CLIENT_REDIRECT_URL}")
