@@ -3,16 +3,15 @@ Analysis Module
 Handles stock data analysis, technical indicators, AI integration with Gemini.
 """
 import logging
-import pandas as pd
-import numpy as np
+import requests
 import statistics
 import math
 from typing import List, Dict, Tuple, Optional
-import google.generativeai as genai
-from google.oauth2.credentials import Credentials
+import pandas as pd
+import numpy as np
 
 from config import Config
-from auth import user_sessions
+from auth import user_sessions, refresh_oauth_token
 
 logger = logging.getLogger(__name__)
 
@@ -117,12 +116,12 @@ def fmt_price(x):
 
 # ==================== GEMINI AI INTEGRATION ====================
 def call_gemini_with_user_token(prompt: str, user_id: str, retry_count: int = 0) -> str:
-    """Call Gemini API with user's OAuth token using the official SDK."""
+    """Call Gemini API with user's OAuth token using the requests library."""
     if user_id not in user_sessions:
         return "⚠️ **Authentication Required** – Please sign in to use AI analysis"
 
     user_session = user_sessions[user_id]
-    oauth_token = user_session['oauth_token']
+    oauth_token = user_session.get('oauth_token')
     granted_scopes = user_session.get('granted_scopes', [])
     required_scope = 'https://www.googleapis.com/auth/generative-language.tuning'
 
@@ -130,30 +129,35 @@ def call_gemini_with_user_token(prompt: str, user_id: str, retry_count: int = 0)
         return "⚠️ **Missing API Permissions** – Please sign out and sign in again to grant Gemini API access."
 
     try:
-        # Create credentials from the user's OAuth token
-        creds = Credentials(
-            token=oauth_token,
-            refresh_token=user_session.get('refresh_token'),
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=Config.GOOGLE_CLIENT_ID,
-            client_secret=Config.GOOGLE_CLIENT_SECRET,
-            scopes=granted_scopes
+        response = requests.post(
+            "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
+            headers={"Authorization": f"Bearer {oauth_token}", "Content-Type": "application/json"},
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.7, "topK": 40, "topP": 0.95, "maxOutputTokens": 1024}
+            },
+            timeout=30
         )
 
-        # Create the model and generate content
-        model = genai.GenerativeModel('gemini-1.5-flash', client_options={"credentials": creds})
-        response = model.generate_content(prompt)
+        if response.status_code == 401 and retry_count < 1:
+            if refresh_oauth_token(user_id):
+                return call_gemini_with_user_token(prompt, user_id, retry_count + 1)
+            return "⚠️ **Session Expired** – Please sign in again"
 
-        return response.text
+        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+
+        result = response.json()
+        if 'candidates' in result and len(result['candidates']) > 0:
+            return result['candidates'][0]['content']['parts'][0]['text']
+        return "⚠️ **Empty response from AI** – Please try again"
 
     except Exception as e:
-        # The SDK provides much better error messages
-        logger.error(f"❌ Gemini API SDK error: {e}")
-        if "429" in str(e):
+        logger.error(f"❌ Gemini API HTTP error: {e.response.status_code} - {e.response.text}")
+        if e.response.status_code == 429:
             return "⚠️ **Rate Limit Exceeded** – The AI is experiencing high traffic. Please wait a moment and try again."
-        if "401" in str(e) or "403" in str(e):
+        if e.response.status_code in [401, 403]:
             return "⚠️ **Authentication Error** – Your session may have expired. Please try refreshing the page or logging in again."
-        return f"⚠️ **AI Error** – An unexpected issue occurred while contacting the AI model. Please try again later."
+        return f"⚠️ **API Error {e.response.status_code}** – An unexpected issue occurred. Please try again later."
 
     except Exception as e:
         logger.error(f"❌ Gemini API error: {e}")
