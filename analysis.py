@@ -130,7 +130,7 @@ def call_gemini_with_user_token(prompt: str, user_id: str, retry_count: int = 0)
 
     try:
         response = requests.post(
-            "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent",
+            "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent",
             headers={"Authorization": f"Bearer {oauth_token}", "Content-Type": "application/json"},
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
