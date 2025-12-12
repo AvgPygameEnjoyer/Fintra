@@ -5,7 +5,7 @@ import { initialize as initializeEvents } from './events.js';
 import { setupSidebar } from './sidebar.js';
 import { initializeChat, updateChatContextIndicator } from './chat.js';
 import { fetchData, loadStockDatabase } from './data.js';
-import { hideAutocomplete } from './autocomplete.js';
+import { hideAutocomplete, selectStock } from './autocomplete.js';
 
 async function init() {
     log.info('Initializing application...');
@@ -38,5 +38,8 @@ async function init() {
 
     log.info('✅ Application initialized successfully.');
 }
+
+// Make selectStock function global for event handlers
+window.selectStock = selectStock;
 
 document.addEventListener('DOMContentLoaded', init);

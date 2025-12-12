@@ -39,11 +39,17 @@ export function handleAutocompleteKeydown(e) {
 export function showAutocomplete(stocks) {
     STATE.selectedIndex = -1;
     DOM.autocomplete.innerHTML = stocks.map(stock => `
-        <div class="autocomplete-item" onclick="selectStock('${stock.symbol}')">
+        <div class="autocomplete-item" data-symbol="${stock.symbol}">
             <div class="ticker-symbol">${stock.symbol}</div>
             <div class="company-name">${stock.name}</div>
         </div>
     `).join('');
+
+    DOM.autocomplete.querySelectorAll('.autocomplete-item').forEach(item => {
+        item.addEventListener('click', () => {
+            window.selectStock(item.dataset.symbol);
+        });
+    });
     DOM.autocomplete.classList.add('active');
 }
 
@@ -66,6 +72,7 @@ export function selectStock(symbol) {
     DOM.symbol.value = symbol;
     hideAutocomplete();
     DOM.symbol.focus();
+    // Trigger a search when a stock is selected from autocomplete
     const sidebarItem = document.querySelector(`.sidebar-stock-item[data-symbol="${symbol}"]`);
     if (sidebarItem) {
         document.querySelectorAll('.sidebar-stock-item').forEach(item => item.classList.remove('active'));
