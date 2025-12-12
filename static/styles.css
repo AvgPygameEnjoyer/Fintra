@@ -263,6 +263,38 @@ body {
     transform: rotate(180deg);
 }
 
+.period-selector {
+    position: relative;
+    margin-left: auto;
+    margin-right: 16px;
+}
+
+.period-select {
+    padding: 6px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background-color: #f9fafb;
+    color: #374151;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    transition: all 0.2s ease;
+}
+
+.period-select:hover {
+    border-color: var(--primary-purple);
+    background-color: #eef2ff;
+}
+
+.period-select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
 .card-content {
     padding: 0 24px;
     max-height: 0;

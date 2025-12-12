@@ -54,9 +54,9 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
         <div class="period-selector">
             <label>View:</label>
             <select class="period-select" data-target-card="${id}">
-                <option value="30" selected>Last 30 Days</option>
+                <option value="7" selected>Last 7 Days</option>
                 <option value="15">Last 15 Days</option>
-                <option value="7">Last 7 Days</option>
+                <option value="30">Last 30 Days</option>
             </select>
         </div>
     ` : '';
@@ -117,28 +117,6 @@ function createVisualizationContent(data) {
         ${data.MACD?.length ? `<div class="chart-container" id="chart-macd"><canvas id="macdChart"></canvas></div>` : ''}
     `;
 
-    setTimeout(() => {
-        const chartTabs = document.querySelector('#visualization-card .chart-tabs');
-        chartTabs?.addEventListener('click', (e) => {
-            const button = e.target.closest('.chart-tab');
-            if (!button) return;
-
-            chartTabs.querySelectorAll('.chart-tab').forEach(btn => btn.classList.remove('active'));
-            button.classList.add('active');
-
-            const chartId = button.dataset.chart;
-
-            document.querySelectorAll('#visualization-card .chart-container').forEach(container => {
-                container.classList.remove('active');
-            });
-            document.getElementById(`chart-${chartId}`)?.classList.add('active');
-
-            if (STATE.charts[chartId]) {
-                STATE.charts[chartId].resize();
-            }
-        });
-    }, 0);
-
     return tabsHtml + chartContainers;
 }
 
@@ -160,6 +138,32 @@ function createAnalysisContent(content) {
     return `<div class="analysis-content">${html}</div>`;
 }
 
+document.addEventListener('click', function(e) {
+    // Event delegation for chart tabs
+    const chartTab = e.target.closest('.chart-tab');
+    if (chartTab && e.target.closest('#visualization-card')) {
+        const chartTabsContainer = chartTab.parentElement;
+        
+        chartTabsContainer.querySelectorAll('.chart-tab').forEach(btn => btn.classList.remove('active'));
+        chartTab.classList.add('active');
+
+        const chartId = chartTab.dataset.chart;
+
+        document.querySelectorAll('#visualization-card .chart-container').forEach(container => {
+            container.classList.remove('active');
+        });
+        const activeChartContainer = document.getElementById(`chart-${chartId}`);
+        if (activeChartContainer) {
+            activeChartContainer.classList.add('active');
+        }
+
+        // Resize chart to ensure it renders correctly when shown
+        if (STATE.charts[chartId]) {
+            STATE.charts[chartId].resize();
+        }
+    }
+});
+
 function createOhlcvTable(data) {
     if (!data?.length) {
         return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>No OHLCV data available.</p></div>';
@@ -173,8 +177,8 @@ function createOhlcvTable(data) {
                         <tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr>
                     </thead>
                     <tbody>
-                        ${data.slice(-30).map(item => `
-                            <tr>
+                        ${data.map((item, index) => `
+                            <tr style="${index < data.length - 7 ? 'display: none;' : ''}">
                                 <td>${item.Date || 'N/A'}</td>
                                 <td>${formatPrice(item.Open)}</td>
                                 <td>${formatPrice(item.High)}</td>
@@ -201,8 +205,8 @@ function createMaRsiContent(maData, rsiData) {
                 <table>
                     <thead><tr><th>Date</th><th>MA5</th><th>MA10</th><th>MA20</th></tr></thead>
                     <tbody>
-                        ${maData.slice(-30).map(item => `
-                            <tr>
+                        ${maData.map((item, index) => `
+                            <tr style="${index < maData.length - 7 ? 'display: none;' : ''}">
                                 <td>${item.Date || 'N/A'}</td>
                                 <td>${formatPrice(item.MA5)}</td>
                                 <td>${formatPrice(item.MA10)}</td>
@@ -233,7 +237,7 @@ function createRsiTable(rsiData) {
             <table>
                 <thead><tr><th>Date</th><th>RSI</th><th>Status</th></tr></thead>
                 <tbody>
-                    ${rsiData.slice(-30).map(item => {
+                    ${rsiData.map((item, index) => {
                         const rsi = item.RSI;
                         const color = getRsiColor(rsi);
                         const background = getRsiBackground(rsi);
@@ -242,7 +246,7 @@ function createRsiTable(rsiData) {
                         if (rsi < 30) status = 'Oversold';
 
                         return `
-                            <tr>
+                            <tr style="${index < rsiData.length - 7 ? 'display: none;' : ''}">
                                 <td>${item.Date || 'N/A'}</td>
                                 <td style="color: ${color}; font-weight: 700;">${rsi != null ? rsi.toFixed(2) : 'N/A'}</td>
                                 <td style="background: ${background}; color: ${color}; font-weight: 600; border-radius: 6px; padding: 4px 8px; font-size: 0.9em; text-align: center;">${status}</td>
@@ -267,10 +271,10 @@ function createMacdTable(data) {
             <table>
                 <thead><tr><th>Date</th><th>MACD</th><th>Signal</th><th>Histogram</th></tr></thead>
                 <tbody>
-                    ${data.slice(-30).map(item => {
+                    ${data.map((item, index) => {
                         const histClass = item.Histogram > 0 ? 'positive-hist' : (item.Histogram < 0 ? 'negative-hist' : '');
                         return `
-                            <tr>
+                            <tr style="${index < data.length - 7 ? 'display: none;' : ''}">
                                 <td>${item.Date || 'N/A'}</td>
                                 <td>${item.MACD != null ? item.MACD.toFixed(2) : 'N/A'}</td>
                                 <td>${item.Signal != null ? item.Signal.toFixed(2) : 'N/A'}</td>
