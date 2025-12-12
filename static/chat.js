@@ -62,7 +62,7 @@ function handleChatSubmit() {
         return;
     }
 
-    appendMessage('user', text);
+    appendMessage({ role: 'user', content: text });
     DOM.chatInput.value = '';
 
     const typingIndicator = appendMessage({ role: 'bot', content: '...' });

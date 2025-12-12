@@ -112,8 +112,6 @@ function loadSidebarStocks() {
 
     if (STATE.currentSymbol) {
         selectStockFromSidebar(STATE.currentSymbol);
-    } else if (STATE.stockDatabase.length > 0) {
-        selectStockFromSidebar(STATE.stockDatabase[0].symbol);
     }
 }
 

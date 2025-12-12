@@ -17,7 +17,7 @@ export function displayData(data) {
     const cards = [
         { id: 'visualization-card', title: 'Technical Charts & Visualizations', icon: '📊', contentHtml: createVisualizationContent(data), isOpen: false },
         { id: 'rule-based-card', title: 'Technical Analysis', icon: '🔍', contentHtml: createAnalysisContent(data.Rule_Based_Analysis), isOpen: false },
-        ...(data.AI_Review ? [{ id: 'ai-review-card', title: 'AI Review & Summary', icon: '🤖', contentHtml: createAnalysisContent(data.AI_Review), isOpen: false }] : []),
+        ...(data.AI_Review ? [{ id: 'ai-review-card', title: 'AI Review & Summary', icon: '🤖', contentHtml: createAnalysisContent(data.AI_Review), isOpen: true }] : []),
         { id: 'ohlcv-card', title: 'Raw OHLCV Data', icon: '📈', contentHtml: createOhlcvTable(data.OHLCV), isOpen: false },
         { id: 'ma-rsi-card', title: 'Raw Technical Indicators', icon: '📉', contentHtml: createMaRsiContent(data.MA, data.RSI), isOpen: false },
         { id: 'macd-card', title: 'Raw MACD Data', icon: '🎯', contentHtml: createMacdTable(data.MACD), isOpen: false }
@@ -49,10 +49,25 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
     const card = document.createElement('div');
     card.id = id;
     card.className = 'data-card';
+
+    const periodSelectorHtml = (id === 'ohlcv-card' || id === 'ma-rsi-card' || id === 'macd-card') ? `
+        <div class="period-selector">
+            <label>View:</label>
+            <select class="period-select" data-target-card="${id}">
+                <option value="30" selected>Last 30 Days</option>
+                <option value="15">Last 15 Days</option>
+                <option value="7">Last 7 Days</option>
+            </select>
+        </div>
+    ` : '';
+
     card.innerHTML = `
         <div class="card-header">
-            <h2><span>${icon}</span>${title}</h2>
-            <span class="dropdown-icon ${isOpen ? '' : 'collapsed'}">▼</span>
+            <div class="card-title">
+                <h2><span>${icon}</span>${title}</h2>
+            </div>
+            ${periodSelectorHtml}
+            <button class="dropdown-toggle"><span class="dropdown-icon ${isOpen ? '' : 'collapsed'}">▼</span></button>
         </div>
         <div class="card-content ${isOpen ? '' : 'collapsed'}">
             ${contentHtml}
@@ -60,6 +75,21 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
     `;
     return card;
 }
+
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('period-select')) {
+        const cardId = e.target.dataset.targetCard;
+        const days = parseInt(e.target.value, 10);
+        const tableBody = document.querySelector(`#${cardId} tbody`);
+        if (!tableBody) return;
+
+        const allRows = Array.from(tableBody.querySelectorAll('tr'));
+        allRows.forEach((row, index) => {
+            // Show rows from the end of the list
+            row.style.display = (index >= allRows.length - days) ? '' : 'none';
+        });
+    }
+});
 
 function createVisualizationContent(data) {
     if (!data.OHLCV?.length) {
@@ -140,12 +170,10 @@ function createOhlcvTable(data) {
             <div class="data-table">
                 <table>
                     <thead>
-                        <tr>
-                            <th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th>
-                        </tr>
+                        <tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr>
                     </thead>
                     <tbody>
-                        ${data.map(item => `
+                        ${data.slice(-30).map(item => `
                             <tr>
                                 <td>${item.Date || 'N/A'}</td>
                                 <td>${formatPrice(item.Open)}</td>
@@ -171,20 +199,14 @@ function createMaRsiContent(maData, rsiData) {
             <h4>Moving Averages (Latest)</h4>
             <div class="data-table data-table-ma">
                 <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th><th>MA5</th><th>MA10</th><th>MA20</th><th>MA50</th><th>MA200</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Date</th><th>MA5</th><th>MA10</th><th>MA20</th></tr></thead>
                     <tbody>
-                        ${maData.slice(-CONFIG.MAX_CHART_POINTS).map(item => `
+                        ${maData.slice(-30).map(item => `
                             <tr>
                                 <td>${item.Date || 'N/A'}</td>
                                 <td>${formatPrice(item.MA5)}</td>
                                 <td>${formatPrice(item.MA10)}</td>
                                 <td>${formatPrice(item.MA20)}</td>
-                                <td>${formatPrice(item.MA50)}</td>
-                                <td>${formatPrice(item.MA200)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -209,13 +231,9 @@ function createRsiTable(rsiData) {
         <h4>Relative Strength Index (RSI) - Latest</h4>
         <div class="data-table data-table-rsi">
             <table>
-                <thead>
-                    <tr>
-                        <th>Date</th><th>RSI</th><th>Status</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Date</th><th>RSI</th><th>Status</th></tr></thead>
                 <tbody>
-                    ${rsiData.slice(-CONFIG.MAX_CHART_POINTS).map(item => {
+                    ${rsiData.slice(-30).map(item => {
                         const rsi = item.RSI;
                         const color = getRsiColor(rsi);
                         const background = getRsiBackground(rsi);
@@ -247,13 +265,9 @@ function createMacdTable(data) {
         <h4>Moving Average Convergence Divergence (MACD) - Latest</h4>
         <div class="data-table data-table-macd">
             <table>
-                <thead>
-                    <tr>
-                        <th>Date</th><th>MACD</th><th>Signal</th><th>Histogram</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Date</th><th>MACD</th><th>Signal</th><th>Histogram</th></tr></thead>
                 <tbody>
-                    ${data.slice(-CONFIG.MAX_CHART_POINTS).map(item => {
+                    ${data.slice(-30).map(item => {
                         const histClass = item.Histogram > 0 ? 'positive-hist' : (item.Histogram < 0 ? 'negative-hist' : '');
                         return `
                             <tr>
