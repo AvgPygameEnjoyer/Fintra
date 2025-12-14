@@ -22,7 +22,7 @@ class Config:
     REDIRECT_URI = 'https://stock-dashboard-fqtn.onrender.com/api/oauth2callback'
 
     # Production Frontend URL
-    CLIENT_REDIRECT_URL = 'https://budgetwarrenbuffet.vercel.app/'
+    CLIENT_REDIRECT_URL = 'https://fintraio.vercel.app/'
 
     # JWT Configuration
     # These MUST be loaded from the environment for stability across restarts.
@@ -48,7 +48,7 @@ class Config:
 
     # CORS Configuration
     CORS_ORIGINS = [
-        "https://budgetwarrenbuffet.vercel.app" # Your production frontend
+        "https://fintraio.vercel.app" # Your production frontend
     ]
 
     # Cookie Domain
