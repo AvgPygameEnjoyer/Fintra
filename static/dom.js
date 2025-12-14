@@ -5,7 +5,7 @@ export function initialize() {
     const ids = [
         'symbol', 'autocomplete', 'output', 'loading', 'error', 'searchBtn', 
         'sidebar', 'sidebarStocks', 'sidebarSearch', 'chat-toggle', 'chat-window', 
-        'chat-messages', 'chat-input', 'chat-send', 'chat-close', 'chat-refresh',
+        'chat-messages', 'chat-input', 'chat-send', 'chat-close', 'chat-refresh', 'sidebarToggle',
         'mobile-sidebar-toggle', 'desktop-sidebar-toggle',
         'context-symbol',
         'google-signin-btn',

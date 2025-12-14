@@ -132,8 +132,8 @@ export function showWelcomeMessage() {
     if (!STATE.currentSymbol && DOM.output) {
         DOM.output.innerHTML = `
             <div style="text-align: center; padding: 60px 20px; color: #6b7280;">
-                <div style="font-size: 4rem; margin-bottom: 20px;">📊</div>
-                <h2 style="color: #374151; margin-bottom: 10px;">Welcome to Stock Analysis</h2>
+                <div style="font-size: 4rem; margin-bottom: 20px;">👋</div>
+                <h2 style="color: #374151; margin-bottom: 10px;">Welcome to Fintra, your personal finance assistant.</h2>
                 <p>Search for a stock symbol or select from the sidebar to get started</p>
             </div>
         `;

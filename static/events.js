@@ -11,6 +11,7 @@ export function initialize() {
     document.querySelector('.search-form')?.addEventListener('submit', handleSearchSubmit);
     DOM.googleSigninBtn?.addEventListener('click', handleGoogleLogin);
     DOM.logoutBtn?.addEventListener('click', handleLogout);
+    DOM.sidebarToggle?.addEventListener('click', () => setSidebarCollapsed(true));
     
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.input-wrapper')) hideAutocomplete();
