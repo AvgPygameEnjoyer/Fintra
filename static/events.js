@@ -11,7 +11,9 @@ export function initialize() {
     document.querySelector('.search-form')?.addEventListener('submit', handleSearchSubmit);
     DOM.googleSigninBtn?.addEventListener('click', handleGoogleLogin);
     DOM.logoutBtn?.addEventListener('click', handleLogout);
-    DOM.sidebarToggle?.addEventListener('click', () => setSidebarCollapsed(true));
+    DOM.sidebarToggle?.addEventListener('click', () => setSidebarCollapsed(true)); // Close button inside sidebar
+    DOM.mobileSidebarToggle?.addEventListener('click', () => setSidebarCollapsed(!STATE.isSidebarCollapsed));
+    DOM.desktopSidebarToggle?.addEventListener('click', () => setSidebarCollapsed(!STATE.isSidebarCollapsed));
     
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.input-wrapper')) hideAutocomplete();
