@@ -132,7 +132,7 @@ export function showWelcomeMessage() {
     if (!STATE.currentSymbol && DOM.output) {
         DOM.output.innerHTML = `
             <div style="text-align: center; padding: 60px 20px; color: #6b7280;">
-                <img src="/fintralogo.png" alt="Fintra Logo" style="width: 1500px; height: 1500px; margin-bottom: 20px;">
+                <img src="/fintralogo.png" alt="Fintra Logo" style="width: 150px; height: 150px; margin-bottom: 20px;">
                 <h2 style="color: #374151; margin-bottom: 10px;">Welcome to Fintra, your personal finance assistant.</h2>
                 <p>Search for a stock symbol or select from the sidebar to get started</p>
             </div>
