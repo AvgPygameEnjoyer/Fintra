@@ -533,7 +533,11 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
 }
-
+.sidebar-logo {
+    height: 36px;
+    width: auto;
+    margin-right: auto; /* Pushes the close button to the far right */
+}
 .sidebar-header h3 {
     margin: 0;
     font-family: 'Space Grotesk', sans-serif;
