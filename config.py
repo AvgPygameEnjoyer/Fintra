@@ -41,8 +41,6 @@ class Config:
         'openid',
         'https://www.googleapis.com/auth/userinfo.email',
         'https://www.googleapis.com/auth/userinfo.profile',
-        'https://www.googleapis.com/auth/generative-language.peruserquota',
-        'https://www.googleapis.com/auth/generative-language.retriever',
         'https://www.googleapis.com/auth/generative-language.tuning'
     ]
 
