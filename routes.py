@@ -31,7 +31,7 @@ api = Blueprint('api', __name__)
 
 
 # ==================== AUTHENTICATION ROUTES ====================
-@api.route('/auth/login', methods=['GET'])
+@api.route('/auth/login', methods=['GET', 'OPTIONS'])
 def auth_login():
     """Initiate Google OAuth flow."""
     try:

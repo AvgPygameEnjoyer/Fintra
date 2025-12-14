@@ -1,8 +1,8 @@
 :root {
-    --primary-purple: #667eea;
-    --secondary-purple: #764ba2;
-    --accent-green: #10b981;
-    --bg-gradient: linear-gradient(135deg, var(--primary-purple) 0%, var(--secondary-purple) 100%);
+    --fintra-blue: #0052FF;
+    --fintra-dark-blue: #0A2540;
+    --fintra-accent-teal: #00D4C8;
+    --bg-gradient: linear-gradient(135deg, var(--fintra-dark-blue) 0%, #1c3d5e 100%);
     --card-bg: #ffffff;
     --card-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
     --border-radius: 12px;
@@ -128,7 +128,7 @@ body {
 
 .autocomplete-item .ticker-symbol {
     font-weight: 700;
-    color: var(--primary-purple);
+    color: var(--fintra-blue);
     font-size: 0.95rem;
 }
 
@@ -140,7 +140,7 @@ body {
 
 .search-btn {
     padding: 16px 32px;
-    background: var(--accent-green);
+    background: var(--fintra-accent-teal);
     color: white;
     border: none;
     border-radius: var(--border-radius);
@@ -155,8 +155,8 @@ body {
 
 .search-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
-    background: #0da271;
+    box-shadow: 0 8px 20px rgba(0, 212, 200, 0.3);
+    background: #00c2b6;
 }
 
 .search-btn:disabled {
@@ -236,7 +236,7 @@ body {
 
 .card-header h2 {
     font-size: 1.3rem;
-    color: var(--primary-purple);
+    color: var(--fintra-dark-blue);
     margin: 0;
     display: flex;
     align-items: center;
@@ -251,7 +251,7 @@ body {
 
 .dropdown-icon {
     font-size: 1.4rem;
-    color: var(--primary-purple);
+    color: var(--fintra-blue);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -286,7 +286,7 @@ body {
 }
 
 .period-select:hover {
-    border-color: var(--primary-purple);
+    border-color: var(--fintra-blue);
     background-color: #eef2ff;
 }
 
@@ -335,7 +335,7 @@ body {
 .data-table th {
     font-weight: 700;
     background: #f9fafb;
-    color: var(--primary-purple);
+    color: var(--fintra-dark-blue);
     font-size: 0.95rem;
 }
 
@@ -393,7 +393,7 @@ body {
 
 /* Data Colors */
 .data-table td.positive-hist {
-    color: var(--accent-green);
+    color: var(--fintra-accent-teal);
     font-weight: 700;
 }
 
@@ -410,7 +410,7 @@ body {
 }
 
 .analysis-content h3 {
-    color: var(--secondary-purple);
+    color: var(--fintra-dark-blue);
     font-size: 1.3rem;
     margin-top: 24px;
     margin-bottom: 12px;
@@ -422,7 +422,7 @@ body {
 }
 
 .analysis-content h4 {
-    color: var(--primary-purple);
+    color: var(--fintra-blue);
     font-size: 1.1rem;
     margin-top: 18px;
     margin-bottom: 10px;
@@ -527,8 +527,8 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 24px;
-    background: var(--bg-gradient);
+    padding: 20px 24px;    
+    background: var(--fintra-dark-blue);
     color: white;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
@@ -610,14 +610,14 @@ body {
 }
 
 .sidebar-stock-item.active {
-    background: #eef2ff;
-    border-left: 4px solid var(--primary-purple);
+    background: #f0f7ff;
+    border-left: 4px solid var(--fintra-blue);
     padding-left: 20px;
 }
 
 .sidebar-stock-symbol {
     font-weight: 700;
-    color: var(--primary-purple);
+    color: var(--fintra-blue);
     font-size: 1rem;
     margin-bottom: 4px;
 }
@@ -635,7 +635,7 @@ body {
 .sidebar-group-header {
     padding: 16px 24px;
     background: #f8fafc;
-    color: var(--primary-purple);
+    color: var(--fintra-dark-blue);
     font-weight: 700;
     font-size: 0.85rem;
     text-transform: uppercase;
@@ -662,8 +662,8 @@ body {
     position: fixed;
     top: 20px;
     left: 20px;
-    z-index: 999;
-    background: var(--bg-gradient);
+    z-index: 999;    
+    background: var(--fintra-dark-blue);
     color: white;
     border: none;
     border-radius: 10px;
@@ -685,8 +685,8 @@ body {
     position: fixed;
     top: 20px;
     left: 20px;
-    z-index: 1001;
-    background: var(--bg-gradient);
+    z-index: 1001;    
+    background: var(--fintra-dark-blue);
     color: white;
     border: none;
     border-radius: 10px;
@@ -717,7 +717,7 @@ body {
 
 .chart-title {
     text-align: center;
-    color: var(--primary-purple);
+    color: var(--fintra-dark-blue);
     font-weight: 700;
     margin-bottom: 15px;
     font-size: 1.2rem;
@@ -763,7 +763,7 @@ body {
 }
 
 .chart-tab.active {
-    background: var(--primary-purple);
+    background: var(--fintra-blue);
     color: white;
 }
 
@@ -958,7 +958,7 @@ footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #4a47ff;
+  background: var(--fintra-dark-blue);
   color: #fff;
   padding: 10px 14px;
   font-weight: 600;
@@ -990,7 +990,7 @@ footer {
 }
 
 .msg-user {
-  background: #4a47ff;
+  background: var(--fintra-blue);
   color: white;
   align-self: flex-end;
   border-radius: 16px 16px 4px 16px;
@@ -1037,7 +1037,7 @@ footer {
 }
 
 #chat-send {
-  background: #4a47ff;
+  background: var(--fintra-blue);
   color: white;
   border: none;
   padding: 10px 16px;
@@ -1054,7 +1054,7 @@ footer {
 }
 
 #chat-toggle {
-  background: var(--bg-gradient);
+  background: var(--fintra-blue);
   color: white;
   border: none;
   border-radius: 50%;
@@ -1080,8 +1080,8 @@ footer {
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+    height: 100%;    
+    background: linear-gradient(135deg, rgba(10, 37, 64, 0.95) 0%, rgba(28, 61, 94, 0.95) 100%);
     z-index: 10000;
     display: flex;
     align-items: center;
@@ -1115,7 +1115,7 @@ footer {
 }
 
 .auth-card h1 {
-    color: #667eea;
+    color: var(--fintra-blue);
     font-family: 'Space Grotesk', sans-serif;
     font-size: 2.5rem;
     margin-bottom: 10px;
@@ -1147,7 +1147,7 @@ footer {
 .google-signin-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-    border-color: #667eea;
+    border-color: var(--fintra-blue);
 }
 
 .google-icon {
@@ -1223,7 +1223,7 @@ footer {
 }
 
 .logout-btn {
-    background: #ef4444;
+    background: #e53e3e;
     color: white;
     border: none;
     padding: 8px 16px;
@@ -1234,7 +1234,7 @@ footer {
 }
 
 .logout-btn:hover {
-    background: #dc2626;
+    background: #c53030;
     transform: translateY(-1px);
 }
 
