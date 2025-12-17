@@ -102,6 +102,11 @@ export function updateAuthUI() {
     // Once the auth state is determined, always show the main container.
     mainContainer?.classList.remove('hidden');
 }
+
+export function showAuthOverlay() {
+    document.getElementById('auth-overlay')?.classList.remove('hidden');
+}
+
 // ==================== SESSION MANAGEMENT (MERGED) ====================
 
 export function saveSessionState() {
