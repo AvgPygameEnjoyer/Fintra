@@ -1,26 +1,35 @@
 // ==================== CHART RENDERING ====================
 import { STATE, CONFIG } from './config.js';
 
-export function renderCharts(data) {
-    destroyExistingCharts();
-    const latestData = data.OHLCV.slice(-CONFIG.MAX_CHART_POINTS);
-
-    createOHLCVChart(latestData);
-    if (data.RSI?.length) {
-        const latestRSI = data.RSI.slice(-CONFIG.MAX_CHART_POINTS);
-        createRSIChart(latestRSI, latestData);
-    }
-    if (data.MA?.length) {
-        const latestMA = data.MA.slice(-CONFIG.MAX_CHART_POINTS);
-        createMovingAveragesChart(latestMA, latestData);
-    }
-    if (data.MACD?.length) {
-        const latestMACD = data.MACD.slice(-CONFIG.MAX_CHART_POINTS);
-        createMACDChart(latestMACD, latestData);
+export function renderChart(chartId, data) {
+    // Store data globally for easy access by tab click events
+    window.currentChartData = data;
+    
+    const ohlcvData = data.OHLCV.slice(-CONFIG.MAX_CHART_POINTS);
+    
+    switch (chartId) {
+        case 'ohlcv':
+            createOHLCVChart(ohlcvData);
+            break;
+        case 'rsi':
+            if (data.RSI?.length) {
+                createRSIChart(data.RSI.slice(-CONFIG.MAX_CHART_POINTS), ohlcvData);
+            }
+            break;
+        case 'movingAverages':
+            if (data.MA?.length) {
+                createMovingAveragesChart(data.MA.slice(-CONFIG.MAX_CHART_POINTS), ohlcvData);
+            }
+            break;
+        case 'macd':
+            if (data.MACD?.length) {
+                createMACDChart(data.MACD.slice(-CONFIG.MAX_CHART_POINTS), ohlcvData);
+            }
+            break;
     }
 }
 
-function destroyExistingCharts() {
+export function destroyExistingCharts() {
     Object.values(STATE.charts).forEach(chart => chart?.destroy());
     STATE.charts = { ohlcv: null, rsi: null, movingAverages: null, macd: null };
 }

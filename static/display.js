@@ -1,6 +1,6 @@
 // ==================== DATA DISPLAY ====================
 import { STATE, formatPrice, formatNumber, getRsiColor, getRsiBackground, CONFIG } from './config.js';
-import { renderCharts } from './charts.js';
+import { renderChart, destroyExistingCharts } from './charts.js';
 
 export function displayData(data) {
     const companyInfo = STATE.stockDatabase.find(s => s.symbol === data.ticker) || { name: 'Technical Analysis Data' };
@@ -14,7 +14,7 @@ export function displayData(data) {
     const grid = document.createElement('div');
     grid.className = 'data-grid';
 
-    const cards = [
+    const cards = [ 
         { id: 'visualization-card', title: 'Technical Charts & Visualizations', icon: '📊', contentHtml: createVisualizationContent(data), isOpen: false },
         { id: 'rule-based-card', title: 'Technical Analysis', icon: '🔍', contentHtml: createAnalysisContent(data.Rule_Based_Analysis), isOpen: false },
         ...(data.AI_Review ? [{ id: 'ai-review-card', title: 'AI Review & Summary', icon: '🤖', contentHtml: createAnalysisContent(data.AI_Review), isOpen: true }] : []),
@@ -32,17 +32,18 @@ export function displayData(data) {
             const isCollapsed = content.classList.contains('collapsed');
 
             content.classList.toggle('collapsed', !isCollapsed);
-            icon.classList.toggle('collapsed', !isCollapsed);
+            icon.classList.toggle('collapsed', !isCollapsed); 
 
-            if (cardData.id === 'visualization-card' && isCollapsed) {
-                renderCharts(data);
+            if (cardData.id === 'visualization-card') {
+                if (isCollapsed) {
+                    // If expanding, render the default chart if it doesn't exist
+                    if (!STATE.charts.ohlcv) renderChart('ohlcv', data);
+                }
             }
         });
         grid.appendChild(card);
     });
-
     document.getElementById('output').appendChild(grid);
-    renderCharts(data);
 }
 
 function createDataCard({ id, title, icon, contentHtml, isOpen }) {
@@ -158,8 +159,10 @@ document.addEventListener('click', function(e) {
         }
 
         // Resize chart to ensure it renders correctly when shown
-        if (STATE.charts[chartId]) {
-            STATE.charts[chartId].resize();
+        if (STATE.charts[chartId]) { 
+            STATE.charts[chartId].resize(); 
+        } else {
+            renderChart(chartId, window.currentChartData);
         }
     }
 });
