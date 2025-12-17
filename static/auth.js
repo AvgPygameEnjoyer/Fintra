@@ -138,8 +138,8 @@ export function loadSessionState() {
 export function showWelcomeMessage() {
     if (!STATE.currentSymbol && DOM.output) {
         DOM.output.innerHTML = `
-            <div style="text-align: center; padding: 60px 20px; background: rgba(10, 37, 64, 0.8); border-radius: 12px;">
-                <img src="/fintralogo.png" alt="Fintra Logo" style="width: 150px; height: 150px; margin-bottom: 20px;">
+            <div style="text-align: center; padding: 40px 20px; background: rgba(10, 37, 64, 0.8); border-radius: 12px; margin-top: 20px;">
+                <img src="/fintralogo.png" alt="Fintra Logo" style="width: 120px; height: 120px; margin-bottom: 15px;">
                 <h2 style="color: #ffffff; margin-bottom: 10px; font-family: 'Space Grotesk', sans-serif;">Welcome to Fintra</h2>
                 <p style="color: #e5e7eb; opacity: 0.9;">Your personal AI-powered market analyst.</p>
                 <p style="color: #cbd5e1; margin-top: 20px;">Search for a stock symbol or select from the sidebar to get started.</p>
