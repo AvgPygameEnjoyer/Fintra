@@ -896,7 +896,9 @@ body {
         display: none !important;
     }
 
-    /* This rule is now handled by JavaScript, so we can remove it for clarity */
+    .sidebar:not(.sidebar-collapsed) ~ .desktop-sidebar-toggle {
+        left: 340px; /* Move button when sidebar is open */
+    }
 }
 
 @media (max-width: 480px) {

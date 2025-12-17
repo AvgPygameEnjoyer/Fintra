@@ -53,13 +53,9 @@ export function setSidebarCollapsed(collapsed) {
 
     if (DOM.mobileSidebarToggle) {
         DOM.mobileSidebarToggle.innerHTML = collapsed ? '☰' : '✕';
-        DOM.mobileSidebarToggle.style.left = !collapsed && window.matchMedia('(max-width: 768px)').matches ? '300px' : '20px';
-        DOM.mobileSidebarToggle.style.display = window.matchMedia('(max-width: 768px)').matches ? 'block' : 'none';
     }
     if (DOM.desktopSidebarToggle) {
         DOM.desktopSidebarToggle.innerHTML = collapsed ? '☰' : '✕';
-        DOM.desktopSidebarToggle.style.left = !collapsed && window.matchMedia('(min-width: 769px)').matches ? '340px' : '20px';
-        DOM.desktopSidebarToggle.style.display = window.matchMedia('(min-width: 769px)').matches ? 'block' : 'none';
     }
 }
 
