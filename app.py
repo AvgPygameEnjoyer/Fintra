@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
+#DevEasterEgg
 # ==================== APPLICATION FACTORY ====================
 def create_app():
     """Application factory pattern"""
