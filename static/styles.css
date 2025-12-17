@@ -710,6 +710,7 @@ body {
 
 /* Chart Styles */
 .chart-container {
+    display: none; /* Hide containers by default */
     position: relative;
     height: 400px;
     margin: 20px 0;
@@ -717,6 +718,11 @@ body {
     border-radius: 12px;
     padding: 20px;
     background: white;
+}
+
+.chart-container.active {
+    display: block; /* Only show the active container */
+    animation: fadeIn 0.3s ease-in-out;
 }
 
 .chart-title {
