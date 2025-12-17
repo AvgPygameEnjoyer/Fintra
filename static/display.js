@@ -13,7 +13,7 @@ export function displayData(data) {
 
     const grid = document.createElement('div');
     grid.className = 'data-grid';
-
+//Deveasteregg
     const cards = [ 
         { id: 'visualization-card', title: 'Technical Charts & Visualizations', icon: '📊', contentHtml: createVisualizationContent(data), isOpen: false },
         { id: 'rule-based-card', title: 'Technical Analysis', icon: '🔍', contentHtml: createAnalysisContent(data.Rule_Based_Analysis), isOpen: false },
