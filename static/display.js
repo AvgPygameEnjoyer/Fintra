@@ -58,7 +58,6 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
                 <option value="7" selected>Last 7 Days</option>
                 <option value="15">Last 15 Days</option>
                 <option value="30">Last 30 Days</option>
-                <option value="all">View All</option>
             </select>
         </div>
     ` : '';
@@ -69,7 +68,7 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
                 <h2><span>${icon}</span>${title}</h2>
             </div>
             ${periodSelectorHtml}
-            <button class="dropdown-toggle"><span class="dropdown-icon ${isOpen ? '' : 'collapsed'}">▼</span></button>
+            <button class="dropdown-toggle" aria-label="Toggle card content"><span class="dropdown-icon ${isOpen ? '' : 'collapsed'}">▼</span></button>
         </div>
         <div class="card-content ${isOpen ? '' : 'collapsed'}">
             ${contentHtml}
@@ -79,16 +78,26 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
 }
 
 document.addEventListener('change', function(e) {
-    if (e.target.classList.contains('period-select')) {
+    const periodSelect = e.target.closest('.period-select');
+    if (periodSelect) {
         const cardId = e.target.dataset.targetCard;
-        const days = parseInt(e.target.value, 10);
-        const tableBody = document.querySelector(`#${cardId} table > tbody`);
-        if (!tableBody) return;
+        const days = e.target.value === 'all' ? Infinity : parseInt(e.target.value, 10);
+        const card = document.getElementById(cardId);
+        if (!card) return;
 
-        const allRows = Array.from(tableBody.querySelectorAll('tr'));
-        allRows.forEach((row, index) => {
-            // Show rows from the end of the list
-            row.style.display = (index >= allRows.length - days) ? '' : 'none';
+        // This will update all tables within the card (e.g., MA and RSI)
+        const tableBodies = card.querySelectorAll('table > tbody');
+        
+        tableBodies.forEach(tbody => {
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+            const totalRows = allRows.length;
+            if (totalRows === 0) return;
+
+            const rowsToShow = days === Infinity ? totalRows : days;
+
+            allRows.forEach((row, index) => {
+                row.style.display = (index >= totalRows - rowsToShow) ? '' : 'none';
+            });
         });
     }
 });
@@ -207,14 +216,13 @@ function createMaRsiContent(maData, rsiData) {
             <h4>Moving Averages (Latest)</h4>
             <div class="data-table data-table-ma">
                 <table>
-                    <thead><tr><th>Date</th><th>MA5</th><th>MA10</th><th>MA20</th></tr></thead>
+                    <thead><tr><th>Date</th><th>MA5</th><th>MA10</th></tr></thead>
                     <tbody>
                         ${maData.map((item, index) => `
                             <tr style="${index < maData.length - 7 ? 'display: none;' : ''}">
                                 <td>${item.Date || 'N/A'}</td>
                                 <td>${formatPrice(item.MA5)}</td>
                                 <td>${formatPrice(item.MA10)}</td>
-                                <td>${formatPrice(item.MA20)}</td>
                             </tr>
                         `).join('')}
                     </tbody>

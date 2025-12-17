@@ -18,8 +18,8 @@ export function setupSidebar() {
 
     // Determine initial sidebar state based on screen size and saved state.
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    // On desktop, default to open unless a collapsed state was saved. On mobile, default to collapsed.
-    setSidebarCollapsed(isMobile ? true : (STATE.isSidebarCollapsed || false));
+    // On desktop, always default to open. On mobile, default to collapsed.
+    setSidebarCollapsed(isMobile);
 
     window.matchMedia('(max-width: 768px)').addEventListener('change', (e) => {
         setSidebarCollapsed(e.matches);
