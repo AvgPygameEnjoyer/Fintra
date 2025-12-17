@@ -7,8 +7,9 @@ export function initialize() {
         'sidebar', 'sidebarStocks', 'sidebarSearch', 'clearSearchBtn', 'chat-toggle', 'chat-window', 
         'chat-messages', 'chat-input', 'chat-send', 'chat-close', 'chat-refresh', 'sidebarToggle',
         'context-symbol',
-        'google-signin-btn',
-        'logout-btn'
+        'google-signin-btn', 'logout-btn',
+        // Add the missing sidebar toggle buttons
+        'mobile-sidebar-toggle', 'desktop-sidebar-toggle'
     ];
     ids.forEach(id => {
         const camelCaseId = id.replace(/-(\w)/g, (_, c) => c.toUpperCase());
