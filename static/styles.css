@@ -866,17 +866,14 @@ body {
 
 @media (min-width: 769px) {
     .sidebar-collapsed ~ .desktop-sidebar-toggle {
-        display: block;
+        display: block; /* Show the toggle when the sidebar is collapsed */
     }
 
     .mobile-sidebar-toggle {
         display: none !important;
     }
 
-    .sidebar:not(.sidebar-collapsed) ~ .desktop-sidebar-toggle {
-        left: 340px;
-        display: block;
-    }
+    /* This rule is now handled by JavaScript, so we can remove it for clarity */
 }
 
 @media (max-width: 480px) {
