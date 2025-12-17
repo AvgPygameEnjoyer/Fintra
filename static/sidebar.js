@@ -46,10 +46,10 @@ function toggleSidebar() {
 export function setSidebarCollapsed(collapsed) {
     STATE.isSidebarCollapsed = collapsed;
     saveSessionState();
-    const mainContent = document.querySelector('.container');
+    const container = document.querySelector('.container');
 
     DOM.sidebar?.classList.toggle('sidebar-collapsed', collapsed);
-    mainContent?.classList.toggle('sidebar-collapsed', collapsed);
+    container?.classList.toggle('sidebar-collapsed', collapsed);
 
     if (DOM.mobileSidebarToggle) {
         DOM.mobileSidebarToggle.innerHTML = collapsed ? '☰' : '✕';

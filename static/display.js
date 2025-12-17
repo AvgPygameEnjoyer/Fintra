@@ -58,6 +58,7 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
                 <option value="7" selected>Last 7 Days</option>
                 <option value="15">Last 15 Days</option>
                 <option value="30">Last 30 Days</option>
+                <option value="all">View All</option>
             </select>
         </div>
     ` : '';
@@ -81,7 +82,7 @@ document.addEventListener('change', function(e) {
     if (e.target.classList.contains('period-select')) {
         const cardId = e.target.dataset.targetCard;
         const days = parseInt(e.target.value, 10);
-        const tableBody = document.querySelector(`#${cardId} tbody`);
+        const tableBody = document.querySelector(`#${cardId} table > tbody`);
         if (!tableBody) return;
 
         const allRows = Array.from(tableBody.querySelectorAll('tr'));
