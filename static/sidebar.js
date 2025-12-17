@@ -14,10 +14,6 @@ export function setupSidebar() {
         }, CONFIG.DEBOUNCE_DELAY));
     }
 
-    // Attach events to the toggles that now exist in the HTML
-    DOM.mobileSidebarToggle?.addEventListener('click', toggleSidebar);
-    DOM.desktopSidebarToggle?.addEventListener('click', toggleSidebar);
-
     loadSidebarStocks();
 
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
@@ -37,10 +33,6 @@ export function setupSidebar() {
             }
         }
     });
-}
-
-function toggleSidebar() {
-    setSidebarCollapsed(!STATE.isSidebarCollapsed);
 }
 
 export function setSidebarCollapsed(collapsed) {
