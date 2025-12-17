@@ -1,59 +1,72 @@
-import { STATE, CONFIG, DOM } from './config.js';
+import { deps } from './config.js';
 import { showNotification } from './notifications.js';
-import * as deps from './main.js'; // Assuming main.js exports log
 
-// ==================== AUTHENTICATION FLOW ====================
+// ==================== LOGGER (MOVED) ====================
+const IS_LOCALHOST = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3,
+};
+const CURRENT_LOG_LEVEL = IS_LOCALHOST ? LOG_LEVELS.DEBUG : LOG_LEVELS.INFO;
 
-/**
- * Initiates the Google login flow by fetching the auth URL from the backend.
- */
+export const log = {
+    debug: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.DEBUG) console.log('%c🐛 DEBUG', 'color: #9ca3af;', ...args);
+    },
+    info: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.INFO) console.log('%cℹ️ INFO', 'color: #3b82f6; font-weight: bold;', ...args);
+    },
+    warn: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.WARN) console.warn('%c⚠️ WARN', 'color: #f97316; font-weight: bold;', ...args);
+    },
+    error: (...args) => {
+        if (CURRENT_LOG_LEVEL <= LOG_LEVELS.ERROR) console.error('%c❌ ERROR', 'color: #ef4444; font-weight: bold;', ...args);
+    }
+};
+
+const { STATE, DOM, CONFIG } = deps;
+
 export async function handleGoogleLogin() {
     try {
         deps.log.debug('Initiating Google login...');
         const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, { credentials: 'include' });
         const data = await response.json();
         if (response.ok && data.success && data.auth_url && data.state_token) {
-            // Store the state token to verify after the redirect
             localStorage.setItem(CONFIG.OAUTH_STATE_KEY, data.state_token);
-            // Redirect the user to Google's authentication page
             window.location.href = data.auth_url;
         } else {
+            showNotification('Could not initiate login. Please try again.', 'error');
             deps.log.error('Failed to get auth URL from backend.', data);
-            showNotification('Login initiation failed. Please try again.', 'error');
         }
     } catch (error) {
         deps.log.error('Login error:', error);
-        showNotification('An error occurred during login. Please check the console.', 'error');
+        showNotification('Login failed due to a network or server error.', 'error');
     }
 }
 
-/**
- * Checks the user's authentication status with the backend.
- * This is called on application startup.
- */
 export async function checkAuthStatus() {
     try {
         const response = await fetch(`${CONFIG.API_BASE_URL}/auth/status`, { credentials: 'include' });
         const data = await response.json();
         STATE.isAuthenticated = data.authenticated;
         STATE.user = data.user || null;
+        updateAuthUI();
+        return data.authenticated;
     } catch (error) {
         deps.log.error('Auth check error:', error);
-    } finally {
-        // Once the auth check is complete, remove the loading state from the sign-in button
-        const signInButton = document.getElementById('google-signin-btn');
-        signInButton?.classList.remove('loading');
+        STATE.isAuthenticated = false;
+        STATE.user = null;
+        updateAuthUI();
+        return false;
     }
 }
 
-/**
- * Handles the user logout process.
- * @param {boolean} showNotify - Whether to show a notification on successful logout.
- */
 export async function handleLogout(showNotify = true) {
     try {
         await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
-    } catch (error) { 
+    } catch (error) {
         deps.log.warn('Logout request to backend failed, but logging out on client-side anyway.', error);
     } finally {
         STATE.isAuthenticated = false;
@@ -64,85 +77,57 @@ export async function handleLogout(showNotify = true) {
     }
 }
 
-// ==================== UI UPDATES ====================
-
-/**
- * Updates the UI based on the user's authentication state.
- * Shows/hides the login overlay and user info bar.
- */
 export function updateAuthUI() {
     if (STATE.isAuthenticated && STATE.user) {
-        // User is authenticated
         document.getElementById('auth-overlay')?.classList.add('hidden');
-        
         const userInfoBar = document.getElementById('user-info-bar');
         if (userInfoBar) {
             userInfoBar.classList.remove('hidden');
             document.getElementById('user-name').textContent = STATE.user.name;
-            document.getElementById('user-avatar').src = STATE.user.picture || 
+            document.getElementById('user-avatar').src = STATE.user.picture ||
                 `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23e2e8f0'/><text x='50' y='55' font-size='40' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'>👤</text></svg>`;
         }
-        
-        // Start session timer
-        startSessionTimer();
-
     } else {
-        // User is not authenticated
         document.getElementById('auth-overlay')?.classList.remove('hidden');
         document.getElementById('user-info-bar')?.classList.add('hidden');
-        
-        // Show welcome message if no stock is selected
-        showWelcomeMessage();
     }
 }
 
-// ==================== SESSION MANAGEMENT ====================
-
-let sessionTimerInterval;
-
-/**
- * Starts a countdown timer to warn the user about session expiration.
- */
-function startSessionTimer() {
-    if (sessionTimerInterval) clearInterval(sessionTimerInterval);
-
-    const sessionDuration = 15 * 60; // 15 minutes in seconds
-    let remainingTime = sessionDuration;
-
-    const timerElement = document.getElementById('session-timer');
-    const warningElement = document.getElementById('session-warning');
-
-    sessionTimerInterval = setInterval(() => {
-        remainingTime--;
-        const minutes = Math.floor(remainingTime / 60);
-        const seconds = remainingTime % 60;
-        
-        if (timerElement) {
-            timerElement.textContent = `Session: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        }
-
-        if (remainingTime <= 60 && remainingTime > 0) {
-            // Show warning in the last minute
-            if (warningElement) {
-                warningElement.classList.remove('hidden');
-                warningElement.textContent = `Your session will expire in ${remainingTime} seconds.`;
-            }
-        } else {
-            if (warningElement) warningElement.classList.add('hidden');
-        }
-
-        if (remainingTime <= 0) {
-            clearInterval(sessionTimerInterval);
-            handleLogout(false); // Logout without notification
-            showNotification('Your session has expired. Please sign in again.', 'warning');
-        }
-    }, 1000);
+export function showAuthOverlay() {
+    document.getElementById('auth-overlay')?.classList.remove('hidden');
 }
 
-/**
- * Displays a welcome message in the main output area if no stock is selected.
- */
-function showWelcomeMessage() {
+// ==================== SESSION MANAGEMENT (MERGED) ====================
+
+export function saveSessionState() {
+    try {
+        const sessionToSave = {
+            currentSessionId: STATE.currentSessionId,
+            currentSymbol: STATE.currentSymbol,
+            isSidebarCollapsed: STATE.isSidebarCollapsed,
+        };
+        localStorage.setItem(CONFIG.SESSION_STORAGE_KEY, JSON.stringify(sessionToSave));
+    } catch (error) {
+        deps.log.error('Could not save session state:', error);
+    }
+}
+
+export function loadSessionState() {
+    try {
+        const savedSession = JSON.parse(localStorage.getItem(CONFIG.SESSION_STORAGE_KEY));
+        if (savedSession) {
+            STATE.currentSessionId = savedSession.currentSessionId || STATE.currentSessionId;
+            STATE.currentSymbol = savedSession.currentSymbol || null;
+            STATE.isSidebarCollapsed = savedSession.isSidebarCollapsed || false;
+            if (STATE.currentSymbol && DOM.symbol) DOM.symbol.value = STATE.currentSymbol;
+        }
+    } catch (error) {
+        deps.log.error('Could not load session state:', error);
+    }
+    saveSessionState();
+}
+
+export function showWelcomeMessage() {
     if (!STATE.currentSymbol && DOM.output) {
         DOM.output.innerHTML = `
             <div style="text-align: center; padding: 60px 20px; color: #6b7280;">
