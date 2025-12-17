@@ -52,7 +52,11 @@ function handleChatSubmit() {
     if (!text) return;
 
     if (!STATE.isAuthenticated) {
-        appendMessage({ role: 'system', content: 'Please sign in to use the AI Chatbot.' });
+        // Temporarily add a system message without saving it to history
+        const systemMessage = appendMessage({ role: 'system', content: 'Please sign in to use the AI Chatbot.' }, true);
+        setTimeout(() => {
+            systemMessage?.remove();
+        }, 5000); // Remove the message after 5 seconds
         showAuthOverlay();
         return;
     }
@@ -112,11 +116,11 @@ function handleChatSubmit() {
     }
 }
 
-function appendMessage(message) {
+function appendMessage(message, isTemporary = false) {
     const { role, content } = message;
 
-    // Add to state, unless it's a temporary typing indicator
-    if (content !== '...') {
+    // Add to state, unless it's a temporary message or typing indicator
+    if (content !== '...' && !isTemporary) {
         STATE.chatHistory.push({ role, content });
     }
 

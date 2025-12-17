@@ -141,13 +141,8 @@ function filterSidebarStocks(query) {
 }
 
 function selectStockFromSidebar(symbol) {
-    if (DOM.symbol) {
-        DOM.symbol.value = symbol;
-    }
+    DOM.symbol.value = symbol;
     hideAutocomplete();
-    if (DOM.symbol) {
-        DOM.symbol.focus();
-    }
 
     document.querySelectorAll('.sidebar-stock-item').forEach(item => item.classList.remove('active'));
     const sidebarItem = document.querySelector(`.sidebar-stock-item[data-symbol="${symbol}"]`);

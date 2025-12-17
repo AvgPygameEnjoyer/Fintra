@@ -22,18 +22,18 @@ async function init() {
     log.debug('Step 3: Caching DOM elements...');
     initializeDOM();
 
-    log.debug('Step 4: Initializing UI components and event listeners...');
+    // Step 4: Load session and check auth status to update the UI early.
+    log.debug('Step 4: Loading local session state and checking auth...');
+    loadSessionState();
+    await checkAuthStatus();
+
+    // Step 5: Initialize UI components and event listeners.
+    log.debug('Step 5: Initializing UI components and event listeners...');
     initializeEvents();
     setupSidebar();
     initializeChat();
-
-    // Step 5: Load session and check auth status to update the UI.
-    log.debug('Step 5: Loading local session state...');
-    loadSessionState();
     
-    log.debug('Step 6: Checking authentication status...');
-    await checkAuthStatus();
-    
+    // Step 6: Show welcome message or initial data if a symbol is present.
     showWelcomeMessage();
 
     log.info('✅ Application initialized successfully.');

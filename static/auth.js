@@ -53,13 +53,13 @@ export async function checkAuthStatus() {
         STATE.isAuthenticated = data.authenticated;
         STATE.user = data.user || null;
         updateAuthUI();
-        return data.authenticated;
     } catch (error) {
         deps.log.error('Auth check error:', error);
         STATE.isAuthenticated = false;
         STATE.user = null;
         updateAuthUI();
-        return false;
+    } finally {
+        return STATE.isAuthenticated;
     }
 }
 
