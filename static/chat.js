@@ -147,8 +147,8 @@ function appendMessage(message, isTemporary = false) {
 }
 
 export function updateChatContextIndicator(symbol) {
-    if (DOM.contextSymbol) {
-        DOM.contextSymbol.textContent = symbol || 'None';
-        DOM.contextSymbol.style.color = symbol ? '#667eea' : '#ef4444';
+    const contextIndicator = document.getElementById('chat-context-header');
+    if (contextIndicator) {
+        contextIndicator.textContent = `Context: ${symbol || 'None'}`;
     }
 }

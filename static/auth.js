@@ -93,11 +93,12 @@ export function updateAuthUI() {
         }
     } else {
         authOverlay?.classList.remove('hidden');
+        mainContainer?.classList.add('hidden'); // Hide main content when auth overlay is visible
         userInfoBar?.classList.add('hidden');
         // The button is only visible when not authenticated, so we ensure it's not in a loading state.
         googleBtn?.classList.remove('loading');
     }
-
+    
     // Once the auth state is determined, always show the main container.
     mainContainer?.classList.remove('hidden');
 }
@@ -139,7 +140,7 @@ export function loadSessionState() {
 export function showWelcomeMessage() {
     if (!STATE.currentSymbol && DOM.output) {
         DOM.output.innerHTML = `
-            <div style="text-align: center; padding: 60px 20px; color: #6b7280;">
+            <div style="text-align: center; padding: 60px 20px; color: white; background: rgba(10, 37, 64, 0.8); border-radius: 12px;">
                 <img src="/fintralogo.png" alt="Fintra Logo" style="width: 150px; height: 150px; margin-bottom: 20px;">
                 <h2 style="color: #374151; margin-bottom: 10px;">Welcome to Fintra, your personal finance assistant.</h2>
                 <p>Search for a stock symbol or select from the sidebar to get started</p>

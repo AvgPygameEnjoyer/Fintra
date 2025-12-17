@@ -13,7 +13,6 @@ export function displayData(data) {
 
     const grid = document.createElement('div');
     grid.className = 'data-grid';
-//Deveasteregg
     const cards = [ 
         { id: 'visualization-card', title: 'Technical Charts & Visualizations', icon: '📊', contentHtml: createVisualizationContent(data), isOpen: false },
         { id: 'rule-based-card', title: 'Technical Analysis', icon: '🔍', contentHtml: createAnalysisContent(data.Rule_Based_Analysis), isOpen: false },
@@ -26,11 +25,12 @@ export function displayData(data) {
     cards.forEach(cardData => {
         const card = createDataCard(cardData);
         card.classList.add('full-width');
-        card.querySelector('.card-header').addEventListener('click', function() {
+        card.querySelector('.card-header').addEventListener('click', function(e) {
+            if (e.target.closest('.period-selector')) return; // Ignore clicks on the period selector
             const content = card.querySelector('.card-content');
             const icon = card.querySelector('.dropdown-icon');
             const isCollapsed = content.classList.contains('collapsed');
-
+            
             content.classList.toggle('collapsed', !isCollapsed);
             icon.classList.toggle('collapsed', !isCollapsed); 
 
@@ -54,7 +54,7 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
     const periodSelectorHtml = (id === 'ohlcv-card' || id === 'ma-rsi-card' || id === 'macd-card') ? `
         <div class="period-selector">
             <label>View:</label>
-            <select class="period-select" data-target-card="${id}">
+            <select class="period-select" data-target-card-id="${id}">
                 <option value="7" selected>Last 7 Days</option>
                 <option value="15">Last 15 Days</option>
                 <option value="30">Last 30 Days</option>
@@ -68,7 +68,7 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
                 <h2><span>${icon}</span>${title}</h2>
             </div>
             ${periodSelectorHtml}
-            <button class="dropdown-toggle" aria-label="Toggle card content"><span class="dropdown-icon ${isOpen ? '' : 'collapsed'}">▼</span></button>
+            <span class="dropdown-toggle" aria-label="Toggle card content"><span class="dropdown-icon ${isOpen ? '' : 'collapsed'}">▼</span></span>
         </div>
         <div class="card-content ${isOpen ? '' : 'collapsed'}">
             ${contentHtml}
@@ -80,7 +80,7 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
 document.addEventListener('change', function(e) {
     const periodSelect = e.target.closest('.period-select');
     if (periodSelect) {
-        const cardId = e.target.dataset.targetCard;
+        const cardId = e.target.dataset.targetCardId;
         const days = e.target.value === 'all' ? Infinity : parseInt(e.target.value, 10);
         const card = document.getElementById(cardId);
         if (!card) return;

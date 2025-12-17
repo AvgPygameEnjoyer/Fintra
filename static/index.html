@@ -77,7 +77,8 @@
     <div id="chatbot">
         <div id="chat-window">
             <div id="chat-header">
-                <span>Fintra AI Chat</span>
+                <span id="chat-title">Fintra AI Chat</span>
+                <span id="chat-context-header">Context: None</span>
                 <div>
                     <button id="chat-refresh" title="Refresh Context">🔄</button>
                     <button id="chat-close">✖</button>
@@ -85,7 +86,6 @@
             </div>
             <div id="chat-messages"></div>
             <div id="chat-footer"> 
-                <div id="chat-context-indicator">Context: <span id="context-symbol">None</span></div>
                 <input type="text" id="chat-input" placeholder="Ask about the current stock...">
                 <button id="chat-send">Send</button>
             </div>
