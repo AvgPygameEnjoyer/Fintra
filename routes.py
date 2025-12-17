@@ -267,7 +267,7 @@ def get_data():
             ticker=symbol,
             OHLCV=clean_df(hist_display, ['Open', 'High', 'Low', 'Close', 'Volume']),
             MA=clean_df(hist_display, ['MA5', 'MA10']),
-            RSI=[float(x) if not pd.isna(x) else None for x in hist_display['RSI'].tolist()],
+            RSI=clean_df(hist_display, ['RSI']),
             MACD=clean_df(hist_display, ['MACD', 'Signal', 'Histogram']),
             AI_Review=gemini_analysis,
             Rule_Based_Analysis=rule_based_text

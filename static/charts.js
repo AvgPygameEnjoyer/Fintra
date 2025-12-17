@@ -116,7 +116,7 @@ function createRSIChart(rsiData, ohlcvData) {
     if (!ctx) return;
 
     const dates = ohlcvData.map(item => item.Date?.substring(5) || 'N/A');
-    const rsiValues = rsiData.map(item => item.RSI);
+    const rsiValues = rsiData.map(item => item.RSI); // This now correctly extracts the RSI value from each object
 
     STATE.charts.rsi = new Chart(ctx, {
         type: 'line',
