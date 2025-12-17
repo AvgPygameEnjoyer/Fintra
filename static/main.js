@@ -1,5 +1,5 @@
 import { deps } from './config.js';
-import { checkAuthStatus, updateAuthUI, loadSessionState, showWelcomeMessage, log } from './auth.js';
+import { handleLogout, checkAuthStatus, updateAuthUI, loadSessionState, showWelcomeMessage, log } from './auth.js';
 import { initialize as initializeDOM } from './dom.js';
 import { initialize as initializeEvents } from './events.js';
 import { setupSidebar } from './sidebar.js';
@@ -9,6 +9,9 @@ import { hideAutocomplete, selectStock } from './autocomplete.js';
 
 async function init() {
     log.info('Initializing application...');
+
+    // Log out on every page refresh to ensure a clean session state.
+    await handleLogout(false); // Pass false to prevent showing the "Logged out" notification.
 
     // Step 1: Populate the dependency container.
     deps.log = log;
