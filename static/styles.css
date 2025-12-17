@@ -1154,6 +1154,40 @@ footer {
     border-color: var(--fintra-blue);
 }
 
+.google-signin-btn .spinner {
+    display: none;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(0, 0, 0, 0.2);
+    border-top-color: #0052FF;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+}
+
+.google-signin-btn.loading .spinner {
+    display: block;
+}
+
+.google-signin-btn.loading .google-icon,
+.google-signin-btn.loading .button-text {
+    display: none;
+}
+
+.google-signin-btn:not(.loading) .spinner {
+    display: none;
+}
+
+.google-signin-btn .button-text {
+    display: inline;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .google-icon {
     width: 24px;
     height: 24px;
