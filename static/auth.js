@@ -102,11 +102,6 @@ export function updateAuthUI() {
     // Once the auth state is determined, always show the main container.
     mainContainer?.classList.remove('hidden');
 }
-
-export function showAuthOverlay() {
-    document.getElementById('auth-overlay')?.classList.remove('hidden');
-}
-
 // ==================== SESSION MANAGEMENT (MERGED) ====================
 
 export function saveSessionState() {
@@ -140,10 +135,11 @@ export function loadSessionState() {
 export function showWelcomeMessage() {
     if (!STATE.currentSymbol && DOM.output) {
         DOM.output.innerHTML = `
-            <div style="text-align: center; padding: 60px 20px; color: white; background: rgba(10, 37, 64, 0.8); border-radius: 12px;">
+            <div style="text-align: center; padding: 60px 20px; background: rgba(10, 37, 64, 0.8); border-radius: 12px;">
                 <img src="/fintralogo.png" alt="Fintra Logo" style="width: 150px; height: 150px; margin-bottom: 20px;">
-                <h2 style="color: #374151; margin-bottom: 10px;">Welcome to Fintra, your personal finance assistant.</h2>
-                <p>Search for a stock symbol or select from the sidebar to get started</p>
+                <h2 style="color: #ffffff; margin-bottom: 10px; font-family: 'Space Grotesk', sans-serif;">Welcome to Fintra</h2>
+                <p style="color: #e5e7eb; opacity: 0.9;">Your personal AI-powered market analyst.</p>
+                <p style="color: #cbd5e1; margin-top: 20px;">Search for a stock symbol or select from the sidebar to get started.</p>
             </div>
         `;
     }

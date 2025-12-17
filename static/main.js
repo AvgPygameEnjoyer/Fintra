@@ -1,5 +1,5 @@
 import { deps } from './config.js';
-import { handleGoogleLogin, checkAuthStatus, handleLogout, updateAuthUI, loadSessionState, saveSessionState, showWelcomeMessage, log } from './auth.js';
+import { checkAuthStatus, updateAuthUI, loadSessionState, showWelcomeMessage, log } from './auth.js';
 import { initialize as initializeDOM } from './dom.js';
 import { initialize as initializeEvents } from './events.js';
 import { setupSidebar } from './sidebar.js';
@@ -25,17 +25,18 @@ async function init() {
     // Step 4: Load session and check auth status to update the UI early.
     log.debug('Step 4: Loading local session state and checking auth...');
     loadSessionState();
-    await checkAuthStatus();
+    const isAuthenticated = await checkAuthStatus();
 
     // Step 5: Initialize UI components and event listeners.
     log.debug('Step 5: Initializing UI components and event listeners...');
     initializeEvents();
     setupSidebar();
     initializeChat();
-    
-    // Step 6: Show welcome message or initial data if a symbol is present.
-    showWelcomeMessage();
 
+    // Step 6: If authenticated and no symbol is selected, show the welcome message.
+    if (isAuthenticated && !deps.STATE.currentSymbol) {
+        showWelcomeMessage();
+    }
     log.info('✅ Application initialized successfully.');
 }
 
