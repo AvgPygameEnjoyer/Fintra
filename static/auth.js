@@ -78,9 +78,12 @@ export async function handleLogout(showNotify = true) {
 }
 
 export function updateAuthUI() {
+    const authOverlay = document.getElementById('auth-overlay');
+    const userInfoBar = document.getElementById('user-info-bar');
+    const googleBtn = document.getElementById('google-signin-btn');
+
     if (STATE.isAuthenticated && STATE.user) {
-        document.getElementById('auth-overlay')?.classList.add('hidden');
-        const userInfoBar = document.getElementById('user-info-bar');
+        authOverlay?.classList.add('hidden');
         if (userInfoBar) {
             userInfoBar.classList.remove('hidden');
             document.getElementById('user-name').textContent = STATE.user.name;
@@ -88,8 +91,10 @@ export function updateAuthUI() {
                 `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23e2e8f0'/><text x='50' y='55' font-size='40' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'>👤</text></svg>`;
         }
     } else {
-        document.getElementById('auth-overlay')?.classList.remove('hidden');
-        document.getElementById('user-info-bar')?.classList.add('hidden');
+        authOverlay?.classList.remove('hidden');
+        userInfoBar?.classList.add('hidden');
+        // The button is only visible when not authenticated, so we ensure it's not in a loading state.
+        googleBtn?.classList.remove('loading');
     }
 }
 
