@@ -46,12 +46,24 @@ def clean_df(df, columns):
 
 # ==================== TECHNICAL INDICATORS ====================
 def compute_rsi(series, period=14):
-    """Calculate Relative Strength Index"""
+    """
+    Calculate Relative Strength Index (RSI) using the standard method.
+    This method uses a Simple Moving Average for the initial period and then
+    switches to an Exponential Moving Average (Wilder's smoothing) for subsequent periods,
+    which aligns with most trading platforms.
+    """
     delta = series.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    avg_gain = gain.ewm(span=period, adjust=False).mean()
-    avg_loss = loss.ewm(span=period, adjust=False).mean()
+
+    # Calculate initial averages using SMA
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()[:period]
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()[:period]
+
+    # Calculate subsequent averages using Wilder's smoothing (equivalent to an EMA with alpha = 1/period)
+    avg_gain = pd.concat([avg_gain, gain[period:]]).ewm(alpha=1/period, adjust=False).mean()
+    avg_loss = pd.concat([avg_loss, loss[period:]]).ewm(alpha=1/period, adjust=False).mean()
+
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
