@@ -81,6 +81,7 @@ export function updateAuthUI() {
     const authOverlay = document.getElementById('auth-overlay');
     const userInfoBar = document.getElementById('user-info-bar');
     const googleBtn = document.getElementById('google-signin-btn');
+    const mainContainer = document.querySelector('.container');
 
     if (STATE.isAuthenticated && STATE.user) {
         authOverlay?.classList.add('hidden');
@@ -96,6 +97,9 @@ export function updateAuthUI() {
         // The button is only visible when not authenticated, so we ensure it's not in a loading state.
         googleBtn?.classList.remove('loading');
     }
+
+    // Once the auth state is determined, always show the main container.
+    mainContainer?.classList.remove('hidden');
 }
 
 export function showAuthOverlay() {
