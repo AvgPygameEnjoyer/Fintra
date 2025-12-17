@@ -10,9 +10,6 @@ import { hideAutocomplete, selectStock } from './autocomplete.js';
 async function init() {
     log.info('Initializing application...');
 
-    // Log out on every page refresh to ensure a clean session state.
-    await handleLogout(false); // Pass false to prevent showing the "Logged out" notification.
-
     // Step 1: Populate the dependency container.
     deps.log = log;
     deps.updateAuthUI = updateAuthUI;
