@@ -113,7 +113,6 @@ export function saveSessionState() {
     try {
         const sessionToSave = {
             currentSessionId: STATE.currentSessionId,
-            currentSymbol: STATE.currentSymbol,
             isSidebarCollapsed: STATE.isSidebarCollapsed,
         };
         localStorage.setItem(CONFIG.SESSION_STORAGE_KEY, JSON.stringify(sessionToSave));
@@ -126,10 +125,9 @@ export function loadSessionState() {
     try {
         const savedSession = JSON.parse(localStorage.getItem(CONFIG.SESSION_STORAGE_KEY));
         if (savedSession) {
-            STATE.currentSessionId = savedSession.currentSessionId || STATE.currentSessionId;
-            STATE.currentSymbol = savedSession.currentSymbol || null;
-            STATE.isSidebarCollapsed = savedSession.isSidebarCollapsed || false;
-            if (STATE.currentSymbol && DOM.symbol) DOM.symbol.value = STATE.currentSymbol;
+            STATE.currentSessionId = savedSession.currentSessionId || STATE.currentSessionId; // Keep session ID
+            STATE.isSidebarCollapsed = savedSession.isSidebarCollapsed ?? false; // Keep sidebar state
+            STATE.currentSymbol = null; // Always reset the symbol on page load
         }
     } catch (error) {
         deps.log.error('Could not load session state:', error);
