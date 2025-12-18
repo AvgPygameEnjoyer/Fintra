@@ -1452,20 +1452,20 @@ footer {
 }
 
 .position-card {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #102A43; /* A solid, dark blue that complements the background */
+    border: 1px solid #243B53; /* A subtle border for definition */
     border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); /* A deeper shadow for a floating effect */
     overflow: hidden;
     transition: all 0.3s ease;
     color: white;
 }
 
 .position-card:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+    background: #183A5C;
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    border-color: #334E68;
 }
 
 .position-card-header {
@@ -1475,14 +1475,13 @@ footer {
     padding: 16px 20px;
     cursor: pointer;
     user-select: none;
-    border-bottom: 1px solid transparent;
-    transition: border-color 0.3s ease;
+    transition: background-color 0.3s ease;
 }
 
 .position-symbol {
     font-size: 1.2rem;
     font-weight: 700;
-    color: var(--fintra-accent-teal);
+    color: #F0F4F8; /* A softer white for the main symbol */
 }
 
 .position-company-name {
@@ -1514,7 +1513,7 @@ footer {
 }
 
 .position-card-body {
-    padding: 0 24px;
+    padding: 0 20px;
     max-height: 0;
     opacity: 0;
     overflow: hidden;
@@ -1522,7 +1521,8 @@ footer {
 }
 
 .position-card-body.expanded {
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-top: 1px solid #243B53;
 }
 
 .position-pnl {
