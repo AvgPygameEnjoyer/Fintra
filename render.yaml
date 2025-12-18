@@ -5,7 +5,7 @@ services:
     plan: free
     runtime: python
     pythonVersion: "3.12"
-    buildCommand: "pip install -r requirements.txt"
+    buildCommand: "pip install --upgrade pip && pip install --cache-dir /tmp/pip-cache gunicorn flask flask-cors Flask-SQLAlchemy yfinance pandas numpy python-dotenv google-genai google-api-core requests PyJWT"
     startCommand: "gunicorn app:app --bind 0.0.0.0:10000 --workers 2 --timeout 60"
     envVars:
       - key: PYTHON_VERSION
