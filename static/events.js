@@ -6,10 +6,14 @@ import { handleGoogleLogin, handleLogout } from './auth.js';
 import { setSidebarCollapsed } from './sidebar.js';
 
 export function initialize() {
-    const debouncedAutocomplete = debounce(handleAutocompleteInput, CONFIG.DEBOUNCE_DELAY);
     DOM.symbol.addEventListener('input', handleSearchInput);
     DOM.symbol.addEventListener('keydown', handleAutocompleteKeydown);
     document.querySelector('.search-form')?.addEventListener('submit', handleSearchSubmit);
+
+    // --- New: Add autocomplete to modal input ---
+    DOM.addPositionSymbolInput.addEventListener('input', (e) => handleAutocompleteInput(e, DOM.modalAutocomplete));
+    DOM.addPositionSymbolInput.addEventListener('keydown', (e) => handleAutocompleteKeydown(e, DOM.modalAutocomplete));
+
     DOM.googleSigninBtn?.addEventListener('click', handleGoogleLogin);
     DOM.logoutBtn?.addEventListener('click', handleLogout);
     DOM.sidebarToggle?.addEventListener('click', () => setSidebarCollapsed(true)); // Close button inside sidebar
@@ -22,7 +26,10 @@ export function initialize() {
     });
     
     document.addEventListener('click', (e) => {
-        if (!e.target.closest('.input-wrapper')) hideAutocomplete();
+        if (!e.target.closest('.input-wrapper')) {
+            hideAutocomplete(DOM.autocomplete);
+            hideAutocomplete(DOM.modalAutocomplete);
+        }
     });
     
     document.addEventListener('keydown', (e) => {
@@ -38,7 +45,7 @@ export function initialize() {
 function handleSearchInput(e) {
     const hasText = e.target.value.trim().length > 0;
     DOM.clearSearchBtn?.classList.toggle('visible', hasText);
-    debounce(handleAutocompleteInput, CONFIG.DEBOUNCE_DELAY)(e);
+    debounce((event) => handleAutocompleteInput(event, DOM.autocomplete), CONFIG.DEBOUNCE_DELAY)(e);
 }
 
 function handleSearchSubmit(e) {

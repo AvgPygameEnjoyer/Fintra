@@ -94,10 +94,16 @@
     <dialog id="add-position-modal" class="add-position-modal">
         <form id="add-position-form">
             <h3>Add New Position</h3>
-            <input type="text" name="symbol" placeholder="Stock Symbol (e.g., AAPL)" required>
-            <input type="number" name="quantity" placeholder="Quantity" step="any" required>
-            <input type="number" name="entry_price" placeholder="Average Entry Price" step="any" required>
-            <input type="date" name="entry_date" required>
+            <div class="input-wrapper">
+                <input type="text" id="add-position-symbol-input" name="symbol" placeholder="Stock Symbol (e.g., AAPL)" required autocomplete="off">
+                <div id="modal-autocomplete" class="autocomplete-dropdown"></div>
+            </div>
+            <input type="number" name="quantity" placeholder="Quantity" step="any" min="0" required>
+            <div class="input-wrapper">
+                <input type="number" id="add-position-entry-price" name="entry_price" placeholder="Average Entry Price" step="any" required>
+                <span id="current-price-indicator" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #6b7280; font-size: 0.9rem; display: none;"></span>
+            </div>
+            <input type="date" name="entry_date">
             <textarea name="notes" placeholder="Notes (optional)"></textarea>
             <div class="modal-actions">
                 <button type="button" id="close-modal-btn" class="btn-secondary">Cancel</button>

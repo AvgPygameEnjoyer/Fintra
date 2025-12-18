@@ -1,7 +1,7 @@
 import { deps } from './config.js';
 import { showNotification } from './notifications.js';
 
-const { DOM, CONFIG, STATE } = deps;
+const { DOM, CONFIG, STATE, debounce } = deps;
 
 export function initializePortfolio() {
     // Event Listeners for portfolio functionality
@@ -17,6 +17,29 @@ export function initializePortfolio() {
             DOM.addPositionModal.close();
         }
     });
+
+    // --- New: Logic for current price indicator ---
+    const debouncedPriceFetch = debounce(async (e) => {
+        const symbol = e.target.value.trim().toUpperCase();
+        if (!symbol) {
+            DOM.currentPriceIndicator.style.display = 'none';
+            return;
+        }
+        try {
+            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`);
+            const data = await response.json();
+            const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+            if (price) {
+                DOM.currentPriceIndicator.textContent = `Live: $${price.toFixed(2)}`;
+                DOM.currentPriceIndicator.style.display = 'block';
+            } else {
+                DOM.currentPriceIndicator.style.display = 'none';
+            }
+        } catch (error) {
+            DOM.currentPriceIndicator.style.display = 'none';
+        }
+    }, 500);
+    DOM.addPositionSymbolInput?.addEventListener('input', debouncedPriceFetch);
 }
 
 function showSearchView() {
@@ -67,6 +90,14 @@ async function fetchAndDisplayPortfolio() {
             btn.addEventListener('click', (e) => {
                 const positionId = e.target.closest('button').dataset.id;
                 handleDeletePosition(positionId);
+            });
+        });
+
+        // --- New: Add event listeners for expandable cards ---
+        portfolioContent.querySelectorAll('.position-card-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const cardBody = header.nextElementSibling;
+                cardBody.classList.toggle('expanded');
             });
         });
 
@@ -139,13 +170,13 @@ function createPositionCard(pos) {
     return `
         <div class="position-card">
             <div class="position-card-header">
-                <div>
+                <div class="position-card-title">
                     <div class="position-symbol">${pos.symbol}</div>
                     <div class="position-company-name">${company?.name || 'N/A'}</div>
                 </div>
                 <button class="delete-position-btn" data-id="${pos.id}" title="Delete Position">×</button>
             </div>
-            <div class="position-card-body">
+            <div class="position-card-body" style="padding-top: 20px; padding-bottom: 20px;">
                 <div class="position-pnl ${pnlClass}">
                     <div class="pnl-amount">${pnlSign}${pos.pnl.toFixed(2)}</div>
                     <div class="pnl-percent">(${pnlSign}${pos.pnl_percent.toFixed(2)}%)</div>
@@ -168,3 +199,10 @@ function createPositionCard(pos) {
         </div>
     `;
 }
+
+// Add a simple CSS rule for the expanded state
+const style = document.createElement('style');
+style.textContent = `
+    .position-card-body.expanded { max-height: 500px; opacity: 1; }
+`;
+document.head.appendChild(style);
