@@ -8,8 +8,13 @@ services:
     dns:
       - 8.8.8.8
     volumes:
-      - .:/app
+      - .:/app # Mount local code for development
+      - venv:/app/venv # Persist the virtual environment in a named volume
     env_file:
       - .env
     environment:
       - FLASK_ENV=development
+
+# Define the named volume
+volumes:
+  venv:
