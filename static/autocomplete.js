@@ -47,10 +47,19 @@ export function showAutocomplete(stocks, dropdownElement, inputElement) {
 
     dropdownElement.querySelectorAll('.autocomplete-item').forEach(item => {
         item.addEventListener('click', () => {
-            window.selectStock(item.dataset.symbol);
+            inputElement.value = item.dataset.symbol;
+            hideAutocomplete(dropdownElement);
+            
+            if (inputElement.id === 'symbol') {
+                // Main search behavior
+                window.selectStock(item.dataset.symbol);
+            } else {
+                // Modal behavior: Trigger input event to fetch price
+                inputElement.dispatchEvent(new Event('input'));
+            }
         });
     });
-    DOM.autocomplete.classList.add('active');
+    dropdownElement.classList.add('active');
 }
 
 export function hideAutocomplete(dropdownElement) {

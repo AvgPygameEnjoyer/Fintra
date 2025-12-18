@@ -1452,41 +1452,47 @@ footer {
 }
 
 .position-card {
-    background: var(--card-bg);
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
-    box-shadow: var(--card-shadow);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     overflow: hidden;
     transition: all 0.3s ease;
+    color: white;
 }
 
 .position-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
 }
 
 .position-card-header {
     display: flex;
     justify-content: space-between;    
     align-items: center;
-    padding: 20px 24px;
+    padding: 16px 20px;
     cursor: pointer;
     user-select: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.3s ease;
 }
 
 .position-symbol {
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     font-weight: 700;
-    color: var(--fintra-dark-blue);
+    color: var(--fintra-accent-teal);
 }
 
 .position-company-name {
     font-size: 0.9rem;
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .delete-position-btn {
     background: transparent;
-    color: #ef4444;
+    color: rgba(255, 255, 255, 0.5);
     border: none;
     border-radius: 50%;
     width: 28px;
@@ -1502,7 +1508,8 @@ footer {
 }
 
 .delete-position-btn:hover {
-    background: #fee2e2;
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
     transform: scale(1.1);
 }
 
@@ -1512,6 +1519,10 @@ footer {
     opacity: 0;
     overflow: hidden;
     transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.position-card-body.expanded {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .position-pnl {
@@ -1530,7 +1541,7 @@ footer {
 .pnl-percent {
     font-size: 1rem;
     font-weight: 600;
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .position-details {
@@ -1542,7 +1553,7 @@ footer {
 }
 
 .position-details span {
-    color: #6b7280;
+    color: rgba(255, 255, 255, 0.6);
     display: block;
     margin-bottom: 4px;
 }
@@ -1550,10 +1561,13 @@ footer {
 .position-details strong {
     font-weight: 700;
     font-size: 1.1rem;
+    color: white;
 }
 
 /* === Add Position Modal === */
 .add-position-modal {
+    position: fixed;
+    inset: 0;
     border: none;
     border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
@@ -1561,6 +1575,8 @@ footer {
     margin: auto; /* This will center the modal */
     width: 100%;
     max-width: 400px;
+    background: white;
+    color: #374151;
 }
 
 .add-position-modal::backdrop {

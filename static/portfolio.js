@@ -112,6 +112,11 @@ async function handleAddPosition(e) {
     const formData = new FormData(e.target);
     const positionData = Object.fromEntries(formData.entries());
 
+    if (parseFloat(positionData.quantity) < 0) {
+        showNotification('Quantity cannot be negative.', 'error');
+        return;
+    }
+
     try {
         const response = await fetch(`${CONFIG.API_BASE_URL}/positions`, {
             method: 'POST',
