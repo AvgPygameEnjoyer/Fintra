@@ -14,6 +14,10 @@ class Config:
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_SAMESITE = 'None'
 
+    # Database Configuration
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///portfolio.db')
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
     # Google OAuth Configuration
     GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
     GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')

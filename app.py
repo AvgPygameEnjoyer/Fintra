@@ -10,6 +10,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from config import Config
+from database import db
 from auth import cleanup_expired_sessions, user_sessions
 from routes import api
 
@@ -34,6 +35,11 @@ def create_app():
 
     # Load configuration
     app.config.from_object(Config)
+
+    # Initialize extensions
+    db.init_app(app)
+
+    # CORS setup
     CORS(
         app,
         supports_credentials=True,
@@ -96,6 +102,10 @@ def create_app():
 
     # Add a startup log to display critical configuration
     with app.app_context():
+        # Create database tables if they don't exist
+        db.create_all()
+        logger.info(" 🗃️  Database tables ensured.")
+
         logger.info("=" * 70)
         logger.info(" 🚀 BACKEND SERVER STARTING UP")
         logger.info(f" 🌍 Environment: Production")

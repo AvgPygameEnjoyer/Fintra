@@ -22,7 +22,7 @@ body {
     color: #374151;
 }
 
-.container {
+.main-container {
     max-width: 1000px;
     margin: 0 auto;
     transition: all 0.3s ease;
@@ -1367,4 +1367,240 @@ footer {
     transform: translateY(-10px);
     pointer-events: none;
     visibility: hidden;
+}
+
+/* === View Tabs === */
+.view-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 10px;
+}
+
+.view-tab {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.view-tab:hover {
+    color: white;
+}
+
+.view-tab.active {
+    color: white;
+    border-bottom-color: var(--fintra-accent-teal);
+}
+
+/* === Portfolio View === */
+.portfolio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    color: white;
+}
+
+.portfolio-header h2 {
+    font-size: 1.8rem;
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+.add-position-btn {
+    background: var(--fintra-accent-teal);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.add-position-btn:hover {
+    background: #00c2b6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 212, 200, 0.2);
+}
+
+.empty-portfolio {
+    background: rgba(10, 37, 64, 0.8);
+    color: white;
+    padding: 60px 30px;
+    text-align: center;
+    border-radius: 16px;
+}
+
+.empty-portfolio h3 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+}
+
+.portfolio-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.position-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.position-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+.position-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px 20px;
+    background: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.position-symbol {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--fintra-dark-blue);
+}
+
+.position-company-name {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.delete-position-btn {
+    background: #fee2e2;
+    color: #ef4444;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.delete-position-btn:hover {
+    background: #ef4444;
+    color: white;
+}
+
+.position-card-body {
+    padding: 20px;
+}
+
+.position-pnl {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.position-pnl.positive .pnl-amount { color: #10b981; }
+.position-pnl.negative .pnl-amount { color: #ef4444; }
+
+.pnl-amount {
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.pnl-percent {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #6b7280;
+}
+
+.position-details {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.position-details span {
+    color: #6b7280;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.position-details strong {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+/* === Add Position Modal === */
+.add-position-modal {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 30px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.add-position-modal::backdrop {
+    background: rgba(10, 37, 64, 0.8);
+    backdrop-filter: blur(5px);
+}
+
+.add-position-modal h3 {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.add-position-modal input,
+.add-position-modal textarea {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 1rem;
+}
+
+.add-position-modal textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.modal-actions button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.modal-actions .btn-secondary {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.modal-actions .btn-primary {
+    background: var(--fintra-blue);
+    color: white;
 }

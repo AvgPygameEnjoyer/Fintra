@@ -7,7 +7,9 @@ export function initialize() {
         'sidebar', 'sidebarStocks', 'sidebarSearch', 'clearSearchBtn', 'chat-toggle', 'chat-window', 
         'chat-messages', 'chat-input', 'chat-send', 'chat-close', 'chat-refresh', 'sidebarToggle',
         'context-symbol',
-        'google-signin-btn', 'logout-btn',
+        'google-signin-btn', 'logout-btn', 'search-view', 'portfolio-view',
+        'search-tab-btn', 'portfolio-tab-btn', 'add-position-btn', 'portfolio-content',
+        'add-position-modal', 'add-position-form', 'close-modal-btn',
         // Add the missing sidebar toggle buttons
         'mobile-sidebar-toggle', 'desktop-sidebar-toggle'
     ];

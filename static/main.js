@@ -5,6 +5,7 @@ import { initialize as initializeEvents } from './events.js';
 import { setupSidebar } from './sidebar.js';
 import { initializeChat, updateChatContextIndicator } from './chat.js';
 import { fetchData, loadStockDatabase } from './data.js';
+import { initializePortfolio } from './portfolio.js';
 import { hideAutocomplete, selectStock } from './autocomplete.js';
 
 async function init() {
@@ -32,6 +33,7 @@ async function init() {
     initializeEvents();
     setupSidebar();
     initializeChat();
+    initializePortfolio();
 
     // Step 6: If authenticated and no symbol is selected, show the welcome message.
     if (isAuthenticated && !deps.STATE.currentSymbol) {

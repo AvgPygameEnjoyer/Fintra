@@ -52,26 +52,59 @@
     <button id="mobile-sidebar-toggle" class="mobile-sidebar-toggle">☰</button>
     <button id="desktop-sidebar-toggle" class="desktop-sidebar-toggle"></button>
 
-    <div class="container hidden">
+    <div class="main-container container hidden">
         <header class="header">
             <h1>Fintra</h1>
             <p>Intelligent Market Analysis, Simplified.</p>
         </header>
 
-        <div class="search-card">
-            <form class="search-form">
-                <div class="input-wrapper">
-                    <input type="text" id="symbol" class="search-input" placeholder="Enter stock symbol (e.g., AAPL, RELIANCE)">
-                    <button type="button" id="clearSearchBtn" class="clear-search-btn" title="Clear search">×</button>
-                    <div id="autocomplete" class="autocomplete-dropdown"></div>
-                </div>
-                <button id="searchBtn" class="search-btn" type="submit">Search</button>
-            </form>
+        <div class="view-tabs">
+            <button id="search-tab-btn" class="view-tab active">🔍 Search</button>
+            <button id="portfolio-tab-btn" class="view-tab">💼 My Portfolio</button>
         </div>
 
-        <div id="loading" class="loading">Loading data...</div>
-        <div id="error" class="error"></div>
-        <div id="output"></div>
+        <div id="search-view">
+            <div class="search-card">
+                <form class="search-form">
+                    <div class="input-wrapper">
+                        <input type="text" id="symbol" class="search-input" placeholder="Enter stock symbol (e.g., AAPL, RELIANCE)">
+                        <button type="button" id="clearSearchBtn" class="clear-search-btn" title="Clear search">×</button>
+                        <div id="autocomplete" class="autocomplete-dropdown"></div>
+                    </div>
+                    <button id="searchBtn" class="search-btn" type="submit">Search</button>
+                </form>
+            </div>
+
+            <div id="loading" class="loading">Loading data...</div>
+            <div id="error" class="error"></div>
+            <div id="output"></div>
+        </div>
+
+        <div id="portfolio-view" style="display: none;">
+            <div class="portfolio-header">
+                <h2>Your Holdings</h2>
+                <button id="add-position-btn" class="add-position-btn">+ Add Position</button>
+            </div>
+            <div id="portfolio-content">
+                <!-- Portfolio cards will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <dialog id="add-position-modal" class="add-position-modal">
+        <form id="add-position-form">
+            <h3>Add New Position</h3>
+            <input type="text" name="symbol" placeholder="Stock Symbol (e.g., AAPL)" required>
+            <input type="number" name="quantity" placeholder="Quantity" step="any" required>
+            <input type="number" name="entry_price" placeholder="Average Entry Price" step="any" required>
+            <input type="date" name="entry_date" required>
+            <textarea name="notes" placeholder="Notes (optional)"></textarea>
+            <div class="modal-actions">
+                <button type="button" id="close-modal-btn" class="btn-secondary">Cancel</button>
+                <button type="submit" class="btn-primary">Save Position</button>
+                </div>
+        </form>
+    </dialog>
     </div>
     
     <div id="chatbot">

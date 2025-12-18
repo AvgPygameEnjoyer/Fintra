@@ -18,6 +18,8 @@ from auth import (
     user_sessions, generate_jwt_token, verify_jwt_token,
     set_token_cookies, refresh_oauth_token, require_auth
 )
+from database import db
+from models import User, Position
 from analysis import (
     latest_symbol_data, conversation_context, clean_df,
     compute_rsi, compute_macd, generate_rule_based_analysis,
@@ -28,6 +30,25 @@ logger = logging.getLogger(__name__)
 
 # Create Blueprint for all routes
 api = Blueprint('api', __name__)
+
+
+# ==================== PORTFOLIO HELPERS ====================
+def get_user_from_token():
+    """Helper to get user_id and db_user from access token."""
+    access_token = request.cookies.get('access_token')
+    if not access_token:
+        return None, None
+
+    payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
+    if not payload:
+        return None, None
+
+    user_id = payload.get('user_id')
+    if not user_id:
+        return None, None
+
+    db_user = User.query.filter_by(google_user_id=user_id).first()
+    return user_id, db_user
 
 
 # ==================== AUTHENTICATION ROUTES ====================
@@ -111,6 +132,21 @@ def oauth_callback():
         if not user_id:
             logger.error("No 'sub' (user_id) in ID token.")
             return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=missing_user_id')
+
+        # --- NEW: Sync with database ---
+        # Find user in our DB or create them if they are new.
+        db_user = User.query.filter_by(google_user_id=user_id).first()
+        if not db_user:
+            db_user = User(
+                google_user_id=user_id,
+                email=user_info.get('email'),
+                name=user_info.get('name')
+            )
+            db.session.add(db_user)
+        else: # Update user info if it has changed
+            db_user.email = user_info.get('email')
+            db_user.name = user_info.get('name')
+        db.session.commit()
 
         logger.info(f"User '{user_info.get('email')}' authenticated. Storing session.")
         user_sessions[user_id] = {
@@ -222,10 +258,8 @@ def get_data():
         return auth_response
     logger.info("Received request for /api/get_data") # This log is now reachable
     data = request.get_json()
-    symbol = data.get('symbol', '').upper().strip()    
-    access_token = request.cookies.get('access_token')
-    payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
-    user_id = payload.get('user_id') if payload else None
+    symbol = data.get('symbol', '').upper().strip()
+    user_id, _ = get_user_from_token()
 
     if not symbol:
         return jsonify(error="No symbol provided"), 400
@@ -289,12 +323,8 @@ def chat():
     if auth_response:
         return auth_response
     data = request.get_json()
-    query = data.get('query', '').strip()
-    
-    access_token = request.cookies.get('access_token')
-    payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
-    user_id = payload.get('user_id') if payload else None
-
+    query = data.get('query', '').strip()    
+    user_id, db_user = get_user_from_token()
     current_symbol_hint = data.get('current_symbol')
 
     if not query:
@@ -388,6 +418,118 @@ Respond now:"""
         logger.error(f"❌ Chat handler error: {e}")
         return jsonify(error=f"Server error: {str(e)}"), 500
 
+
+# ==================== PORTFOLIO ROUTES ====================
+@api.route('/portfolio', methods=['GET'])
+def get_portfolio():
+    """Fetch all positions for the current user."""
+    auth_response = require_auth()
+    if auth_response:
+        return auth_response
+
+    _, db_user = get_user_from_token()
+    if not db_user:
+        return jsonify(error="Database user not found for this session."), 404
+
+    try:
+        positions = Position.query.filter_by(user_id=db_user.id).order_by(Position.symbol).all()
+        
+        if not positions:
+            return jsonify([]), 200
+
+        # Batch fetch current prices from yfinance
+        symbols = [p.symbol for p in positions]
+        tickers = yf.Tickers(' '.join(symbols))
+        
+        portfolio_data = []
+        for p in positions:
+            try:
+                # yfinance returns data for all tickers, access by symbol
+                ticker_info = tickers.tickers.get(p.symbol.upper())
+                current_price = ticker_info.history(period='1d')['Close'].iloc[0] if not ticker_info.history(period='1d').empty else p.entry_price
+                
+                current_value = p.quantity * current_price
+                entry_value = p.quantity * p.entry_price
+                pnl = current_value - entry_value
+                pnl_percent = (pnl / entry_value) * 100 if entry_value != 0 else 0
+
+                portfolio_data.append({
+                    "id": p.id,
+                    "symbol": p.symbol,
+                    "quantity": p.quantity,
+                    "entry_price": p.entry_price,
+                    "entry_date": p.entry_date.strftime('%Y-%m-%d'),
+                    "notes": p.notes,
+                    "current_price": current_price,
+                    "current_value": current_value,
+                    "pnl": pnl,
+                    "pnl_percent": pnl_percent
+                })
+            except Exception as e:
+                logger.error(f"Could not fetch live price for {p.symbol}: {e}. Using entry price.")
+                # Append with data we have, even if live price fails
+                portfolio_data.append({
+                    "id": p.id, "symbol": p.symbol, "quantity": p.quantity,
+                    "entry_price": p.entry_price, "entry_date": p.entry_date.strftime('%Y-%m-%d'),
+                    "notes": p.notes, "current_price": p.entry_price, "current_value": p.quantity * p.entry_price,
+                    "pnl": 0, "pnl_percent": 0
+                })
+
+        return jsonify(portfolio_data), 200
+    except Exception as e:
+        logger.error(f"❌ Error fetching portfolio: {e}")
+        return jsonify(error="Failed to fetch portfolio data."), 500
+
+
+@api.route('/positions', methods=['POST'])
+def add_position():
+    """Add a new position to the user's portfolio."""
+    auth_response = require_auth()
+    if auth_response: return auth_response
+    
+    _, db_user = get_user_from_token()
+    if not db_user: return jsonify(error="Database user not found."), 404
+
+    data = request.get_json()
+    # Basic validation
+    required_fields = ['symbol', 'quantity', 'entry_price']
+    if not all(field in data for field in required_fields):
+        return jsonify(error=f"Missing required fields: {', '.join(required_fields)}"), 400
+
+    try:
+        new_position = Position(
+            symbol=data['symbol'].upper(),
+            quantity=float(data['quantity']),
+            entry_price=float(data['entry_price']),
+            entry_date=datetime.strptime(data.get('entry_date', datetime.now(timezone.utc).strftime('%Y-%m-%d')), '%Y-%m-%d').date(),
+            notes=data.get('notes'),
+            user_id=db_user.id
+        )
+        db.session.add(new_position)
+        db.session.commit()
+        return jsonify(id=new_position.id, message="Position added successfully"), 201
+    except Exception as e:
+        logger.error(f"❌ Error adding position: {e}")
+        db.session.rollback()
+        return jsonify(error="Failed to add position."), 500
+
+
+@api.route('/positions/<int:position_id>', methods=['DELETE'])
+def delete_position(position_id):
+    """Delete a position."""
+    auth_response = require_auth()
+    if auth_response: return auth_response
+    
+    _, db_user = get_user_from_token()
+    if not db_user: return jsonify(error="Database user not found."), 404
+
+    position = Position.query.get_or_404(position_id)
+    if position.user_id != db_user.id:
+        return jsonify(error="Forbidden: You do not own this position."), 403
+
+    db.session.delete(position)
+    db.session.commit()
+    return jsonify(message="Position deleted successfully"), 200
 
 # ==================== HEALTH CHECK ====================
 @api.route('/health', methods=['GET'])
