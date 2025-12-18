@@ -201,6 +201,10 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Docker files for local development only
+Dockerfile
+docker-compose.yml
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
