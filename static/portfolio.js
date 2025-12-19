@@ -46,11 +46,10 @@ export function initializePortfolio() {
             return;
         }
         try {
-            const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`);
-            const data = await response.json();
-            const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
-            if (price) {
-                DOM.currentPriceIndicator.textContent = `Live: $${price.toFixed(2)}`;
+            const response = await fetch(`${CONFIG.API_BASE_URL}/price/${symbol}`);
+            if (response.ok) {
+                const data = await response.json();
+                DOM.currentPriceIndicator.textContent = `Live: $${data.price.toFixed(2)}`;
                 DOM.currentPriceIndicator.style.display = 'block';
             } else {
                 DOM.currentPriceIndicator.style.display = 'none';

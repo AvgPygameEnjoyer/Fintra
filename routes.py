@@ -421,6 +421,25 @@ Respond now:"""
         return jsonify(error=f"Server error: {str(e)}"), 500
 
 
+@api.route('/price/<symbol>', methods=['GET'])
+def get_current_price(symbol):
+    """Get current price for a symbol (proxy for frontend to avoid CORS)."""
+    if not symbol:
+        return jsonify(error="Symbol required"), 400
+    
+    try:
+        ticker = yf.Ticker(symbol)
+        # Fast fetch of 1 day history
+        hist = ticker.history(period="1d")
+        if not hist.empty:
+            price = hist['Close'].iloc[-1]
+            return jsonify(price=price), 200
+        return jsonify(error="Price not found"), 404
+    except Exception as e:
+        logger.error(f"Price fetch error: {e}")
+        return jsonify(error="Server error"), 500
+
+
 # ==================== PORTFOLIO ROUTES ====================
 @api.route('/portfolio', methods=['GET'])
 def get_portfolio():
@@ -516,11 +535,18 @@ def add_position():
         return jsonify(error=f"Missing required fields: {', '.join(required_fields)}"), 400
 
     try:
+        # Handle date parsing safely (empty string from form becomes today)
+        entry_date_str = data.get('entry_date')
+        if entry_date_str:
+            entry_date = datetime.strptime(entry_date_str, '%Y-%m-%d').date()
+        else:
+            entry_date = datetime.now(timezone.utc).date()
+
         new_position = Position(
             symbol=data['symbol'].upper(),
             quantity=float(data['quantity']),
             entry_price=float(data['entry_price']),
-            entry_date=datetime.strptime(data.get('entry_date', datetime.now(timezone.utc).strftime('%Y-%m-%d')), '%Y-%m-%d').date(),
+            entry_date=entry_date,
             notes=data.get('notes'),
             user_id=db_user.id
         )
