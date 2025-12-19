@@ -1703,3 +1703,30 @@ footer {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 82, 255, 0.2);
 }
+
+/* Chat Portfolio Toggle */
+.portfolio-toggle {
+    position: relative;
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+}
+
+.portfolio-toggle input {
+    display: none;
+}
+
+.portfolio-toggle .slider {
+    font-size: 1.2rem;
+    opacity: 0.4;
+    transition: opacity 0.3s ease, transform 0.2s ease;
+    filter: grayscale(100%);
+    display: block;
+}
+
+.portfolio-toggle input:checked + .slider {
+    opacity: 1;
+    filter: grayscale(0%);
+    transform: scale(1.1);
+}

@@ -328,6 +328,7 @@ def chat():
     query = data.get('query', '').strip()    
     user_id, db_user = get_user_from_token()
     current_symbol_hint = data.get('current_symbol')
+    use_portfolio = data.get('use_portfolio', False)
 
     if not query:
         return jsonify(error="No query provided"), 400
@@ -345,16 +346,36 @@ def chat():
         if "user_positions" not in session_ctx:
             session_ctx["user_positions"] = {}
         session_ctx["last_active"] = datetime.now(timezone.utc).isoformat()
+        
+        # --- NEW: Fetch real portfolio positions from DB ---
+        user_db_positions = []
+        if db_user and use_portfolio:
+            user_db_positions = Position.query.filter_by(user_id=db_user.id).all()
+        
+        portfolio_summary = []
+        for p in user_db_positions:
+            portfolio_summary.append(f"{p.symbol} ({p.quantity} @ ${p.entry_price})")
+        portfolio_context_str = ("PORTFOLIO: " + ", ".join(portfolio_summary)) if portfolio_summary else ("PORTFOLIO: Empty" if use_portfolio else "")
 
-        matched_symbol = next((s for s in latest_symbol_data.keys() if s.lower() in query.lower()),
-                              current_symbol_hint or session_ctx["current_symbol"])
-        if matched_symbol and matched_symbol in latest_symbol_data:
+        # Enhanced symbol matching: Check portfolio symbols first, then cached data
+        def get_symbol_from_query(q):
+            for p in user_db_positions:
+                if p.symbol.lower() in q.lower(): return p.symbol
+            for s in latest_symbol_data.keys():
+                if s.lower() in q.lower(): return s
+            return None
+
+        matched_symbol = get_symbol_from_query(query) or current_symbol_hint or session_ctx["current_symbol"]
+
+        if matched_symbol:
             session_ctx["current_symbol"] = matched_symbol
-        else:
-            matched_symbol = None
 
         position_info, has_position = "", False
         if matched_symbol:
+            # 1. Check DB Position (Priority)
+            db_pos = next((p for p in user_db_positions if p.symbol == matched_symbol), None)
+            
+            # 2. Check Chat Session Updates (Override/Hypothetical)
             position_match = re.search(r'(?:bought|sold|entry|long|short|got)\s+at\s+\$?(\d+\.?\d*)', query,
                                        re.IGNORECASE)
             if position_match:
@@ -363,14 +384,33 @@ def chat():
                     "entry_price": entry_price,
                     "date": datetime.now(timezone.utc).isoformat()
                 }
-                position_info = f"The user just updated their position: they are **long** {matched_symbol} with an **entry price of ${entry_price}**."
+                position_info = f"User mentioned in chat: **long** {matched_symbol} at **${entry_price}**."
+            
+            elif db_pos:
+                has_position = True
+                entry = db_pos.entry_price
+                qty = db_pos.quantity
+                
+                # Try to get current price from cache
+                current_price = None
+                if matched_symbol in latest_symbol_data and latest_symbol_data[matched_symbol]:
+                    current_price = latest_symbol_data[matched_symbol][-1].get('Close')
+                
+                if current_price:
+                    pnl_dollars = (current_price - entry) * qty
+                    pnl_percent = (current_price - entry) / entry * 100
+                    position_info = f"User owns **{qty} shares** of {matched_symbol} at avg price **${entry:.2f}**. Current Price: ${current_price:.2f}. P&L: **${pnl_dollars:.2f} ({pnl_percent:.2f}%)**."
+                else:
+                    position_info = f"User owns **{qty} shares** of {matched_symbol} at avg price **${entry:.2f}**."
+
             elif matched_symbol in session_ctx["user_positions"]:
                 has_position = True
                 entry = session_ctx["user_positions"][matched_symbol]['entry_price']
-                current_price = latest_symbol_data[matched_symbol][-1]['Close']
-                pnl_dollars = current_price - entry
-                pnl_percent = (current_price - entry) / entry * 100
-                position_info = f"User has a position in {matched_symbol} with an **entry price of ${entry}**. Current price: ${current_price}. P&L: **${pnl_dollars:.2f} ({pnl_percent:.2f}%)**."
+                current_price = latest_symbol_data[matched_symbol][-1]['Close'] if matched_symbol in latest_symbol_data else None
+                if current_price:
+                    pnl_dollars = current_price - entry
+                    pnl_percent = (current_price - entry) / entry * 100
+                    position_info = f"User mentioned previously: entry at **${entry}**. Current: ${current_price}. P&L: **${pnl_dollars:.2f} ({pnl_percent:.2f}%)**."
 
         technical_summary = generate_rule_based_analysis(matched_symbol, latest_symbol_data[
             matched_symbol]) if matched_symbol in latest_symbol_data else ""
@@ -381,13 +421,15 @@ def chat():
 RESPONSE GUIDELINES:
 1. **Tone**: Sound like a savvy trader/mentor. Use simple, confident language.
 2. **Context**: Use the CURRENT STOCK and TECHNICAL CONTEXT for analysis.
-3. **Position**: If P&L is available, calculate it precisely and state it first.
-4. **Length**: Be brief (2-3 sentences) unless they need detailed analysis.
-5. If user mentions 'detailed', give a longer more in depth answer preferably in markdown.
+3. **Position**: If P&L is available, calculate it precisely and state it first. Reference the user's specific holdings.
+4. **Portfolio**: You have access to the user's portfolio. Reference it if they ask about "my stocks" or "my portfolio".
+5. **Length**: Be brief (2-3 sentences) unless they need detailed analysis.
+6. If user mentions 'detailed', give a longer more in depth answer preferably in markdown.
 CURRENT STOCK: {matched_symbol or 'None'}
+{portfolio_context_str}
 {position_info}
 TECHNICAL CONTEXT:
-{technical_summary[:500] if technical_summary else 'No technical data available'}
+{technical_summary[:500] if technical_summary else 'No technical data available (User has not viewed chart recently)'}
 CONVERSATION HISTORY (Last 3 turns):
 {history_text}
 USER QUESTION: {query}

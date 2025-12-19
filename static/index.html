@@ -129,7 +129,11 @@
             <div id="chat-header">
                 <span id="chat-title">Fintra AI Chat</span>
                 <span id="chat-context-header">Context: None</span>
-                <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label class="portfolio-toggle" title="Toggle Portfolio Context">
+                        <input type="checkbox" id="chat-use-portfolio">
+                        <span class="slider">💼</span>
+                    </label>
                     <button id="chat-refresh" title="Refresh Context">🔄</button>
                     <button id="chat-close">✖</button>
                 </div>
