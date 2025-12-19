@@ -3,6 +3,8 @@ import { showNotification } from './notifications.js';
 
 const { DOM, CONFIG, STATE } = deps;
 
+let positionToDeleteId = null;
+
 export function initializePortfolio() {
     // Event Listeners for portfolio functionality
     DOM.portfolioTabBtn?.addEventListener('click', showPortfolioView);
@@ -16,6 +18,24 @@ export function initializePortfolio() {
         if (e.target.id === 'add-position-modal') {
             DOM.addPositionModal.close();
         }
+    });
+
+    // Delete Modal Listeners
+    const deleteModal = document.getElementById('delete-modal');
+    const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+    const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+
+    cancelDeleteBtn?.addEventListener('click', () => deleteModal.close());
+    
+    confirmDeleteBtn?.addEventListener('click', () => {
+        if (positionToDeleteId) {
+            executeDeletePosition(positionToDeleteId);
+        }
+        deleteModal.close();
+    });
+    
+    deleteModal?.addEventListener('click', (e) => {
+        if (e.target === deleteModal) deleteModal.close();
     });
 
     // --- New: Logic for current price indicator ---
@@ -88,8 +108,10 @@ async function fetchAndDisplayPortfolio() {
         // Add event listeners for delete buttons
         portfolioContent.querySelectorAll('.delete-position-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent card expansion when clicking delete
                 const positionId = e.target.closest('button').dataset.id;
-                handleDeletePosition(positionId);
+                positionToDeleteId = positionId;
+                document.getElementById('delete-modal').showModal();
             });
         });
 
@@ -97,7 +119,9 @@ async function fetchAndDisplayPortfolio() {
         portfolioContent.querySelectorAll('.position-card-header').forEach(header => {
             header.addEventListener('click', () => {
                 const cardBody = header.nextElementSibling;
+                const arrow = header.querySelector('.position-card-arrow');
                 cardBody.classList.toggle('expanded');
+                arrow?.classList.toggle('rotated');
             });
         });
 
@@ -142,11 +166,7 @@ async function handleAddPosition(e) {
     }
 }
 
-async function handleDeletePosition(positionId) {
-    if (!confirm('Are you sure you want to delete this position?')) {
-        return;
-    }
-
+async function executeDeletePosition(positionId) {
     try {
         const response = await fetch(`${CONFIG.API_BASE_URL}/positions/${positionId}`, {
             method: 'DELETE',
@@ -179,7 +199,12 @@ function createPositionCard(pos) {
                     <div class="position-symbol">${pos.symbol}</div>
                     <div class="position-company-name">${company?.name || 'N/A'}</div>
                 </div>
-                <button class="delete-position-btn" data-id="${pos.id}" title="Delete Position">×</button>
+                <div style="display: flex; align-items: center;">
+                    <button class="delete-position-btn" data-id="${pos.id}" title="Delete Position">×</button>
+                    <div class="position-card-arrow">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                </div>
             </div>
             <div class="position-card-body" style="padding-top: 20px; padding-bottom: 20px;">
                 <div class="position-pnl ${pnlClass}">

@@ -1506,6 +1506,22 @@ footer {
     margin-left: 16px;
 }
 
+.position-card-arrow {
+    color: rgba(255, 255, 255, 0.5);
+    transition: transform 0.3s ease, color 0.3s ease;
+    display: flex;
+    align-items: center;
+    margin-left: 12px;
+}
+
+.position-card-header:hover .position-card-arrow {
+    color: white;
+}
+
+.position-card-arrow.rotated {
+    transform: rotate(180deg);
+}
+
 .delete-position-btn:hover {
     background: rgba(239, 68, 68, 0.2);
     color: #ef4444;
