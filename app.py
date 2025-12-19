@@ -44,7 +44,7 @@ def create_app():
         app,
         supports_credentials=True,
         origins=Config.CORS_ORIGINS,
-        methods=["GET", "POST", "OPTIONS"]
+        methods=["GET", "POST", "OPTIONS", "DELETE", "PUT"]
     )
 
     # Register blueprints

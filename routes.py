@@ -10,7 +10,7 @@ import yfinance as yf
 import re
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
-from flask import Blueprint, request, jsonify, session, redirect
+from flask import Blueprint, request, jsonify, session, redirect, make_response
 import pandas as pd
 
 from config import Config
@@ -166,7 +166,9 @@ def oauth_callback():
         jwt_refresh = generate_jwt_token(user_sessions[user_id], Config.REFRESH_TOKEN_JWT_SECRET,
                                          Config.REFRESH_TOKEN_EXPIRETIME)
 
-        response = redirect(Config.CLIENT_REDIRECT_URL)
+        # Use JS redirect to ensure cookies are set reliably across domains (fixes double login)
+        response = make_response(f'<script>window.location.href = "{Config.CLIENT_REDIRECT_URL}";</script>')
+        response.headers['Content-Type'] = 'text/html'
         set_token_cookies(response, jwt_access, jwt_refresh)
 
         logger.info("--- OAuth Callback End: Success ---")
@@ -439,14 +441,31 @@ def get_portfolio():
 
         # Batch fetch current prices from yfinance
         symbols = [p.symbol for p in positions]
-        tickers = yf.Tickers(' '.join(symbols))
+        try:
+            tickers = yf.Tickers(' '.join(symbols))
+        except Exception:
+            tickers = None
         
         portfolio_data = []
         for p in positions:
             try:
-                # yfinance returns data for all tickers, access by symbol
-                ticker_info = tickers.tickers.get(p.symbol.upper())
-                current_price = ticker_info.history(period='1d')['Close'].iloc[0] if not ticker_info.history(period='1d').empty else p.entry_price
+                current_price = p.entry_price
+                price_found = False
+
+                # 1. Try batch fetch
+                if tickers:
+                    ticker_info = tickers.tickers.get(p.symbol.upper())
+                    if ticker_info:
+                        hist = ticker_info.history(period='1d')
+                        if not hist.empty:
+                            current_price = hist['Close'].iloc[0]
+                            price_found = True
+                
+                # 2. Fallback to individual fetch if batch failed (fixes "needs refresh" bug)
+                if not price_found:
+                    hist = yf.Ticker(p.symbol).history(period='1d')
+                    if not hist.empty:
+                        current_price = hist['Close'].iloc[0]
                 
                 current_value = p.quantity * current_price
                 entry_value = p.quantity * p.entry_price
