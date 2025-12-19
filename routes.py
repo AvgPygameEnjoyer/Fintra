@@ -437,6 +437,8 @@ def get_current_price(symbol):
         return jsonify(error="Price not found"), 404
     except Exception as e:
         logger.error(f"Price fetch error: {e}")
+        if "Too Many Requests" in str(e) or "Rate limited" in str(e):
+            return jsonify(error="Rate limit exceeded. Please try again later."), 429
         return jsonify(error="Server error"), 500
 
 

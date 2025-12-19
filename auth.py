@@ -123,6 +123,25 @@ def require_auth():
                     refresh_oauth_token(user_id)
                 return None  # Success!
             else:
+                # --- RECOVERY LOGIC START ---
+                # If server restarted, memory is wiped but JWT is still valid.
+                # We recover the user identity from the DB to allow basic app usage.
+                try:
+                    from models import User
+                    db_user = User.query.filter_by(google_user_id=user_id).first()
+                    if db_user:
+                        logger.info(f"♻️ Recovering session for {user_id} from database.")
+                        user_sessions[user_id] = {
+                            'user_id': user_id, 'email': db_user.email, 'name': db_user.name,
+                            'picture': None, 'oauth_token': None, 'refresh_token': None,
+                            'token_expiry': datetime.now(timezone.utc),
+                            'expires_at': datetime.now(timezone.utc) + timedelta(days=7),
+                            'granted_scopes': []
+                        }
+                        return None # Allow access
+                except Exception as e:
+                    logger.error(f"Session recovery failed: {e}")
+                # --- RECOVERY LOGIC END ---
                 logger.warning(f"Access token valid, but no active session found for user_id: {user_id}. Denying access.")
         else:
             logger.warning("Access token found but it is invalid or expired.")
