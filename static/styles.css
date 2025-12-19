@@ -1568,15 +1568,16 @@ footer {
 .add-position-modal {
     position: fixed;
     inset: 0;
-    border: none;
+    border: 1px solid #334E68;
     border-radius: 16px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
     padding: 0;
     margin: auto;
     width: 90%;
     max-width: 450px;
-    background: white;
-    color: #374151;
+    background: #102A43; /* Dark blue background */
+    color: #F0F4F8; /* Soft white text */
+    overflow: hidden; /* Contain the header's negative margins */
 }
 
 .add-position-modal::backdrop {
@@ -1592,11 +1593,13 @@ footer {
 }
 
 .add-position-modal h3 {
-    font-size: 1.5rem;
-    margin: 0 0 8px 0;
-    text-align: center;
-    color: var(--fintra-dark-blue);
+    font-size: 1.4rem;
+    margin: -32px -32px 16px -32px; /* Negative margins to create a header effect */
+    padding: 24px 32px;
+    text-align: left;
+    color: white;
     font-weight: 700;
+    background: #0A2540; /* Darker blue for the header layer */
 }
 
 .add-position-modal .input-wrapper {
@@ -1609,21 +1612,26 @@ footer {
 .add-position-modal textarea {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid #e5e7eb;
+    border: 2px solid #243B53; /* Darker border */
     border-radius: 8px;
     font-family: inherit;
     font-size: 1rem;
-    color: #374151;
-    background: #f9fafb;
+    color: #F0F4F8; /* Light text color */
+    background: #183A5C; /* Lighter dark blue for input background */
     transition: all 0.2s ease;
     outline: none;
     box-sizing: border-box;
 }
 
+.add-position-modal input::placeholder,
+.add-position-modal textarea::placeholder {
+    color: #8D9FB3;
+}
+
 .add-position-modal input:focus,
 .add-position-modal textarea:focus {
     border-color: var(--fintra-blue);
-    background: white;
+    background: #102A43; /* Match modal background on focus */
     box-shadow: 0 0 0 4px rgba(0, 82, 255, 0.1);
 }
 
@@ -1660,13 +1668,13 @@ footer {
 }
 
 .modal-actions .btn-secondary {
-    background: #f3f4f6;
-    color: #4b5563;
+    background: #334E68;
+    color: #F0F4F8;
 }
 
 .modal-actions .btn-secondary:hover {
-    background: #e5e7eb;
-    color: #1f2937;
+    background: #486581;
+    color: white;
 }
 
 .modal-actions .btn-primary {
