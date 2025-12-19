@@ -1,7 +1,7 @@
 import { deps } from './config.js';
 import { showNotification } from './notifications.js';
 
-const { DOM, CONFIG, STATE, debounce } = deps;
+const { DOM, CONFIG, STATE } = deps;
 
 export function initializePortfolio() {
     // Event Listeners for portfolio functionality
@@ -211,3 +211,12 @@ style.textContent = `
     .position-card-body.expanded { max-height: 500px; opacity: 1; }
 `;
 document.head.appendChild(style);
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        const context = this;
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(context, args), wait);
+    };
+}
