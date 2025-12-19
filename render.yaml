@@ -5,7 +5,7 @@ services:
     plan: free
     runtime: python
     buildCommand: "./build.sh"
-    startCommand: "gunicorn app:app --bind 0.0.0.0:10000 --workers 2 --timeout 60"
+    startCommand: "gunicorn app:app --bind 0.0.0.0:10000 --workers 1 --timeout 60"
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.4"
