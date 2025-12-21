@@ -520,18 +520,41 @@ def get_portfolio():
 
         # Batch fetch current prices from yfinance
         symbols = [p.symbol for p in positions]
-        # Use yf.download for batch fetching history, required for indicators
-        tickers_hist = yf.download(symbols, period="60d", interval="1d", group_by='ticker', progress=False)
+        
+        # Use yf.download for batch fetching history
+        tickers_hist = None
+        if symbols:
+            try:
+                tickers_hist = yf.download(symbols, period="60d", interval="1d", group_by='ticker', progress=False)
+            except Exception as e:
+                logger.error(f"Batch download failed: {e}")
         
         portfolio_data = []
         for p in positions:
             try:
-                # Handle single vs multiple ticker download result
-                hist = tickers_hist[p.symbol] if len(symbols) > 1 else tickers_hist
+                hist = pd.DataFrame()
+                # 1. Try extracting from batch
+                if tickers_hist is not None and not tickers_hist.empty:
+                    try:
+                        if len(symbols) > 1:
+                            hist = tickers_hist[p.symbol]
+                        else:
+                            hist = tickers_hist
+                    except Exception:
+                        pass # Symbol might be missing from batch, fall through to individual fetch
+
+                # 2. Fallback to individual fetch if batch failed or data is missing
+                if hist.empty or 'Close' not in hist.columns:
+                    hist = yf.Ticker(p.symbol).history(period="60d", interval="1d")
+
+                # 3. Validate and Clean
                 if hist.empty or 'Close' not in hist.columns:
                     raise ValueError(f"No valid history for {p.symbol}")
+
+                # Create a copy to avoid SettingWithCopyWarning on slices
+                hist = hist.copy()
+                hist = hist.dropna(subset=['Close'])
                 
-                hist.dropna(subset=['Close'], inplace=True)
                 if hist.empty:
                     raise ValueError(f"History is empty after dropping NaNs for {p.symbol}")
 
