@@ -47,22 +47,18 @@ def clean_df(df, columns):
 # ==================== TECHNICAL INDICATORS ====================
 def compute_rsi(series, period=14):
     """
-    Calculate Relative Strength Index (RSI) using the standard method.
-    This method uses a Simple Moving Average for the initial period and then
-    switches to an Exponential Moving Average (Wilder's smoothing) for subsequent periods,
-    which aligns with most trading platforms.
+    Calculate Relative Strength Index (RSI) using a standard exponential
+    moving average method (Wilder's smoothing).
     """
-    delta = series.diff()
-    gain = delta.clip(lower=0)
-    loss = -delta.clip(upper=0)
+    delta = series.diff(1)
 
-    # Calculate initial averages using SMA
-    avg_gain = gain.rolling(window=period, min_periods=period).mean()[:period]
-    avg_loss = loss.rolling(window=period, min_periods=period).mean()[:period]
+    # Separate gains and losses, and fill the initial NaN
+    gain = delta.where(delta > 0, 0.0).fillna(0)
+    loss = -delta.where(delta < 0, 0.0).fillna(0)
 
-    # Calculate subsequent averages using Wilder's smoothing (equivalent to an EMA with alpha = 1/period)
-    avg_gain = pd.concat([avg_gain, gain[period:]]).ewm(alpha=1/period, adjust=False).mean()
-    avg_loss = pd.concat([avg_loss, loss[period:]]).ewm(alpha=1/period, adjust=False).mean()
+    # Calculate Wilder's smoothing for gain and loss
+    avg_gain = gain.ewm(alpha=1/period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1/period, adjust=False).mean()
 
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
@@ -80,8 +76,9 @@ def compute_macd(series):
 
 # ==================== ANALYSIS HELPER FUNCTIONS ====================
 def safe_get(d: Dict, key: str, default=None):
-    v = d.get(key, default)
-    return None if v is None else v
+    """Safely get a value from a dict, returning default if key is missing or value is None."""
+    v = d.get(key)
+    return v if v is not None else default
 
 
 def mean_or(val_list, fallback=0.0):
