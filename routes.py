@@ -24,7 +24,8 @@ from models import User, Position
 from analysis import (
     latest_symbol_data, conversation_context, clean_df,
     compute_rsi, compute_macd, generate_rule_based_analysis,
-    get_gemini_ai_analysis, call_gemini_with_user_token
+    get_gemini_ai_analysis, call_gemini_with_user_token,
+    find_recent_macd_crossover
 )
 
 logger = logging.getLogger(__name__)
