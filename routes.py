@@ -4,6 +4,7 @@ Defines all Flask routes and API endpoints.
 """
 import logging
 import secrets
+import traceback
 import jwt
 import requests
 import yfinance as yf
@@ -23,7 +24,8 @@ from models import User, Position
 from analysis import (
     latest_symbol_data, conversation_context, clean_df,
     compute_rsi, compute_macd, generate_rule_based_analysis,
-    get_gemini_ai_analysis, call_gemini_with_user_token
+    get_gemini_ai_analysis, call_gemini_with_user_token,
+    find_recent_macd_crossover
 )
 
 logger = logging.getLogger(__name__)
@@ -599,6 +601,8 @@ def get_portfolio():
                 })
             except Exception as e:
                 logger.error(f"Could not fetch live price for {p.symbol}: {e}. Using entry price.")
+                logger.error(f"❌ CRITICAL ERROR processing {p.symbol}: {str(e)}")
+                logger.error(traceback.format_exc())
                 # Append with data we have, even if live price fails
                 portfolio_data.append({
                     "id": p.id, "symbol": p.symbol, "quantity": p.quantity,
