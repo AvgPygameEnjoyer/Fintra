@@ -23,7 +23,8 @@ export const STATE = {
     isLoading: false,
     isAuthenticated: false,
     user: null,
-    chatHistory: [] // Add chat history to the global state
+    chatHistory: [], // Add chat history to the global state
+    portfolio: [] // Initialize portfolio state
 };
 
 export const DOM = {};

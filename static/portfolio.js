@@ -38,6 +38,9 @@ export function initializePortfolio() {
         if (e.target === deleteModal) deleteModal.close();
     });
 
+    // Initialize Chat Portfolio Menu
+    setupChatPortfolioMenu();
+
     // --- New: Logic for current price indicator ---
     const debouncedPriceFetch = debounce(async (e) => {
         const symbol = e.target.value.trim().toUpperCase();
@@ -86,6 +89,9 @@ async function fetchAndDisplayPortfolio() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const positions = await response.json();
+        
+        // Store in global state for chat context
+        STATE.portfolio = positions;
 
         if (positions.length === 0) {
             portfolioContent.innerHTML = `
@@ -184,6 +190,62 @@ async function executeDeletePosition(positionId) {
         console.error('❌ Error deleting position:', error);
         showNotification(error.message, 'error');
     }
+}
+
+function setupChatPortfolioMenu() {
+    const btn = document.getElementById('chat-portfolio-btn');
+    const menu = document.getElementById('chat-portfolio-menu');
+    const checkbox = document.getElementById('chat-use-portfolio');
+    const contextHeader = document.getElementById('chat-context-header');
+
+    if (!btn || !menu) return;
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Repopulate menu on click to ensure fresh data
+        renderChatPortfolioMenu(menu, checkbox, contextHeader, btn);
+        menu.classList.toggle('active');
+        btn.classList.toggle('active');
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!menu.contains(e.target) && e.target !== btn) {
+            menu.classList.remove('active');
+            btn.classList.remove('active');
+        }
+    });
+}
+
+function renderChatPortfolioMenu(menu, checkbox, contextHeader, btn) {
+    const positions = STATE.portfolio || [];
+    
+    let html = `<div class="chat-portfolio-item" data-symbol="">
+                    <span>None (Clear Context)</span>
+                </div>`;
+    
+    positions.forEach(pos => {
+        const isSelected = STATE.currentSymbol === pos.symbol;
+        html += `
+            <div class="chat-portfolio-item ${isSelected ? 'selected' : ''}" data-symbol="${pos.symbol}">
+                <span>${pos.symbol}</span>
+                <span style="font-size: 0.8em; opacity: 0.8;">${pos.quantity} qty</span>
+            </div>
+        `;
+    });
+
+    menu.innerHTML = html;
+
+    menu.querySelectorAll('.chat-portfolio-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const symbol = item.dataset.symbol;
+            STATE.currentSymbol = symbol || null;
+            checkbox.checked = !!symbol; // Check hidden box if symbol selected
+            contextHeader.textContent = symbol ? `Context: ${symbol}` : 'Context: None';
+            menu.classList.remove('active');
+            btn.classList.remove('active');
+        });
+    });
 }
 
 function createPositionCard(pos) {

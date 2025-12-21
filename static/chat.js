@@ -71,6 +71,8 @@ function handleChatSubmit() {
 
     const typingIndicator = appendMessage({ role: 'bot', content: '...' });
 
+    const usePortfolio = document.getElementById('chat-use-portfolio')?.checked || false;
+
     try {
         fetch(`${CONFIG.API_BASE_URL}/chat`, {
             method: 'POST',
@@ -82,6 +84,7 @@ function handleChatSubmit() {
                 query: text,
                 session_id: STATE.currentSessionId,
                 current_symbol: STATE.currentSymbol,
+                use_portfolio: usePortfolio,
                 history: STATE.chatHistory // Use the state array for history
             }),
             credentials: 'include'
