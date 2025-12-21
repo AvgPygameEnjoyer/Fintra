@@ -124,9 +124,20 @@ async function fetchAndDisplayPortfolio() {
         portfolioContent.querySelectorAll('.position-card-header').forEach(header => {
             header.addEventListener('click', () => {
                 const cardBody = header.nextElementSibling;
+                const card = header.closest('.position-card');
                 const arrow = header.querySelector('.position-card-arrow');
-                cardBody.classList.toggle('expanded');
+                const isExpanded = cardBody.classList.toggle('expanded');
                 arrow?.classList.toggle('rotated');
+
+                // If we are expanding the card and it's not already charted
+                if (isExpanded && !card.dataset.charted) {
+                    const positionId = card.dataset.posId;
+                    const positionData = positions.find(p => p.id == positionId);
+                    if (positionData && positionData.chart_data && positionData.chart_data.length > 0) {
+                        renderPositionChart(positionData);
+                        card.dataset.charted = 'true'; // Mark as charted
+                    }
+                }
             });
         });
 
@@ -248,13 +259,63 @@ function renderChatPortfolioMenu(menu, checkbox, contextHeader, btn) {
     });
 }
 
+function renderPositionChart(pos) {
+    const canvas = document.getElementById(`chart-pos-${pos.id}`);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const chartData = pos.chart_data;
+    const dates = chartData.map(d => d.Date.substring(5));
+    const closes = chartData.map(d => d.Close);
+
+    if (STATE.charts[`pos-${pos.id}`]) {
+        STATE.charts[`pos-${pos.id}`].destroy();
+    }
+
+    STATE.charts[`pos-${pos.id}`] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Close Price',
+                data: closes,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 2,
+                tension: 0.1,
+                fill: true,
+                pointRadius: 0,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: false }
+            },
+            scales: {
+                x: { display: false },
+                y: { display: false }
+            }
+        }
+    });
+}
+
+function getRsiColor(rsi) {
+    if (rsi == null) return '#6b7280';
+    if (rsi > 70) return '#ef4444'; // Red for overbought
+    if (rsi < 30) return '#10b981'; // Green for oversold
+    return '#F0F4F8'; // Default white-ish for neutral
+}
+
 function createPositionCard(pos) {
     const pnlClass = pos.pnl >= 0 ? 'positive' : 'negative';
     const pnlSign = pos.pnl >= 0 ? '+' : '';
     const company = STATE.stockDatabase.find(s => s.symbol === pos.symbol);
 
     return `
-        <div class="position-card">
+        <div class="position-card" data-pos-id="${pos.id}" data-pos-symbol="${pos.symbol}">
             <div class="position-card-header">
                 <div class="position-card-title">
                     <div class="position-symbol">${pos.symbol}</div>
@@ -267,7 +328,7 @@ function createPositionCard(pos) {
                     </div>
                 </div>
             </div>
-            <div class="position-card-body" style="padding-top: 20px; padding-bottom: 20px;">
+            <div class="position-card-body">
                 <div class="position-pnl ${pnlClass}">
                     <div class="pnl-amount">${pnlSign}${pos.pnl.toFixed(2)}</div>
                     <div class="pnl-percent">(${pnlSign}${pos.pnl_percent.toFixed(2)}%)</div>
@@ -286,17 +347,27 @@ function createPositionCard(pos) {
                         <strong>$${pos.current_price.toFixed(2)}</strong>
                     </div>
                 </div>
+                <div class="position-indicators">
+                    <div class="indicator-item">
+                        <span>RSI (14)</span>
+                        <strong style="color: ${getRsiColor(pos.rsi)}">${pos.rsi ? pos.rsi.toFixed(2) : 'N/A'}</strong>
+                    </div>
+                    <div class="indicator-item">
+                        <span>MA5 / MA10</span>
+                        <strong>${pos.ma5 ? '$'+pos.ma5.toFixed(2) : 'N/A'} / ${pos.ma10 ? '$'+pos.ma10.toFixed(2) : 'N/A'}</strong>
+                    </div>
+                    <div class="indicator-item">
+                        <span>MACD Status</span>
+                        <strong>${pos.macd_status || 'N/A'}</strong>
+                    </div>
+                </div>
+                <div class="position-chart-container">
+                    <canvas id="chart-pos-${pos.id}"></canvas>
+                </div>
             </div>
         </div>
     `;
 }
-
-// Add a simple CSS rule for the expanded state
-const style = document.createElement('style');
-style.textContent = `
-    .position-card-body.expanded { max-height: 500px; opacity: 1; }
-`;
-document.head.appendChild(style);
 
 function debounce(func, wait) {
     let timeout;

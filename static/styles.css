@@ -1537,8 +1537,10 @@ footer {
 }
 
 .position-card-body.expanded {
-    padding: 20px;
+    padding: 0 20px 20px 20px;
     border-top: 1px solid #243B53;
+    max-height: 500px;
+    opacity: 1;
 }
 
 .position-pnl {
@@ -1580,6 +1582,37 @@ footer {
     color: white;
 }
 
+.position-indicators {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 16px 0;
+    border-top: 1px solid #243B53;
+    margin-top: 20px;
+}
+
+.indicator-item {
+    text-align: center;
+}
+
+.indicator-item span {
+    display: block;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 6px;
+}
+
+.indicator-item strong {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #F0F4F8;
+}
+
+.position-chart-container {
+    position: relative;
+    height: 120px;
+    margin-top: 16px;
+}
 /* === Add Position Modal === */
 .add-position-modal {
     position: fixed;

@@ -370,6 +370,24 @@ def chat():
         if matched_symbol:
             session_ctx["current_symbol"] = matched_symbol
 
+        technical_summary = ""
+        if matched_symbol:
+            # If we don't have recent data for the symbol, fetch it now for context
+            if matched_symbol not in latest_symbol_data:
+                logger.info(f"Chat context: No cached data for {matched_symbol}. Fetching now.")
+                try:
+                    ticker = yf.Ticker(matched_symbol)
+                    hist = ticker.history(period="60d", interval="1d")
+                    if not hist.empty:
+                        hist['RSI'] = compute_rsi(hist['Close'])
+                        hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
+                        latest_symbol_data[matched_symbol] = clean_df(hist.dropna(), ['Open', 'High', 'Low', 'Close', 'Volume', 'RSI', 'MACD', 'Signal', 'Histogram'])
+                except Exception as e:
+                    logger.error(f"Chat context fetch failed for {matched_symbol}: {e}")
+            
+            if matched_symbol in latest_symbol_data:
+                technical_summary = generate_rule_based_analysis(matched_symbol, latest_symbol_data[matched_symbol])
+
         position_info, has_position = "", False
         if matched_symbol:
             # 1. Check DB Position (Priority)
@@ -412,8 +430,6 @@ def chat():
                     pnl_percent = (current_price - entry) / entry * 100
                     position_info = f"User mentioned previously: entry at **${entry}**. Current: ${current_price}. P&L: **${pnl_dollars:.2f} ({pnl_percent:.2f}%)**."
 
-        technical_summary = generate_rule_based_analysis(matched_symbol, latest_symbol_data[
-            matched_symbol]) if matched_symbol in latest_symbol_data else ""
         history_text = "\n".join(
             f"User: {h['user']}\nAssistant: {h['assistant']}" for h in session_ctx["conversation_history"][-3:])
 
@@ -429,7 +445,7 @@ CURRENT STOCK: {matched_symbol or 'None'}
 {portfolio_context_str}
 {position_info}
 TECHNICAL CONTEXT:
-{technical_summary[:500] if technical_summary else 'No technical data available (User has not viewed chart recently)'}
+{technical_summary[:500] if technical_summary else 'No technical data available.'}
 CONVERSATION HISTORY (Last 3 turns):
 {history_text}
 USER QUESTION: {query}
@@ -504,36 +520,42 @@ def get_portfolio():
 
         # Batch fetch current prices from yfinance
         symbols = [p.symbol for p in positions]
-        try:
-            tickers = yf.Tickers(' '.join(symbols))
-        except Exception:
-            tickers = None
+        # Use yf.download for batch fetching history, required for indicators
+        tickers_hist = yf.download(symbols, period="60d", interval="1d", group_by='ticker', progress=False)
         
         portfolio_data = []
         for p in positions:
             try:
-                current_price = p.entry_price
-                price_found = False
-
-                # 1. Try batch fetch
-                if tickers:
-                    ticker_info = tickers.tickers.get(p.symbol.upper())
-                    if ticker_info:
-                        hist = ticker_info.history(period='1d')
-                        if not hist.empty:
-                            current_price = hist['Close'].iloc[0]
-                            price_found = True
+                # Handle single vs multiple ticker download result
+                hist = tickers_hist[p.symbol] if len(symbols) > 1 else tickers_hist
+                if hist.empty or 'Close' not in hist.columns:
+                    raise ValueError(f"No valid history for {p.symbol}")
                 
-                # 2. Fallback to individual fetch if batch failed (fixes "needs refresh" bug)
-                if not price_found:
-                    hist = yf.Ticker(p.symbol).history(period='1d')
-                    if not hist.empty:
-                        current_price = hist['Close'].iloc[0]
+                hist.dropna(subset=['Close'], inplace=True)
+                if hist.empty:
+                    raise ValueError(f"History is empty after dropping NaNs for {p.symbol}")
+
+                # Calculate indicators
+                hist['RSI'] = compute_rsi(hist['Close'])
+                hist['MA5'] = hist['Close'].rolling(window=5).mean()
+                hist['MA10'] = hist['Close'].rolling(window=10).mean()
+                hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
+                
+                latest = hist.iloc[-1]
+                current_price = latest['Close']
+                
+                hist_list_for_macd = clean_df(hist.dropna(subset=['MACD', 'Signal']), ['MACD', 'Signal'])
+                crossover_type, crossover_days_ago = find_recent_macd_crossover(hist_list_for_macd, lookback=7)
+                macd_status = "None"
+                if crossover_type != 'none':
+                    macd_status = f"{crossover_type.capitalize()} {crossover_days_ago}d ago"
                 
                 current_value = p.quantity * current_price
                 entry_value = p.quantity * p.entry_price
                 pnl = current_value - entry_value
                 pnl_percent = (pnl / entry_value) * 100 if entry_value != 0 else 0
+
+                chart_data = clean_df(hist.tail(30), ['Date', 'Close'])
 
                 portfolio_data.append({
                     "id": p.id,
@@ -545,7 +567,12 @@ def get_portfolio():
                     "current_price": current_price,
                     "current_value": current_value,
                     "pnl": pnl,
-                    "pnl_percent": pnl_percent
+                    "pnl_percent": pnl_percent,
+                    "rsi": latest.get('RSI'),
+                    "ma5": latest.get('MA5'),
+                    "ma10": latest.get('MA10'),
+                    "macd_status": macd_status,
+                    "chart_data": chart_data
                 })
             except Exception as e:
                 logger.error(f"Could not fetch live price for {p.symbol}: {e}. Using entry price.")
@@ -554,7 +581,8 @@ def get_portfolio():
                     "id": p.id, "symbol": p.symbol, "quantity": p.quantity,
                     "entry_price": p.entry_price, "entry_date": p.entry_date.strftime('%Y-%m-%d'),
                     "notes": p.notes, "current_price": p.entry_price, "current_value": p.quantity * p.entry_price,
-                    "pnl": 0, "pnl_percent": 0
+                    "pnl": 0, "pnl_percent": 0,
+                    "rsi": None, "ma5": None, "ma10": None, "macd_status": "N/A", "chart_data": []
                 })
 
         return jsonify(portfolio_data), 200
