@@ -222,6 +222,49 @@ Use **bold, professional and robotic words**. Make it concise and **easy to read
     return call_gemini_with_user_token(prompt, user_id)
 
 
+def get_gemini_position_summary(position_data: Dict, user_id: str) -> str:
+    """Get an AI-powered summary for a specific user position."""
+    symbol = position_data.get('symbol')
+    quantity = position_data.get('quantity')
+    entry_price = position_data.get('entry_price')
+    current_price = position_data.get('current_price')
+    pnl = position_data.get('pnl')
+    pnl_percent = position_data.get('pnl_percent')
+
+    if not all([symbol, quantity, entry_price, current_price, pnl is not None, pnl_percent is not None]):
+        return "⚠️ Insufficient position data for AI summary."
+
+    position_context = (
+        f"The user holds **{quantity} shares** of **{symbol}** with an entry price of **${entry_price:,.2f}**. "
+        f"The current price is **${current_price:,.2f}**. "
+        f"This results in a P&L of **${pnl:,.2f} ({pnl_percent:+.2f}%)**."
+    )
+
+    technical_context = ""
+    if symbol in latest_symbol_data:
+        technical_context = generate_rule_based_analysis(symbol, latest_symbol_data[symbol])
+
+    prompt = f"""You are a **Portfolio Analyst AI**. Your task is to provide a concise, actionable summary for a user's specific stock position.
+
+**USER'S POSITION:**
+{position_context}
+
+**TECHNICAL ANALYSIS CONTEXT:**
+{technical_context}
+
+**YOUR TASK:**
+Based on the user's position and the technical context, provide a brief, skimmable summary. Follow this structure exactly:
+1.  **Stance:** A clear recommendation (e.g., "Hold," "Consider Trimming," "Hold for now"). Justify it in one sentence based on the P&L and a key technical signal (e.g., RSI, MA trend).
+2.  **Position Health:** A one-sentence assessment of the investment's current state (e.g., "The position is in a healthy profit zone," or "The position is currently under pressure but holding above key support.").
+3.  **Key Levels:** State the immediate support and resistance levels to watch.
+
+**RULES:**
+- Be direct and concise. Use bold for key terms. Do not forecast the future. Analyze the present situation based on the data provided. Address the user's *position*, not just the stock in general.
+
+Provide your summary now:"""
+    return call_gemini_with_user_token(prompt, user_id)
+
+
 def generate_rule_based_analysis(symbol: str, latest_data: List[Dict], lookback: int = 14) -> str:
     """Generate comprehensive rule-based technical analysis"""
     try:

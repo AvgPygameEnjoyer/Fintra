@@ -24,7 +24,7 @@ from models import User, Position
 from analysis import (
     latest_symbol_data, conversation_context, clean_df,
     compute_rsi, compute_macd, generate_rule_based_analysis,
-    get_gemini_ai_analysis, call_gemini_with_user_token,
+    get_gemini_ai_analysis, call_gemini_with_user_token, get_gemini_position_summary,
     find_recent_macd_crossover
 )
 
@@ -585,23 +585,29 @@ def get_portfolio():
 
                 chart_data = clean_df(hist.tail(30), ['Date', 'Close'])
 
-                portfolio_data.append({
+                position_payload = {
                     "id": p.id,
                     "symbol": p.symbol,
                     "quantity": p.quantity,
                     "entry_price": p.entry_price,
                     "entry_date": p.entry_date.strftime('%Y-%m-%d'),
                     "notes": p.notes,
-                    "current_price": current_price,
+                    "current_price": current_price, # Used for AI summary
                     "current_value": current_value,
-                    "pnl": pnl,
-                    "pnl_percent": pnl_percent,
+                    "pnl": pnl, # Used for AI summary
+                    "pnl_percent": pnl_percent, # Used for AI summary
                     "rsi": latest.get('RSI'),
                     "ma5": latest.get('MA5'),
                     "ma10": latest.get('MA10'),
                     "macd_status": macd_status,
                     "chart_data": chart_data
-                })
+                }
+
+                # Get the new AI Position Summary
+                position_payload['ai_position_summary'] = get_gemini_position_summary(position_payload, db_user.google_user_id)
+
+                portfolio_data.append(position_payload)
+
             except Exception as e:
                 logger.error(f"❌ CRITICAL ERROR processing {p.symbol}: {str(e)}")
                 logger.error(traceback.format_exc())
@@ -611,7 +617,8 @@ def get_portfolio():
                     "entry_price": p.entry_price, "entry_date": p.entry_date.strftime('%Y-%m-%d'),
                     "notes": p.notes, "current_price": p.entry_price, "current_value": p.quantity * p.entry_price,
                     "pnl": 0, "pnl_percent": 0,
-                    "rsi": None, "ma5": None, "ma10": None, "macd_status": "N/A", "chart_data": []
+                    "rsi": None, "ma5": None, "ma10": None, "macd_status": "N/A", "chart_data": [],
+                    "ai_position_summary": "⚠️ AI summary could not be generated due to a data error."
                 })
 
         return jsonify(portfolio_data), 200
