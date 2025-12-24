@@ -689,3 +689,7 @@ def health():
         active_sessions=len(user_sessions),
         env="production" # Hardcoded for production
     ), 200
+
+@app.route('/ping')
+def ping():
+    return "ok", 200
