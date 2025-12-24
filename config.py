@@ -21,10 +21,15 @@ class Config:
     # Check for DATABASE_URL. If provided by Render/Neon, it might start with 'postgres://'
     # SQLAlchemy requires 'postgresql://', so we fix it if necessary.
     _db_url = os.getenv('DATABASE_URL')
+    
+    # Robust cleaning: strip whitespace and quotes that might have been pasted in
+    if _db_url:
+        _db_url = _db_url.strip().strip('"').strip("'")
+
     if _db_url and _db_url.startswith('postgres://'):
         _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 
-    SQLALCHEMY_DATABASE_URI = _db_url or f"sqlite:///{os.path.join(DATA_DIR, 'portfolio.db')}"
+    SQLALCHEMY_DATABASE_URI = _db_url if _db_url else f"sqlite:///{os.path.join(DATA_DIR, 'portfolio.db')}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Google OAuth Configuration
