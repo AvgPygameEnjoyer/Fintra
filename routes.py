@@ -690,6 +690,7 @@ def health():
         env="production" # Hardcoded for production
     ), 200
 
-@app.route('/ping')
+
+@api.route('/ping')
 def ping():
     return "ok", 200
