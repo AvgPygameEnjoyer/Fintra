@@ -31,6 +31,12 @@ class Config:
 
     SQLALCHEMY_DATABASE_URI = _db_url if _db_url else f"sqlite:///{os.path.join(DATA_DIR, 'portfolio.db')}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # Engine options to improve connection pool reliability, especially for serverless DBs like Neon.
+    # pool_pre_ping checks if a connection is alive before using it, preventing OperationalError
+    # on stale connections.
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+    }
 
     # Google OAuth Configuration
     GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')

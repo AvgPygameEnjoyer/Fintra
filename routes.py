@@ -178,7 +178,10 @@ def oauth_callback():
 
     except Exception as e:
         logger.error(f"CRITICAL ERROR in /oauth2callback: {e}")
-        return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=callback_crash&reason={str(e)}')
+        logger.error(traceback.format_exc()) # Log the full traceback for debugging
+        # Create a safe, user-friendly error message without newlines
+        error_reason = "db_connection_failed" if "OperationalError" in str(e) else "internal_error"
+        return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=callback_crash&reason={error_reason}')
 
 
 @api.route('/auth/token/refresh', methods=['POST'])
