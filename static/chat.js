@@ -131,16 +131,10 @@ function appendMessage(message, isTemporary = false) {
     div.className = `msg msg-${role}`;
 
     if (role === 'bot' || role === 'system') {
-        let html = content;
-        html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
-        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-        html = html.replace(/`(.+?)`/g, '<code>$1</code>');
-        html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
-        html = html.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
-        if (!html.startsWith('<p>')) html = '<p>' + html + '</p>';
+        // Use marked.parse() which is now available globally
+        const html = marked.parse(content);
         div.innerHTML = html;
-    } else {
+    } else { // Handle user messages
         div.textContent = content;
     }
 

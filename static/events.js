@@ -3,6 +3,7 @@ import { DOM, debounce, CONFIG, STATE } from './config.js';
 import { handleAutocompleteInput, handleAutocompleteKeydown, hideAutocomplete, selectStock } from './autocomplete.js';
 import { fetchData } from './data.js';
 import { handleGoogleLogin, handleLogout } from './auth.js';
+import { renderChart } from './charts.js';
 import { setSidebarCollapsed } from './sidebar.js';
 
 export function initialize() {
@@ -38,6 +39,26 @@ export function initialize() {
             if (!STATE.isSidebarCollapsed && window.matchMedia('(max-width: 768px)').matches) {
                 setSidebarCollapsed(true);
             }
+        }
+    });
+
+    // New: Period selector for data tables
+    document.addEventListener('change', function(e) {
+        const periodSelect = e.target.closest('.period-select');
+        if (periodSelect) {
+            const cardId = e.target.dataset.targetCardId;
+            const days = e.target.value === 'all' ? Infinity : parseInt(e.target.value, 10);
+            const card = document.getElementById(cardId);
+            if (!card) return;
+
+            const tableBodies = card.querySelectorAll('table > tbody');
+            tableBodies.forEach(tbody => {
+                const allRows = Array.from(tbody.querySelectorAll('tr'));
+                const totalRows = allRows.length;
+                allRows.forEach((row, index) => {
+                    row.style.display = (index >= totalRows - days) ? '' : 'none';
+                });
+            });
         }
     });
 }

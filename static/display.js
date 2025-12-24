@@ -77,31 +77,6 @@ function createDataCard({ id, title, icon, contentHtml, isOpen }) {
     return card;
 }
 
-document.addEventListener('change', function(e) {
-    const periodSelect = e.target.closest('.period-select');
-    if (periodSelect) {
-        const cardId = e.target.dataset.targetCardId;
-        const days = e.target.value === 'all' ? Infinity : parseInt(e.target.value, 10);
-        const card = document.getElementById(cardId);
-        if (!card) return;
-
-        // This will update all tables within the card (e.g., MA and RSI)
-        const tableBodies = card.querySelectorAll('table > tbody');
-        
-        tableBodies.forEach(tbody => {
-            const allRows = Array.from(tbody.querySelectorAll('tr'));
-            const totalRows = allRows.length;
-            if (totalRows === 0) return;
-
-            const rowsToShow = days === Infinity ? totalRows : days;
-
-            allRows.forEach((row, index) => {
-                row.style.display = (index >= totalRows - rowsToShow) ? '' : 'none';
-            });
-        });
-    }
-});
-
 function createVisualizationContent(data) {
     if (!data.OHLCV?.length) {
         return '<div class="unavailable-notice"><strong>⚠️ Data Unavailable</strong><p>Cannot generate charts without OHLCV data.</p></div>';
@@ -135,47 +110,10 @@ function createAnalysisContent(content) {
     if (!content) {
         return '<div class="unavailable-notice"><strong>⚠️ Analysis Unavailable</strong><p>Could not retrieve rule-based or AI analysis for this security.</p></div>';
     }
-    let html = content.trim()
-        .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*(.+?)\*/g, '<em>$1</em>')
-        .replace(/`(.+?)`/g, '<code>$1</code>')
-        .replace(/~~(.+?)~~/g, '<del>$1</del>')
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>');
-
-    if (!html.startsWith('<')) html = '<p>' + html + '</p>';
-
+    // Use marked.parse() which is now available globally
+    const html = marked.parse(content);
     return `<div class="analysis-content">${html}</div>`;
 }
-
-document.addEventListener('click', function(e) {
-    // Event delegation for chart tabs
-    const chartTab = e.target.closest('.chart-tab');
-    if (chartTab && e.target.closest('#visualization-card')) {
-        const chartTabsContainer = chartTab.parentElement;
-        
-        chartTabsContainer.querySelectorAll('.chart-tab').forEach(btn => btn.classList.remove('active'));
-        chartTab.classList.add('active');
-
-        const chartId = chartTab.dataset.chart;
-
-        document.querySelectorAll('#visualization-card .chart-container').forEach(container => {
-            container.classList.remove('active');
-        });
-        const activeChartContainer = document.getElementById(`chart-${chartId}`);
-        if (activeChartContainer) {
-            activeChartContainer.classList.add('active');
-        }
-
-        // Resize chart to ensure it renders correctly when shown
-        if (STATE.charts[chartId]) { 
-            STATE.charts[chartId].resize(); 
-        } else {
-            renderChart(chartId, window.currentChartData);
-        }
-    }
-});
 
 function createOhlcvTable(data) {
     if (!data?.length) {

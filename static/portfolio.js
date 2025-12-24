@@ -1,4 +1,4 @@
-import { deps } from './config.js';
+import { deps, debounce, getRsiColor } from './config.js';
 import { showNotification } from './notifications.js';
 
 const { DOM, CONFIG, STATE } = deps;
@@ -126,13 +126,13 @@ async function fetchAndDisplayPortfolio() {
                 const cardBody = header.nextElementSibling;
                 const card = header.closest('.position-card');
                 const arrow = header.querySelector('.position-card-arrow');
-                const isExpanded = cardBody.classList.toggle('expanded');
+                const isExpanded = cardBody.classList.toggle('expanded'); 
                 arrow?.classList.toggle('rotated');
 
                 // If we are expanding the card and it's not already charted
                 if (isExpanded && !card.dataset.charted) {
-                    const positionId = card.dataset.posId;
-                    const positionData = positions.find(p => p.id == positionId);
+                    const positionId = card.dataset.id;
+                    const positionData = positions.find(p => p.id == positionId); 
                     if (positionData && positionData.chart_data && positionData.chart_data.length > 0) {
                         renderPositionChart(positionData);
                         card.dataset.charted = 'true'; // Mark as charted
@@ -260,7 +260,7 @@ function renderChatPortfolioMenu(menu, checkbox, contextHeader, btn) {
 }
 
 function renderPositionChart(pos) {
-    const canvas = document.getElementById(`chart-pos-${pos.id}`);
+    const canvas = document.getElementById(`chart-${pos.id}`);
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
@@ -268,11 +268,11 @@ function renderPositionChart(pos) {
     const dates = chartData.map(d => d.Date.substring(5));
     const closes = chartData.map(d => d.Close);
 
-    if (STATE.charts[`pos-${pos.id}`]) {
-        STATE.charts[`pos-${pos.id}`].destroy();
+    if (STATE.charts[`chart-${pos.id}`]) {
+        STATE.charts[`chart-${pos.id}`].destroy();
     }
 
-    STATE.charts[`pos-${pos.id}`] = new Chart(ctx, {
+    STATE.charts[`chart-${pos.id}`] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: dates,
@@ -302,26 +302,23 @@ function renderPositionChart(pos) {
     });
 }
 
-function getRsiColor(rsi) {
-    if (rsi == null) return '#6b7280';
-    if (rsi > 70) return '#ef4444'; // Red for overbought
-    if (rsi < 30) return '#10b981'; // Green for oversold
-    return '#F0F4F8'; // Default white-ish for neutral
-}
-
 function createPositionCard(pos) {
     const pnlClass = pos.pnl >= 0 ? 'positive' : 'negative';
     const pnlSign = pos.pnl >= 0 ? '+' : '';
     const company = STATE.stockDatabase.find(s => s.symbol === pos.symbol);
 
+    // Use marked.parse for the AI summary. It will be available globally from index.html.
+    const aiSummaryHtml = pos.ai_position_summary ? marked.parse(pos.ai_position_summary) : '<p>AI summary is being generated...</p>';
+
     return `
-        <div class="position-card" data-pos-id="${pos.id}" data-pos-symbol="${pos.symbol}">
+        <div class="position-card" data-id="${pos.id}" data-symbol="${pos.symbol}">
             <div class="position-card-header">
                 <div class="position-card-title">
                     <div class="position-symbol">${pos.symbol}</div>
                     <div class="position-company-name">${company?.name || 'N/A'}</div>
                 </div>
-                <div style="display: flex; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <button class="icon-btn search-position-btn" title="Search ${pos.symbol}">🔍</button>
                     <button class="delete-position-btn" data-id="${pos.id}" title="Delete Position">×</button>
                     <div class="position-card-arrow">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
@@ -330,7 +327,7 @@ function createPositionCard(pos) {
             </div>
             <div class="position-card-body">
                 <div class="position-pnl ${pnlClass}">
-                    <div class="pnl-amount">${pnlSign}${pos.pnl.toFixed(2)}</div>
+                    <div class="pnl-amount">${pnlSign}$${pos.pnl.toFixed(2)}</div>
                     <div class="pnl-percent">(${pnlSign}${pos.pnl_percent.toFixed(2)}%)</div>
                 </div>
                 <div class="position-details">
@@ -343,18 +340,18 @@ function createPositionCard(pos) {
                         <strong>$${pos.entry_price.toFixed(2)}</strong>
                     </div>
                     <div>
-                        <span>Current Price</span>
-                        <strong>$${pos.current_price.toFixed(2)}</strong>
+                        <span>Mkt. Value</span>
+                        <strong>$${pos.current_value.toFixed(2)}</strong>
                     </div>
                 </div>
                 <div class="position-indicators">
                     <div class="indicator-item">
                         <span>RSI (14)</span>
-                        <strong style="color: ${getRsiColor(pos.rsi)}">${pos.rsi ? pos.rsi.toFixed(2) : 'N/A'}</strong>
+                        <strong style="color: ${getRsiColor(pos.rsi)}">${pos.rsi != null ? pos.rsi.toFixed(2) : 'N/A'}</strong>
                     </div>
                     <div class="indicator-item">
                         <span>MA5 / MA10</span>
-                        <strong>${pos.ma5 ? '$'+pos.ma5.toFixed(2) : 'N/A'} / ${pos.ma10 ? '$'+pos.ma10.toFixed(2) : 'N/A'}</strong>
+                        <strong>${pos.ma5 != null ? '$'+pos.ma5.toFixed(2) : 'N/A'} / ${pos.ma10 != null ? '$'+pos.ma10.toFixed(2) : 'N/A'}</strong>
                     </div>
                     <div class="indicator-item">
                         <span>MACD Status</span>
@@ -362,18 +359,12 @@ function createPositionCard(pos) {
                     </div>
                 </div>
                 <div class="position-chart-container">
-                    <canvas id="chart-pos-${pos.id}"></canvas>
+                    <canvas id="chart-${pos.id}"></canvas>
+                </div>
+                <div class="position-ai-summary">
+                    ${aiSummaryHtml}
                 </div>
             </div>
         </div>
     `;
-}
-
-function debounce(func, wait) {
-    let timeout;
-    return function(...args) {
-        const context = this;
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(context, args), wait);
-    };
 }

@@ -79,7 +79,7 @@ export function getRsiColor(rsi) {
     if (rsi == null) return '#6b7280';
     if (rsi > 70) return '#ef4444';
     if (rsi < 30) return '#10b981';
-    return '#6b7280';
+    return '#F0F4F8'; // Use a lighter color for neutral on dark backgrounds
 }
 
 export function getRsiBackground(rsi) {
