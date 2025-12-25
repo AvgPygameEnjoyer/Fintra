@@ -32,8 +32,10 @@ def generate_jwt_token(user_data: dict, secret: str, expires_in: str) -> str:
 def verify_jwt_token(token: str, secret: str) -> Optional[dict]:
     """Verify JWT token"""
     try:
-        return jwt.decode(token, secret, algorithms=['HS256'])
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        # Add a 10-second leeway to account for minor clock skew.
+        return jwt.decode(token, secret, algorithms=['HS256'], leeway=timedelta(seconds=10))
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
+        logger.debug(f"JWT verification failed: {e}")
         return None
 
 def set_token_cookies(response, access_token: str, refresh_token: str):
@@ -162,6 +164,27 @@ def require_auth():
         if payload:
             logger.debug("Refresh token is valid.")
             user_id = payload['user_id']
+
+            # --- NEW RECOVERY LOGIC FOR REFRESH TOKEN ---
+            # If the server restarted, the session might be gone even with a valid refresh token.
+            if user_id not in user_sessions:
+                logger.info(f"Refresh token valid, but no session. Attempting recovery for {user_id}.")
+                try:
+                    from models import User
+                    db_user = User.query.filter_by(google_user_id=user_id).first()
+                    if db_user:
+                        logger.info(f"♻️ Recovering session for {user_id} from database via refresh token.")
+                        user_sessions[user_id] = {
+                            'user_id': user_id, 'email': db_user.email, 'name': db_user.name,
+                            'picture': None, 'oauth_token': None, 'refresh_token': None,
+                            'token_expiry': datetime.now(timezone.utc),
+                            'expires_at': datetime.now(timezone.utc) + timedelta(days=7),
+                            'granted_scopes': []
+                        }
+                except Exception as e:
+                    logger.error(f"Session recovery via refresh token failed: {e}")
+            # --- END NEW RECOVERY LOGIC ---
+
             if user_id in user_sessions:
                 logger.info(f"User session found for user_id: {user_id}. Issuing new access token.")
                 user_data = user_sessions[user_id]
@@ -170,7 +193,7 @@ def require_auth():
                 set_token_cookies(response, new_access_token, refresh_token_cookie)
                 return response, 401  # Use 401 to signal the client needs to retry with the new token.
             else:
-                logger.warning(f"Refresh token valid, but no active session found for user_id: {user_id}.")
+                logger.warning(f"Refresh token valid, but no active session found for user_id: {user_id} and recovery failed.")
         else:
             logger.warning("Refresh token found but it is invalid or expired.")
     else:
