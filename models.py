@@ -11,6 +11,7 @@ class User(db.Model):
     google_user_id = db.Column(db.String(120), unique=True, nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     name = db.Column(db.String(120), nullable=True)
+    picture = db.Column(db.String(512), nullable=True)
     positions = db.relationship('Position', backref='owner', lazy=True, cascade="all, delete-orphan")
 
     def __repr__(self):

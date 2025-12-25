@@ -11,7 +11,6 @@ from flask_cors import CORS
 
 from config import Config
 from database import db
-from auth import cleanup_expired_sessions, user_sessions
 from routes import api
 
 # ==================== LOGGING SETUP ====================
@@ -56,12 +55,6 @@ def create_app():
         """Log preflight requests for easier CORS debugging."""
         if request.method == 'OPTIONS':
             logger.info(f"Received PREFLIGHT {request.method} request for {request.path}")
-
-    @app.after_request
-    def cleanup_sessions(response):
-        """Run after every request to clean up expired sessions."""
-        cleanup_expired_sessions()
-        return response
 
     # Error handlers
     @app.errorhandler(Exception)

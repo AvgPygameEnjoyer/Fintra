@@ -16,8 +16,8 @@ import pandas as pd
 
 from config import Config
 from auth import (
-    user_sessions, generate_jwt_token, verify_jwt_token,
-    set_token_cookies, refresh_oauth_token, require_auth
+    generate_jwt_token, verify_jwt_token,
+    set_token_cookies, require_auth
 )
 from database import db
 from models import User, Position
@@ -142,30 +142,27 @@ def oauth_callback():
             db_user = User(
                 google_user_id=user_id,
                 email=user_info.get('email'),
-                name=user_info.get('name')
+                name=user_info.get('name'),
+                picture=user_info.get('picture')
             )
             db.session.add(db_user)
         else: # Update user info if it has changed
             db_user.email = user_info.get('email')
             db_user.name = user_info.get('name')
+            db_user.picture = user_info.get('picture')
         db.session.commit()
 
         logger.info(f"User '{user_info.get('email')}' authenticated. Storing session.")
-        user_sessions[user_id] = {
+        # This user_data is only for JWT generation, not for in-memory session state.
+        user_data_for_jwt = {
             'user_id': user_id,
             'email': user_info.get('email'),
-            'name': user_info.get('name'),
-            'picture': user_info.get('picture'),
-            'oauth_token': tokens.get('access_token'),
-            'refresh_token': tokens.get('refresh_token'),
-            'token_expiry': datetime.now(timezone.utc) + timedelta(seconds=tokens.get('expires_in', 3600)),
-            'expires_at': datetime.now(timezone.utc) + timedelta(seconds=Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME)),
-            'granted_scopes': tokens.get('scope', '').split(' ')
+            'name': user_info.get('name')
         }
 
-        jwt_access = generate_jwt_token(user_sessions[user_id], Config.ACCESS_TOKEN_JWT_SECRET,
+        jwt_access = generate_jwt_token(user_data_for_jwt, Config.ACCESS_TOKEN_JWT_SECRET,
                                         Config.ACCESS_TOKEN_EXPIRETIME)
-        jwt_refresh = generate_jwt_token(user_sessions[user_id], Config.REFRESH_TOKEN_JWT_SECRET,
+        jwt_refresh = generate_jwt_token(user_data_for_jwt, Config.REFRESH_TOKEN_JWT_SECRET,
                                          Config.REFRESH_TOKEN_EXPIRETIME)
 
         # Use JS redirect to ensure cookies are set reliably across domains (fixes double login)
@@ -187,28 +184,8 @@ def oauth_callback():
 @api.route('/auth/token/refresh', methods=['POST'])
 def refresh_token():
     """Refresh JWT access token"""
-    try:
-        refresh_token_cookie = request.cookies.get('refresh_token')
-        if not refresh_token_cookie:
-            return jsonify(error="No refresh token provided"), 401
-
-        payload = verify_jwt_token(refresh_token_cookie, Config.REFRESH_TOKEN_JWT_SECRET)
-        if not payload:
-            return jsonify(error="Invalid or expired refresh token"), 401
-
-        user_id = payload['user_id']
-        if user_id not in user_sessions:
-            return jsonify(error="User session not found"), 401
-
-        user_data = user_sessions[user_id]
-
-        new_access_token = generate_jwt_token(user_data, Config.ACCESS_TOKEN_JWT_SECRET, Config.ACCESS_TOKEN_EXPIRETIME)
-        response = jsonify(success=True, message="Access token refreshed")
-        set_token_cookies(response, new_access_token, refresh_token_cookie)
-        return response, 200
-    except Exception as e:
-        logger.error(f"❌ Token refresh error: {e}")
-        return jsonify(error="Internal token refresh error"), 500
+    # This endpoint is now deprecated. The `require_auth` decorator handles token refresh automatically.
+    return jsonify(error="This endpoint is deprecated. Token refresh is handled by the auth middleware."), 410
 
 
 @api.route('/auth/logout', methods=['POST', 'OPTIONS'])
@@ -235,22 +212,44 @@ def auth_status():
 
         payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
         if payload:
-            user_id = payload['user_id']
-            if user_id in user_sessions:
-                user_session = user_sessions[user_id]
-                return jsonify(
-                    authenticated=True,
-                    user={
-                        "email": user_session.get('email'),
-                        "name": user_session.get('name'),
-                        "picture": user_session.get('picture'),
-                        "expires_in": int((user_session['expires_at'] - datetime.now(timezone.utc)).total_seconds())
-                    }
-                ), 200
+            user_id = payload.get('user_id')
+            if user_id:
+                db_user = User.query.filter_by(google_user_id=user_id).first()
+                if db_user:
+                    # Calculate expiry from the token itself, not a session variable
+                    expires_at = datetime.fromtimestamp(payload['exp'], tz=timezone.utc)
+                    return jsonify(
+                        authenticated=True,
+                        user={
+                            "email": db_user.email,
+                            "name": db_user.name,
+                            "picture": db_user.picture,
+                            "expires_in": int((expires_at - datetime.now(timezone.utc)).total_seconds())
+                        }
+                    ), 200
         return jsonify(authenticated=False), 200
     except Exception as e:
         logger.error(f"❌ Auth status error: {e}")
         return jsonify(authenticated=False), 200
+
+@api.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    return jsonify(
+        status="healthy",
+        services={
+            "yfinance": "operational",
+            "rule_based_analysis": "operational",
+            "oauth_authentication": "enabled"
+        },
+        version="5.0-Stateless",
+        env="production" # Hardcoded for production
+    ), 200
+
+
+@api.route('/ping')
+def ping():
+    return "ok", 200
 
 
 # ==================== DATA & ANALYSIS ROUTES ====================
