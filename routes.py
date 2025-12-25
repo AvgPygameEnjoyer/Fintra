@@ -694,24 +694,3 @@ def delete_position(position_id):
     db.session.delete(position)
     db.session.commit()
     return jsonify(message="Position deleted successfully"), 200
-
-# ==================== HEALTH CHECK ====================
-@api.route('/health', methods=['GET'])
-def health():
-    """Health check endpoint"""
-    return jsonify(
-        status="healthy",
-        services={
-            "yfinance": "operational",
-            "rule_based_analysis": "operational",
-            "oauth_authentication": "enabled"
-        },
-        version="4.0-Modular",
-        active_sessions=len(user_sessions),
-        env="production" # Hardcoded for production
-    ), 200
-
-
-@api.route('/ping')
-def ping():
-    return "ok", 200
