@@ -13,7 +13,8 @@ class Config:
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY')
     
     # Detect environment: Assume production if RENDER env var is set or FLASK_ENV is production
-    IS_PRODUCTION = os.getenv('RENDER') is not None or os.getenv('FLASK_ENV') == 'production'
+    # We default to True if not explicitly development to ensure security headers on cloud deployments
+    IS_PRODUCTION = os.getenv('RENDER') is not None or os.getenv('FLASK_ENV') == 'production' or os.getenv('FLASK_ENV') != 'development'
     SESSION_COOKIE_SECURE = IS_PRODUCTION
     SESSION_COOKIE_SAMESITE = 'None' if IS_PRODUCTION else 'Lax'
 
@@ -81,6 +82,8 @@ class Config:
     # Cookie Domain
     # In production, set this to your parent domain (e.g., ".yourdomain.com") if frontend and backend are on subdomains.
     COOKIE_DOMAIN = os.getenv('COOKIE_DOMAIN') # e.g., ".yourdomain.com"
+    if COOKIE_DOMAIN == "":
+        COOKIE_DOMAIN = None
 
     @staticmethod
     def parse_time_to_seconds(time_str: str) -> int:

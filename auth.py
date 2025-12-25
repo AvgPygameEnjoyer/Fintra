@@ -41,6 +41,11 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
     is_production = current_app.config.get('SESSION_COOKIE_SECURE', False)
     samesite_mode = current_app.config.get('SESSION_COOKIE_SAMESITE', 'Lax')
 
+    # Safety Net: Browsers reject SameSite=None if Secure is False.
+    if samesite_mode == 'None' and not is_production:
+        logger.warning("⚠️ Configuration Mismatch: Forcing Secure=True because SameSite='None'.")
+        is_production = True
+
     response.set_cookie(
         'access_token',
         access_token,
@@ -60,6 +65,8 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         max_age=Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME),
         domain=Config.COOKIE_DOMAIN
     )
+
+    logger.info(f"🍪 Cookies set. Secure={is_production}, SameSite={samesite_mode}, Domain={Config.COOKIE_DOMAIN}")
 
     return response
 
