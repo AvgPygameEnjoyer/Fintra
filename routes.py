@@ -23,8 +23,8 @@ from database import db
 from models import User, Position
 from analysis import (
     latest_symbol_data, conversation_context, clean_df,
-    compute_rsi, compute_macd, generate_rule_based_analysis,
-    get_gemini_ai_analysis, call_gemini_with_user_token, get_gemini_position_summary,
+    compute_rsi, compute_macd, generate_rule_based_analysis, call_gemini_api,
+    get_gemini_ai_analysis, get_gemini_position_summary,
     find_recent_macd_crossover
 )
 
@@ -201,9 +201,6 @@ def refresh_token():
             return jsonify(error="User session not found"), 401
 
         user_data = user_sessions[user_id]
-        if user_data.get('refresh_token') and datetime.now(timezone.utc) > user_data['token_expiry'] - timedelta(
-                minutes=5):
-            refresh_oauth_token(user_id)
 
         new_access_token = generate_jwt_token(user_data, Config.ACCESS_TOKEN_JWT_SECRET, Config.ACCESS_TOKEN_EXPIRETIME)
         response = jsonify(success=True, message="Access token refreshed")
@@ -291,7 +288,7 @@ def get_data():
         latest_symbol_data[symbol] = latest_data_list
 
         rule_based_text = generate_rule_based_analysis(symbol, latest_data_list)
-        gemini_analysis = get_gemini_ai_analysis(symbol, latest_data_list, user_id)
+        gemini_analysis = get_gemini_ai_analysis(symbol, latest_data_list)
 
         if user_id not in conversation_context:
             conversation_context[user_id] = {
@@ -475,7 +472,7 @@ RESPONSE RULES:
 - Sound like a trader chatting, not a robot.
 Respond now:"""
 
-        assistant_response = call_gemini_with_user_token(prompt, user_id)
+        assistant_response = call_gemini_api(prompt)
 
         session_ctx["conversation_history"].append({
             "user": query,
@@ -619,7 +616,7 @@ def get_portfolio():
                 }
 
                 # Get the new AI Position Summary
-                position_payload['ai_position_summary'] = get_gemini_position_summary(position_payload, db_user.google_user_id)
+                position_payload['ai_position_summary'] = get_gemini_position_summary(position_payload)
 
                 portfolio_data.append(position_payload)
 

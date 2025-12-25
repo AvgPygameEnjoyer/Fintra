@@ -118,9 +118,6 @@ def require_auth():
             user_id = payload['user_id']
             if user_id in user_sessions:
                 logger.debug(f"User session found for user_id: {user_id}. Granting access.")
-                user_session = user_sessions[user_id]
-                if datetime.now(timezone.utc) > user_session['token_expiry'] - timedelta(minutes=5):
-                    refresh_oauth_token(user_id)
                 return None  # Success!
             else:
                 # --- RECOVERY LOGIC START ---
@@ -161,10 +158,6 @@ def require_auth():
                 logger.info(f"User session found for user_id: {user_id}. Issuing new access token.")
                 user_data = user_sessions[user_id]
                 new_access_token = generate_jwt_token(user_data, Config.ACCESS_TOKEN_JWT_SECRET, Config.ACCESS_TOKEN_EXPIRETIME)
-                if datetime.now(timezone.utc) > user_data['token_expiry'] - timedelta(minutes=5):
-                    if not refresh_oauth_token(user_id):
-                        logger.error("Failed to refresh the underlying OAuth token. Denying access.")
-                        return jsonify({"error": "Token refresh failed"}), 401
                 response = jsonify({"error": "Access token refreshed. Please retry the request."})
                 set_token_cookies(response, new_access_token, refresh_token_cookie)
                 return response, 401  # Use 401 to signal the client needs to retry with the new token.

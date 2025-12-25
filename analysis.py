@@ -11,7 +11,6 @@ import pandas as pd
 import numpy as np
 
 from config import Config
-from auth import user_sessions, refresh_oauth_token
 
 logger = logging.getLogger(__name__)
 
@@ -124,23 +123,19 @@ def fmt_price(x):
 
 
 # ==================== GEMINI AI INTEGRATION ====================
-def call_gemini_with_user_token(prompt: str, user_id: str, retry_count: int = 0) -> str:
-    """Call Gemini API with user's OAuth token using the requests library."""
-    if user_id not in user_sessions:
-        return "⚠️ **Authentication Required** – Please sign in to use AI analysis"
+def call_gemini_api(prompt: str) -> str:
+    """Call the Gemini API using a static API key."""
+    api_key = Config.GEMINI_API_KEY
+    if not api_key:
+        logger.warning("GEMINI_API_KEY is not set in the environment.")
+        return "⚠️ **AI Service Misconfigured** – The API key is not set on the server."
 
-    user_session = user_sessions[user_id]
-    oauth_token = user_session.get('oauth_token')
-    granted_scopes = user_session.get('granted_scopes', [])
-    required_scope = 'https://www.googleapis.com/auth/generative-language.tuning'
-
-    if required_scope not in granted_scopes:
-        return "⚠️ **Missing API Permissions** – Please sign out and sign in again to grant Gemini API access."
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-12b-it:generateContent?key={api_key}"
 
     try:
         response = requests.post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemma-3-12b-it:generateContent",
-            headers={"Authorization": f"Bearer {oauth_token}", "Content-Type": "application/json"},
+            api_url,
+            headers={"Content-Type": "application/json"},
             json={
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {"temperature": 0.7, "topK": 40, "topP": 0.95, "maxOutputTokens": 1024}
@@ -148,32 +143,35 @@ def call_gemini_with_user_token(prompt: str, user_id: str, retry_count: int = 0)
             timeout=30
         )
 
-        # Log the raw response from Gemini for debugging
         logger.info(f"Gemini API Response: {response.status_code} - {response.text}")
-
-        if response.status_code == 401 and retry_count < 1:
-            if refresh_oauth_token(user_id):
-                return call_gemini_with_user_token(prompt, user_id, retry_count + 1)
-            return "⚠️ **Session Expired** – Please sign in again"
-
-        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+        response.raise_for_status()
 
         result = response.json()
-        if 'candidates' in result and len(result['candidates']) > 0:
+        
+        if 'candidates' in result and result['candidates'] and 'content' in result['candidates'][0]:
             return result['candidates'][0]['content']['parts'][0]['text']
-        return "⚠️ **Empty response from AI** – Please try again"
+        
+        if 'promptFeedback' in result and result['promptFeedback'].get('blockReason'):
+            reason = result['promptFeedback'].get('blockReason')
+            logger.warning(f"Gemini prompt blocked due to: {reason}")
+            return f"⚠️ **AI Prompt Blocked** – Your request was blocked by the safety filter ({reason})."
+        
+        if 'candidates' in result and result['candidates'] and result['candidates'][0].get('finishReason') == 'SAFETY':
+             logger.warning("Gemini response blocked due to safety settings.")
+             return "⚠️ **AI Response Blocked** – The generated response was blocked for safety reasons. Please try a different query."
 
-    except Exception as e:
+        return "⚠️ **Empty or invalid response from AI** – Please try again."
+
+    except requests.exceptions.HTTPError as e:
         logger.error(f"❌ Gemini API HTTP error: {e.response.status_code} - {e.response.text}")
         if e.response.status_code == 429:
             return "⚠️ **Rate Limit Exceeded** – The AI is experiencing high traffic. Please wait a moment and try again."
-        if e.response.status_code in [401, 403]:
-            return "⚠️ **Authentication Error** – Your session may have expired. Please try refreshing the page or logging in again."
+        if e.response.status_code in [400, 403]:
+            return "⚠️ **Authentication Error** – The server's API key may be invalid or missing permissions."
         return f"⚠️ **API Error {e.response.status_code}** – An unexpected issue occurred. Please try again later."
-
-    except Exception as e:
-        logger.error(f"❌ Gemini API error: {e}")
-        return f"⚠️ **Error** – {str(e)}"
+    except requests.exceptions.RequestException as e:
+        logger.error(f"❌ Gemini API connection error: {e}")
+        return f"⚠️ **Connection Error** – Could not connect to the AI service."
 
 
 def format_data_for_ai_skimmable(symbol: str, data: list) -> str:
@@ -206,8 +204,8 @@ def format_data_for_ai_skimmable(symbol: str, data: list) -> str:
     return "\n".join(summary)
 
 
-def get_gemini_ai_analysis(symbol: str, data: list, user_id: str) -> str:
-    """Get AI-powered analysis from Gemini"""
+def get_gemini_ai_analysis(symbol: str, data: list) -> str:
+    """Get AI-powered analysis from Gemini."""
     data_summary = format_data_for_ai_skimmable(symbol, data)
     prompt = f"""You are a **top-tier quant analyst**. Analyze {symbol} in a **trader-friendly, skimmable way**. Provide:
 1. **🎯 Executive Summary:** 1-2 sentences max, key insight.
@@ -219,10 +217,10 @@ def get_gemini_ai_analysis(symbol: str, data: list, user_id: str) -> str:
 Use **bold, professional and robotic words**. Make it concise and **easy to read for recreational traders**.
 ## MARKET DATA
 {data_summary}"""
-    return call_gemini_with_user_token(prompt, user_id)
+    return call_gemini_api(prompt)
 
 
-def get_gemini_position_summary(position_data: Dict, user_id: str) -> str:
+def get_gemini_position_summary(position_data: Dict) -> str:
     """Get an AI-powered summary for a specific user position."""
     symbol = position_data.get('symbol')
     quantity = position_data.get('quantity')
@@ -262,7 +260,7 @@ Based on the user's position and the technical context, provide a brief, skimmab
 - Be direct and concise. Use bold for key terms. Do not forecast the future. Analyze the present situation based on the data provided. Address the user's *position*, not just the stock in general.
 
 Provide your summary now:"""
-    return call_gemini_with_user_token(prompt, user_id)
+    return call_gemini_api(prompt)
 
 
 def generate_rule_based_analysis(symbol: str, latest_data: List[Dict], lookback: int = 14) -> str:

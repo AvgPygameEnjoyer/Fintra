@@ -42,6 +42,9 @@ class Config:
     GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
     GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
 
+    # Gemini API Key
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
     # Production OAuth Redirect URI
     REDIRECT_URI = 'https://stock-dashboard-fqtn.onrender.com/api/oauth2callback'
 
@@ -64,8 +67,7 @@ class Config:
     SCOPES = [
         'openid',
         'https://www.googleapis.com/auth/userinfo.email',
-        'https://www.googleapis.com/auth/userinfo.profile',
-        'https://www.googleapis.com/auth/generative-language.tuning'
+        'https://www.googleapis.com/auth/userinfo.profile'
     ]
 
     # CORS Configuration
