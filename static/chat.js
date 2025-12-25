@@ -35,10 +35,11 @@ function toggleChatWindow() {
 }
 
 function refreshChatContext() {
-    STATE.currentSessionId = generateSessionId();
-    saveSessionState();
-    updateChatContextIndicator(STATE.currentSymbol);
+    STATE.chatContextSymbols = []; // Clear multi-context
+    STATE.currentSymbol = null; // Also clear single context
     STATE.chatHistory = []; // Clear history on refresh
+    updateChatContextIndicator(); // Update UI
+
     DOM.chatMessages.innerHTML = `
         <div style="padding: 10px; text-align: center; color: #6b7280; font-size: 0.9rem;">
             Chat context refreshed. Session ID: ${STATE.currentSessionId}.
@@ -61,8 +62,8 @@ function handleChatSubmit() {
         return;
     }
 
-    if (!STATE.currentSymbol) {
-        appendMessage({ role: 'system', content: 'Please search or select a stock first to set the chat context.' });
+    if (STATE.chatContextSymbols.length === 0 && !STATE.currentSymbol) {
+        appendMessage({ role: 'system', content: 'Please select one or more stocks from your portfolio menu (💼) to set the chat context.' });
         return;
     }
 
@@ -72,6 +73,9 @@ function handleChatSubmit() {
     const typingIndicator = appendMessage({ role: 'bot', content: '...' });
 
     const usePortfolio = document.getElementById('chat-use-portfolio')?.checked || false;
+    
+    // Use multi-context if available, otherwise fall back to single context
+    const contextSymbols = STATE.chatContextSymbols.length > 0 ? STATE.chatContextSymbols : (STATE.currentSymbol ? [STATE.currentSymbol] : []);
 
     try {
         fetch(`${CONFIG.API_BASE_URL}/chat`, {
@@ -83,9 +87,8 @@ function handleChatSubmit() {
             body: JSON.stringify({
                 query: text,
                 session_id: STATE.currentSessionId,
-                current_symbol: STATE.currentSymbol,
-                use_portfolio: usePortfolio,
-                history: STATE.chatHistory // Use the state array for history
+                context_symbols: contextSymbols, // New: send array of symbols
+                history: STATE.chatHistory
             }),
             credentials: 'include'
         })
@@ -144,8 +147,13 @@ function appendMessage(message, isTemporary = false) {
 }
 
 export function updateChatContextIndicator(symbol) {
+    // This function is now multi-purpose. If a symbol is passed, it sets single context.
+    // If not, it reads from the multi-context array.
+    if (symbol) STATE.chatContextSymbols = [symbol];
+
     const contextIndicator = document.getElementById('chat-context-header');
     if (contextIndicator) {
-        contextIndicator.textContent = `Context: ${symbol || 'None'}`;
+        const symbolsText = STATE.chatContextSymbols.join(', ');
+        contextIndicator.textContent = `Context: ${symbolsText || 'None'}`;
     }
 }

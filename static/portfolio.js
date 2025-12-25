@@ -1,5 +1,6 @@
 import { deps, debounce, getRsiColor } from './config.js';
 import { showNotification } from './notifications.js';
+import { updateChatContextIndicator } from './chat.js';
 
 const { DOM, CONFIG, STATE } = deps;
 
@@ -17,6 +18,52 @@ export function initializePortfolio() {
     DOM.addPositionModal?.addEventListener('click', (e) => {
         if (e.target.id === 'add-position-modal') {
             DOM.addPositionModal.close();
+        }
+    });
+
+    // --- Delegated Event Listener for Portfolio Cards ---
+    DOM.portfolioContent?.addEventListener('click', (e) => {
+        const deleteBtn = e.target.closest('.delete-position-btn');
+        const searchBtn = e.target.closest('.search-position-btn');
+        const header = e.target.closest('.position-card-header');
+
+        if (deleteBtn) {
+            e.stopPropagation();
+            positionToDeleteId = deleteBtn.dataset.id;
+            document.getElementById('delete-modal').showModal();
+            return;
+        }
+
+        if (searchBtn) {
+            e.stopPropagation();
+            const card = searchBtn.closest('.position-card');
+            const symbol = card.dataset.symbol;
+            if (symbol) {
+                // Switch to the search tab
+                DOM.searchTabBtn.click();
+                // Populate the search input
+                DOM.symbol.value = symbol;
+                // Manually trigger the search
+                document.querySelector('.search-form').requestSubmit();
+            }
+            return;
+        }
+
+        if (header) {
+            const cardBody = header.nextElementSibling;
+            const card = header.closest('.position-card');
+            const arrow = header.querySelector('.position-card-arrow');
+            const isExpanded = cardBody.classList.toggle('expanded');
+            arrow?.classList.toggle('rotated');
+
+            if (isExpanded && !card.dataset.charted) {
+                const positionId = card.dataset.id;
+                const positionData = STATE.portfolio.find(p => p.id == positionId);
+                if (positionData?.chart_data?.length > 0) {
+                    renderPositionChart(positionData);
+                    card.dataset.charted = 'true';
+                }
+            }
         }
     });
 
@@ -103,43 +150,7 @@ async function fetchAndDisplayPortfolio() {
             return;
         }
 
-        // Render the portfolio cards
-        portfolioContent.innerHTML = `
-            <div class="portfolio-grid">
-                ${positions.map(createPositionCard).join('')}
-            </div>
-        `;
-
-        // Add event listeners for delete buttons
-        portfolioContent.querySelectorAll('.delete-position-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent card expansion when clicking delete
-                const positionId = e.target.closest('button').dataset.id;
-                positionToDeleteId = positionId;
-                document.getElementById('delete-modal').showModal();
-            });
-        });
-
-        // --- New: Add event listeners for expandable cards ---
-        portfolioContent.querySelectorAll('.position-card-header').forEach(header => {
-            header.addEventListener('click', () => {
-                const cardBody = header.nextElementSibling;
-                const card = header.closest('.position-card');
-                const arrow = header.querySelector('.position-card-arrow');
-                const isExpanded = cardBody.classList.toggle('expanded'); 
-                arrow?.classList.toggle('rotated');
-
-                // If we are expanding the card and it's not already charted
-                if (isExpanded && !card.dataset.charted) {
-                    const positionId = card.dataset.id;
-                    const positionData = positions.find(p => p.id == positionId); 
-                    if (positionData && positionData.chart_data && positionData.chart_data.length > 0) {
-                        renderPositionChart(positionData);
-                        card.dataset.charted = 'true'; // Mark as charted
-                    }
-                }
-            });
-        });
+        portfolioContent.innerHTML = `<div class="portfolio-grid">${positions.map(createPositionCard).join('')}</div>`;
 
     } catch (error) {
         console.error('❌ Error fetching portfolio:', error);
@@ -214,9 +225,37 @@ function setupChatPortfolioMenu() {
     btn.addEventListener('click', (e) => {
         e.stopPropagation();
         // Repopulate menu on click to ensure fresh data
-        renderChatPortfolioMenu(menu, checkbox, contextHeader, btn);
+        renderChatPortfolioMenu(menu);
         menu.classList.toggle('active');
         btn.classList.toggle('active');
+    });
+
+    // Delegated listener for menu items
+    menu.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent menu from closing
+        const clearBtn = e.target.closest('[data-action="clear"]');
+        const checkbox = e.target.closest('input[type="checkbox"]');
+
+        if (clearBtn) {
+            STATE.chatContextSymbols = [];
+            updateChatContextIndicator();
+            menu.classList.remove('active');
+            btn.classList.remove('active');
+        } else if (checkbox) {
+            // The 'change' event will handle the logic
+        }
+    });
+
+    menu.addEventListener('change', (e) => {
+        if (e.target.type === 'checkbox') {
+            const symbol = e.target.dataset.symbol;
+            if (e.target.checked) {
+                if (!STATE.chatContextSymbols.includes(symbol)) STATE.chatContextSymbols.push(symbol);
+            } else {
+                STATE.chatContextSymbols = STATE.chatContextSymbols.filter(s => s !== symbol);
+            }
+            updateChatContextIndicator();
+        }
     });
 
     // Close menu when clicking outside
@@ -228,35 +267,22 @@ function setupChatPortfolioMenu() {
     });
 }
 
-function renderChatPortfolioMenu(menu, checkbox, contextHeader, btn) {
+function renderChatPortfolioMenu(menu) {
     const positions = STATE.portfolio || [];
     
-    let html = `<div class="chat-portfolio-item" data-symbol="">
-                    <span>None (Clear Context)</span>
-                </div>`;
+    let html = `<div class="chat-portfolio-item" data-action="clear"><label>None (Clear Context)</label></div>`;
     
     positions.forEach(pos => {
-        const isSelected = STATE.currentSymbol === pos.symbol;
+        const isSelected = STATE.chatContextSymbols.includes(pos.symbol);
         html += `
-            <div class="chat-portfolio-item ${isSelected ? 'selected' : ''}" data-symbol="${pos.symbol}">
-                <span>${pos.symbol}</span>
-                <span style="font-size: 0.8em; opacity: 0.8;">${pos.quantity} qty</span>
+            <div class="chat-portfolio-item">
+                <input type="checkbox" id="chat-ctx-${pos.symbol}" data-symbol="${pos.symbol}" ${isSelected ? 'checked' : ''}>
+                <label for="chat-ctx-${pos.symbol}">${pos.symbol}</label>
             </div>
         `;
     });
 
     menu.innerHTML = html;
-
-    menu.querySelectorAll('.chat-portfolio-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const symbol = item.dataset.symbol;
-            STATE.currentSymbol = symbol || null;
-            checkbox.checked = !!symbol; // Check hidden box if symbol selected
-            contextHeader.textContent = symbol ? `Context: ${symbol}` : 'Context: None';
-            menu.classList.remove('active');
-            btn.classList.remove('active');
-        });
-    });
 }
 
 function renderPositionChart(pos) {

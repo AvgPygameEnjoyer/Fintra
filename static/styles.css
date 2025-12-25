@@ -1794,12 +1794,28 @@ footer {
     cursor: pointer;
     font-size: 0.9rem;
     transition: background 0.2s;
-    display: flex;
-    justify-content: space-between;
+    display: block; /* Changed to block */
+}
+
+.chat-portfolio-item input[type="checkbox"] {
+    margin-right: 10px;
+    accent-color: var(--fintra-blue);
+    vertical-align: middle;
+}
+
+.chat-portfolio-item label {
+    cursor: pointer;
+    display: inline-block;
+    width: calc(100% - 30px); /* Adjust width to prevent wrapping */
+    vertical-align: middle;
 }
 
 .chat-portfolio-item:hover {
     background: #f9fafb;
+    color: var(--fintra-blue);
+}
+
+.chat-portfolio-item[data-action="clear"]:hover label {
     color: var(--fintra-blue);
 }
 

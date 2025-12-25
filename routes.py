@@ -332,8 +332,9 @@ def chat():
     data = request.get_json()
     query = data.get('query', '').strip()    
     user_id, db_user = get_user_from_token()
-    current_symbol_hint = data.get('current_symbol')
+    context_symbols = data.get('context_symbols', [])
     use_portfolio = data.get('use_portfolio', False)
+    current_symbol_hint = data.get('current_symbol')
 
     if not query:
         return jsonify(error="No query provided"), 400
@@ -354,13 +355,13 @@ def chat():
         
         # --- NEW: Fetch real portfolio positions from DB ---
         user_db_positions = []
-        if db_user and use_portfolio:
+        if db_user:
             user_db_positions = Position.query.filter_by(user_id=db_user.id).all()
         
         portfolio_summary = []
         for p in user_db_positions:
             portfolio_summary.append(f"{p.symbol} ({p.quantity} @ ${p.entry_price})")
-        portfolio_context_str = ("PORTFOLIO: " + ", ".join(portfolio_summary)) if portfolio_summary else ("PORTFOLIO: Empty" if use_portfolio else "")
+        portfolio_context_str = ("PORTFOLIO: " + ", ".join(portfolio_summary)) if portfolio_summary else ""
 
         # Enhanced symbol matching: Check portfolio symbols first, then cached data
         def get_symbol_from_query(q):
@@ -368,72 +369,83 @@ def chat():
                 if p.symbol.lower() in q.lower(): return p.symbol
             for s in latest_symbol_data.keys():
                 if s.lower() in q.lower(): return s
+            # Fallback for symbols in text that aren't in cache yet
+            found_symbols = re.findall(r'\b[A-Z]{1,5}\b', q.upper())
+            if found_symbols: return found_symbols[0]
             return None
 
-        matched_symbol = get_symbol_from_query(query) or current_symbol_hint or session_ctx["current_symbol"]
+        # Determine the final list of symbols to analyze
+        final_context_symbols = []
+        if context_symbols:
+            final_context_symbols = context_symbols
+        else:
+            # Fallback logic if no context is explicitly passed
+            symbol_from_query = get_symbol_from_query(query)
+            if symbol_from_query:
+                final_context_symbols.append(symbol_from_query)
+            elif current_symbol_hint:
+                final_context_symbols.append(current_symbol_hint)
+            elif session_ctx.get("current_symbol"):
+                final_context_symbols.append(session_ctx["current_symbol"])
 
-        if matched_symbol:
-            session_ctx["current_symbol"] = matched_symbol
+        # Deduplicate
+        final_context_symbols = list(set(final_context_symbols))
 
-        technical_summary = ""
-        if matched_symbol:
-            # If we don't have recent data for the symbol, fetch it now for context
-            if matched_symbol not in latest_symbol_data:
-                logger.info(f"Chat context: No cached data for {matched_symbol}. Fetching now.")
+        # Update session context with the primary symbol (first one)
+        primary_symbol = final_context_symbols[0] if final_context_symbols else None
+        if primary_symbol:
+            session_ctx["current_symbol"] = primary_symbol
+
+        # --- Build context for all symbols ---
+        technical_summaries = []
+        position_infos = []
+        has_any_position = False
+
+        for symbol in final_context_symbols:
+            # Fetch data if not in cache
+            if symbol not in latest_symbol_data:
+                logger.info(f"Chat context: No cached data for {symbol}. Fetching now.")
                 try:
-                    ticker = yf.Ticker(matched_symbol)
+                    ticker = yf.Ticker(symbol)
                     hist = ticker.history(period="60d", interval="1d")
                     if not hist.empty:
                         hist['RSI'] = compute_rsi(hist['Close'])
                         hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
-                        latest_symbol_data[matched_symbol] = clean_df(hist.dropna(), ['Open', 'High', 'Low', 'Close', 'Volume', 'RSI', 'MACD', 'Signal', 'Histogram'])
+                        latest_symbol_data[symbol] = clean_df(hist.dropna(), ['Open', 'High', 'Low', 'Close', 'Volume', 'RSI', 'MACD', 'Signal', 'Histogram'])
                 except Exception as e:
-                    logger.error(f"Chat context fetch failed for {matched_symbol}: {e}")
-            
-            if matched_symbol in latest_symbol_data:
-                technical_summary = generate_rule_based_analysis(matched_symbol, latest_symbol_data[matched_symbol])
+                    logger.error(f"Chat context fetch failed for {symbol}: {e}")
 
-        position_info, has_position = "", False
-        if matched_symbol:
-            # 1. Check DB Position (Priority)
-            db_pos = next((p for p in user_db_positions if p.symbol == matched_symbol), None)
-            
-            # 2. Check Chat Session Updates (Override/Hypothetical)
-            position_match = re.search(r'(?:bought|sold|entry|long|short|got)\s+at\s+\$?(\d+\.?\d*)', query,
-                                       re.IGNORECASE)
-            if position_match:
-                entry_price = float(position_match.group(1))
-                session_ctx["user_positions"][matched_symbol] = {
-                    "entry_price": entry_price,
-                    "date": datetime.now(timezone.utc).isoformat()
-                }
-                position_info = f"User mentioned in chat: **long** {matched_symbol} at **${entry_price}**."
-            
-            elif db_pos:
-                has_position = True
+            # Add technical summary
+            if symbol in latest_symbol_data:
+                tech_summary = generate_rule_based_analysis(symbol, latest_symbol_data[symbol])
+                technical_summaries.append(f"--- CONTEXT FOR {symbol} ---\n{tech_summary}")
+
+            # Add position info
+            db_pos = next((p for p in user_db_positions if p.symbol == symbol), None)
+            if db_pos:
+                has_any_position = True
                 entry = db_pos.entry_price
                 qty = db_pos.quantity
                 
-                # Try to get current price from cache
                 current_price = None
-                if matched_symbol in latest_symbol_data and latest_symbol_data[matched_symbol]:
-                    current_price = latest_symbol_data[matched_symbol][-1].get('Close')
+                if symbol in latest_symbol_data and latest_symbol_data[symbol]:
+                    current_price = latest_symbol_data[symbol][-1].get('Close')
                 
                 if current_price:
                     pnl_dollars = (current_price - entry) * qty
-                    pnl_percent = (current_price - entry) / entry * 100
-                    position_info = f"User owns **{qty} shares** of {matched_symbol} at avg price **${entry:.2f}**. Current Price: ${current_price:.2f}. P&L: **${pnl_dollars:.2f} ({pnl_percent:.2f}%)**."
+                    pnl_percent = (current_price - entry) / entry * 100 if entry != 0 else 0
+                    position_infos.append(f"User owns **{qty} shares** of {symbol} at avg price **${entry:.2f}**. Current Price: ${current_price:.2f}. P&L: **${pnl_dollars:.2f} ({pnl_percent:.2f}%)**.")
                 else:
-                    position_info = f"User owns **{qty} shares** of {matched_symbol} at avg price **${entry:.2f}**."
+                    position_infos.append(f"User owns **{qty} shares** of {symbol} at avg price **${entry:.2f}**.")
 
-            elif matched_symbol in session_ctx["user_positions"]:
-                has_position = True
-                entry = session_ctx["user_positions"][matched_symbol]['entry_price']
-                current_price = latest_symbol_data[matched_symbol][-1]['Close'] if matched_symbol in latest_symbol_data else None
-                if current_price:
-                    pnl_dollars = current_price - entry
-                    pnl_percent = (current_price - entry) / entry * 100
-                    position_info = f"User mentioned previously: entry at **${entry}**. Current: ${current_price}. P&L: **${pnl_dollars:.2f} ({pnl_percent:.2f}%)**."
+        # Combine contexts
+        technical_context_str = "\n\n".join(technical_summaries)
+        position_context_str = "\n".join(position_infos)
+
+        # Add a specific instruction for comparison if multiple symbols are present
+        comparison_instruction = ""
+        if len(final_context_symbols) > 1:
+            comparison_instruction = f"The user has provided multiple stocks: {', '.join(final_context_symbols)}. **Your primary goal is to compare them** based on the user's query and the provided context. Use a table or bullet points for easy comparison."
 
         history_text = "\n".join(
             f"User: {h['user']}\nAssistant: {h['assistant']}" for h in session_ctx["conversation_history"][-3:])
@@ -444,13 +456,15 @@ RESPONSE GUIDELINES:
 2. **Context**: Use the CURRENT STOCK and TECHNICAL CONTEXT for analysis.
 3. **Position**: If P&L is available, calculate it precisely and state it first. Reference the user's specific holdings.
 4. **Portfolio**: You have access to the user's portfolio. Reference it if they ask about "my stocks" or "my portfolio".
-5. **Length**: Be brief (2-3 sentences) unless they need detailed analysis.
-6. If user mentions 'detailed', give a longer more in depth answer preferably in markdown.
-CURRENT STOCK: {matched_symbol or 'None'}
+5. **Comparison**: {comparison_instruction or 'Focus on the single stock in context.'}
+6. **Length**: Be brief (2-3 sentences) unless they need detailed analysis.
+7. If user mentions 'detailed', give a longer more in depth answer preferably in markdown.
+
+STOCKS IN CONTEXT: {', '.join(final_context_symbols) or 'None'}
 {portfolio_context_str}
-{position_info}
+{position_context_str}
 TECHNICAL CONTEXT:
-{technical_summary[:500] if technical_summary else 'No technical data available.'}
+{technical_context_str[:2000] if technical_context_str else 'No technical data available.'}
 CONVERSATION HISTORY (Last 3 turns):
 {history_text}
 USER QUESTION: {query}
@@ -474,13 +488,14 @@ Respond now:"""
         return jsonify(
             response=assistant_response,
             context={
-                "current_symbol": matched_symbol,
-                "has_position": has_position,
+                "current_symbol": primary_symbol,
+                "has_position": has_any_position,
                 "history_length": len(session_ctx["conversation_history"])
             }
         ), 200
     except Exception as e:
         logger.error(f"❌ Chat handler error: {e}")
+        logger.error(traceback.format_exc())
         return jsonify(error=f"Server error: {str(e)}"), 500
 
 

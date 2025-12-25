@@ -19,6 +19,7 @@ export const STATE = {
     isSidebarCollapsed: false,
     charts: { ohlcv: null, rsi: null, movingAverages: null, macd: null },
     currentSessionId: generateSessionId(),
+    chatContextSymbols: [], // New: For multi-context chat
     currentSymbol: null,
     isLoading: false,
     isAuthenticated: false,
