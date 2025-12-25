@@ -134,6 +134,7 @@ def oauth_callback():
         if not user_id:
             logger.error("No 'sub' (user_id) in ID token.")
             return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=missing_user_id')
+        logger.info(f"OAuth callback processing for Google User ID: {user_id}")
 
         # --- NEW: Sync with database ---
         # Find user in our DB or create them if they are new.
@@ -204,32 +205,69 @@ def logout():
 
 @api.route('/auth/status', methods=['GET'])
 def auth_status():
-    """Check authentication status"""
+    """Check authentication status with robust token handling"""
     try:
         access_token = request.cookies.get('access_token')
-        if not access_token:
-            return jsonify(authenticated=False), 200
+        refresh_token = request.cookies.get('refresh_token')
+        
+        # 1. Try Access Token
+        if access_token:
+            payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
+            if payload:
+                user_id = payload.get('user_id')
+                if user_id:
+                    db_user = User.query.filter_by(google_user_id=user_id).first()
+                    if db_user:
+                        expires_at = datetime.fromtimestamp(payload['exp'], tz=timezone.utc)
+                        return jsonify(
+                            authenticated=True,
+                            user={
+                                "email": db_user.email,
+                                "name": db_user.name,
+                                "picture": db_user.picture,
+                                "expires_in": int((expires_at - datetime.now(timezone.utc)).total_seconds())
+                            }
+                        ), 200
+                    else:
+                        logger.warning(f"Auth status: Valid access token for user_id {user_id}, but user not found in DB.")
+                else:
+                    logger.warning("Auth status: Access token payload missing user_id.")
+        
+        # 2. Fallback: Try Refresh Token (if access token missing or invalid)
+        if refresh_token:
+            payload = verify_jwt_token(refresh_token, Config.REFRESH_TOKEN_JWT_SECRET)
+            if payload:
+                user_id = payload.get('user_id')
+                if user_id:
+                    db_user = User.query.filter_by(google_user_id=user_id).first()
+                    if db_user:
+                        # Generate new access token
+                        user_data = {'user_id': db_user.google_user_id, 'email': db_user.email, 'name': db_user.name}
+                        new_access_token = generate_jwt_token(user_data, Config.ACCESS_TOKEN_JWT_SECRET, Config.ACCESS_TOKEN_EXPIRETIME)
+                        
+                        # Return authenticated with new cookie
+                        response = jsonify(
+                            authenticated=True,
+                            user={
+                                "email": db_user.email,
+                                "name": db_user.name,
+                                "picture": db_user.picture,
+                                "expires_in": Config.parse_time_to_seconds(Config.ACCESS_TOKEN_EXPIRETIME)
+                            }
+                        )
+                        set_token_cookies(response, new_access_token, refresh_token)
+                        logger.info(f"🔄 Auth status recovered session via refresh token for {db_user.email}")
+                        return response, 200
+                    else:
+                        logger.warning(f"Auth status: Valid refresh token for user_id {user_id}, but user not found in DB.")
+                else:
+                    logger.warning("Auth status: Refresh token payload missing user_id.")
 
-        payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
-        if payload:
-            user_id = payload.get('user_id')
-            if user_id:
-                db_user = User.query.filter_by(google_user_id=user_id).first()
-                if db_user:
-                    # Calculate expiry from the token itself, not a session variable
-                    expires_at = datetime.fromtimestamp(payload['exp'], tz=timezone.utc)
-                    return jsonify(
-                        authenticated=True,
-                        user={
-                            "email": db_user.email,
-                            "name": db_user.name,
-                            "picture": db_user.picture,
-                            "expires_in": int((expires_at - datetime.now(timezone.utc)).total_seconds())
-                        }
-                    ), 200
+        logger.info(f"Auth status check failed. Access cookie present: {bool(access_token)}, Refresh cookie present: {bool(refresh_token)}")
         return jsonify(authenticated=False), 200
     except Exception as e:
         logger.error(f"❌ Auth status error: {e}")
+        logger.error(traceback.format_exc())
         return jsonify(authenticated=False), 200
 
 @api.route('/health', methods=['GET'])

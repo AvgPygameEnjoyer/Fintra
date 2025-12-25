@@ -32,7 +32,7 @@ def verify_jwt_token(token: str, secret: str) -> Optional[dict]:
         # Add a 10-second leeway to account for minor clock skew.
         return jwt.decode(token, secret, algorithms=['HS256'], leeway=timedelta(seconds=10))
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError) as e:
-        logger.debug(f"JWT verification failed: {e}")
+        logger.warning(f"JWT verification failed: {e}")
         return None
 
 def set_token_cookies(response, access_token: str, refresh_token: str):
@@ -86,9 +86,9 @@ def require_auth():
                 logger.debug(f"Access token is valid for user {user_id}. Granting access.")
                 return None  # Success
         else:
-            logger.debug("Access token invalid or expired. Falling back to refresh token.")
+            logger.info("Access token invalid or expired. Falling back to refresh token.")
     else:
-        logger.debug("No access_token cookie found.")
+        logger.info("No access_token cookie found in request.")
 
     # 2. Try refresh token
     refresh_token_cookie = request.cookies.get('refresh_token')
@@ -110,9 +110,9 @@ def require_auth():
                 else:
                     logger.error(f"Refresh token is for a user ({user_id}) that does not exist in DB.")
         else:
-            logger.warning("Refresh token found but it is invalid or expired.")
+            logger.warning("Refresh token found but verification failed.")
     else:
-        logger.debug("No refresh_token cookie found.")
+        logger.info("No refresh_token cookie found in request.")
 
     logger.warning("--- Auth check failed: No valid tokens found. Denying access. ---")
     # Clear potentially bad cookies on the client
