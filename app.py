@@ -8,6 +8,7 @@ import traceback
 from sys import stdout
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from sqlalchemy import text
 
 from config import Config
 from database import db
@@ -97,6 +98,16 @@ def create_app():
     with app.app_context():
         # Create database tables if they don't exist
         db.create_all()
+
+        # --- SCHEMA MIGRATION ---
+        # db.create_all() does not update existing tables. We manually ensure the 'picture' column exists.
+        try:
+            with db.engine.connect() as conn:
+                conn.execute(text('ALTER TABLE "user" ADD COLUMN IF NOT EXISTS picture VARCHAR(512)'))
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Schema migration check failed: {e}")
+
         logger.info(" 🗃️  Database tables ensured.")
 
         logger.info("=" * 70)
