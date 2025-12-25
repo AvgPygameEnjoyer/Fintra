@@ -166,9 +166,8 @@ def oauth_callback():
         jwt_refresh = generate_jwt_token(user_data_for_jwt, Config.REFRESH_TOKEN_JWT_SECRET,
                                          Config.REFRESH_TOKEN_EXPIRETIME)
 
-        # Use JS redirect to ensure cookies are set reliably across domains (fixes double login)
-        response = make_response(f'<script>window.location.href = "{Config.CLIENT_REDIRECT_URL}";</script>')
-        response.headers['Content-Type'] = 'text/html'
+        # Use standard HTTP redirect. Browsers handle Set-Cookie on 302s correctly.
+        response = redirect(Config.CLIENT_REDIRECT_URL)
         set_token_cookies(response, jwt_access, jwt_refresh)
 
         logger.info("--- OAuth Callback End: Success ---")
@@ -219,7 +218,7 @@ def auth_status():
                     db_user = User.query.filter_by(google_user_id=user_id).first()
                     if db_user:
                         expires_at = datetime.fromtimestamp(payload['exp'], tz=timezone.utc)
-                        return jsonify(
+                        response = jsonify(
                             authenticated=True,
                             user={
                                 "email": db_user.email,
@@ -227,7 +226,10 @@ def auth_status():
                                 "picture": db_user.picture,
                                 "expires_in": int((expires_at - datetime.now(timezone.utc)).total_seconds())
                             }
-                        ), 200
+                        )
+                        # Prevent caching of auth status
+                        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+                        return response, 200
                     else:
                         logger.warning(f"Auth status: Valid access token for user_id {user_id}, but user not found in DB.")
                 else:
@@ -257,6 +259,8 @@ def auth_status():
                         )
                         set_token_cookies(response, new_access_token, refresh_token)
                         logger.info(f"🔄 Auth status recovered session via refresh token for {db_user.email}")
+                        # Prevent caching
+                        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
                         return response, 200
                     else:
                         logger.warning(f"Auth status: Valid refresh token for user_id {user_id}, but user not found in DB.")
@@ -264,7 +268,9 @@ def auth_status():
                     logger.warning("Auth status: Refresh token payload missing user_id.")
 
         logger.info(f"Auth status check failed. Access cookie present: {bool(access_token)}, Refresh cookie present: {bool(refresh_token)}")
-        return jsonify(authenticated=False), 200
+        response = jsonify(authenticated=False)
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response, 200
     except Exception as e:
         logger.error(f"❌ Auth status error: {e}")
         logger.error(traceback.format_exc())

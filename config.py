@@ -15,8 +15,10 @@ class Config:
     # Detect environment: Assume production if RENDER env var is set or FLASK_ENV is production
     # We default to True if not explicitly development to ensure security headers on cloud deployments
     IS_PRODUCTION = os.getenv('RENDER') is not None or os.getenv('FLASK_ENV') == 'production' or os.getenv('FLASK_ENV') != 'development'
+    
+    # Force secure cookies in production for cross-site usage (Vercel -> Render)
     SESSION_COOKIE_SECURE = IS_PRODUCTION
-    SESSION_COOKIE_SAMESITE = 'None' if IS_PRODUCTION else 'Lax'
+    SESSION_COOKIE_SAMESITE = 'None' if IS_PRODUCTION else 'Lax' 
 
     # Define a data directory, configurable via environment variable. Defaults to the project root.
     DATA_DIR = os.getenv('DATA_DIR', os.path.dirname(os.path.abspath(__file__)))
@@ -81,8 +83,9 @@ class Config:
 
     # Cookie Domain
     # In production, set this to your parent domain (e.g., ".yourdomain.com") if frontend and backend are on subdomains.
+    # If frontend (Vercel) and backend (Render) are on different domains, leave this as None to default to the backend host.
     COOKIE_DOMAIN = os.getenv('COOKIE_DOMAIN') # e.g., ".yourdomain.com"
-    if COOKIE_DOMAIN == "":
+    if COOKIE_DOMAIN == "" or COOKIE_DOMAIN == "None":
         COOKIE_DOMAIN = None
 
     @staticmethod
