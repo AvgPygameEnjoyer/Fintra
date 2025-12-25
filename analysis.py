@@ -5,6 +5,7 @@ Handles stock data analysis, technical indicators, AI integration with Gemini.
 import logging
 import requests
 import statistics
+import random
 import math
 from typing import List, Dict, Tuple, Optional
 import pandas as pd
@@ -123,55 +124,67 @@ def fmt_price(x):
 
 
 # ==================== GEMINI AI INTEGRATION ====================
+# Define a pool of models to rotate through for load balancing and fallback.
+# Includes the Gemma 3 variants requested and Gemini 2.0 Flash as a robust backup.
+GEMINI_MODELS = [
+    "gemma-3-1b",
+    "gemma-3-4b",
+    "gemma-3-12b",
+    "gemma-3-27b",
+    "gemini-2.0-flash"
+]
+
 def call_gemini_api(prompt: str) -> str:
-    """Call the Gemini API using a static API key."""
+    """Call the Gemini API, rotating through models to handle rate limits."""
     api_key = Config.GEMINI_API_KEY
     if not api_key:
         logger.warning("GEMINI_API_KEY is not set in the environment.")
         return "⚠️ **AI Service Misconfigured** – The API key is not set on the server."
 
-    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemma-3-12b-it:generateContent?key={api_key}"
+    # Shuffle models to spread the load (smart delegation)
+    models_queue = GEMINI_MODELS.copy()
+    random.shuffle(models_queue)
 
-    try:
-        response = requests.post(
-            api_url,
-            headers={"Content-Type": "application/json"},
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {"temperature": 0.7, "topK": 40, "topP": 0.95, "maxOutputTokens": 1024}
-            },
-            timeout=30
-        )
-
-        logger.info(f"Gemini API Response: {response.status_code} - {response.text}")
-        response.raise_for_status()
-
-        result = response.json()
+    for model in models_queue:
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         
-        if 'candidates' in result and result['candidates'] and 'content' in result['candidates'][0]:
-            return result['candidates'][0]['content']['parts'][0]['text']
-        
-        if 'promptFeedback' in result and result['promptFeedback'].get('blockReason'):
-            reason = result['promptFeedback'].get('blockReason')
-            logger.warning(f"Gemini prompt blocked due to: {reason}")
-            return f"⚠️ **AI Prompt Blocked** – Your request was blocked by the safety filter ({reason})."
-        
-        if 'candidates' in result and result['candidates'] and result['candidates'][0].get('finishReason') == 'SAFETY':
-             logger.warning("Gemini response blocked due to safety settings.")
-             return "⚠️ **AI Response Blocked** – The generated response was blocked for safety reasons. Please try a different query."
+        try:
+            # logger.info(f"🤖 Attempting AI generation with model: {model}")
+            response = requests.post(
+                api_url,
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.7, "topK": 40, "topP": 0.95, "maxOutputTokens": 1024}
+                },
+                timeout=30
+            )
 
-        return "⚠️ **Empty or invalid response from AI** – Please try again."
+            # Handle Rate Limits (429), Service Overload (503), or Model Not Found (404)
+            if response.status_code in [429, 503, 404]:
+                logger.warning(f"⚠️ Model {model} unavailable ({response.status_code}). Switching...")
+                continue
 
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"❌ Gemini API HTTP error: {e.response.status_code} - {e.response.text}")
-        if e.response.status_code == 429:
-            return "⚠️ **Rate Limit Exceeded** – The AI is experiencing high traffic. Please wait a moment and try again."
-        if e.response.status_code in [400, 403]:
-            return "⚠️ **Authentication Error** – The server's API key may be invalid or missing permissions."
-        return f"⚠️ **API Error {e.response.status_code}** – An unexpected issue occurred. Please try again later."
-    except requests.exceptions.RequestException as e:
-        logger.error(f"❌ Gemini API connection error: {e}")
-        return f"⚠️ **Connection Error** – Could not connect to the AI service."
+            response.raise_for_status()
+            result = response.json()
+
+            if 'candidates' in result and result['candidates'] and 'content' in result['candidates'][0]:
+                return result['candidates'][0]['content']['parts'][0]['text']
+            
+            # Handle safety blocks
+            if 'promptFeedback' in result and result['promptFeedback'].get('blockReason'):
+                return f"⚠️ **AI Prompt Blocked** – Safety filter: {result['promptFeedback'].get('blockReason')}"
+            if 'candidates' in result and result['candidates'] and result['candidates'][0].get('finishReason') == 'SAFETY':
+                return "⚠️ **AI Response Blocked** – Safety filter triggered."
+
+            # If empty response, try next model
+            continue
+
+        except Exception as e:
+            logger.error(f"❌ Error with model {model}: {e}")
+            continue
+
+    return "⚠️ **System Busy** – All AI models are currently experiencing high traffic. Please try again later."
 
 
 def format_data_for_ai_skimmable(symbol: str, data: list) -> str:
