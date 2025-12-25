@@ -195,8 +195,8 @@ def logout():
     try:
         logger.info("User logout initiated.")
         response = jsonify(success=True, message="Logged out")
-        response.set_cookie('access_token', '', max_age=0)
-        response.set_cookie('refresh_token', '', max_age=0)
+        response.set_cookie('access_token', '', max_age=0, path='/')
+        response.set_cookie('refresh_token', '', max_age=0, path='/')
         return response, 200
     except Exception as e:
         logger.error(f"❌ Logout error: {e}")

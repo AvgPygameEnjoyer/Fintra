@@ -52,7 +52,8 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         secure=is_production,
         samesite=samesite_mode,
         max_age=Config.parse_time_to_seconds(Config.ACCESS_TOKEN_EXPIRETIME),
-        domain=Config.COOKIE_DOMAIN
+        domain=Config.COOKIE_DOMAIN,
+        path='/'  # Set cookie path to root to make it available for all API endpoints
     )
 
     response.set_cookie(
@@ -62,7 +63,8 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         secure=is_production,
         samesite=samesite_mode,
         max_age=Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME),
-        domain=Config.COOKIE_DOMAIN
+        domain=Config.COOKIE_DOMAIN,
+        path='/'  # Set cookie path to root
     )
 
     logger.info(f"🍪 Cookies set. Secure={is_production}, SameSite={samesite_mode}, Domain={Config.COOKIE_DOMAIN}")
@@ -117,6 +119,6 @@ def require_auth():
     logger.warning("--- Auth check failed: No valid tokens found. Denying access. ---")
     # Clear potentially bad cookies on the client
     response = jsonify({"error": "Not authenticated. Please sign in."})
-    response.set_cookie('access_token', '', max_age=0)
-    response.set_cookie('refresh_token', '', max_age=0)
+    response.set_cookie('access_token', '', max_age=0, path='/')
+    response.set_cookie('refresh_token', '', max_age=0, path='/')
     return response, 401
