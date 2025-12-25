@@ -11,8 +11,11 @@ class Config:
 
     # Flask Settings
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY')
-    SESSION_COOKIE_SECURE = True
-    SESSION_COOKIE_SAMESITE = 'None'
+    
+    # Detect environment: Assume production if RENDER env var is set or FLASK_ENV is production
+    IS_PRODUCTION = os.getenv('RENDER') is not None or os.getenv('FLASK_ENV') == 'production'
+    SESSION_COOKIE_SECURE = IS_PRODUCTION
+    SESSION_COOKIE_SAMESITE = 'None' if IS_PRODUCTION else 'Lax'
 
     # Define a data directory, configurable via environment variable. Defaults to the project root.
     DATA_DIR = os.getenv('DATA_DIR', os.path.dirname(os.path.abspath(__file__)))

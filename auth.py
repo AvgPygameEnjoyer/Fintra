@@ -39,13 +39,14 @@ def verify_jwt_token(token: str, secret: str) -> Optional[dict]:
 def set_token_cookies(response, access_token: str, refresh_token: str):
     """Set cookies safely so browser actually stores them."""
     is_production = current_app.config.get('SESSION_COOKIE_SECURE', False)
+    samesite_mode = current_app.config.get('SESSION_COOKIE_SAMESITE', 'Lax')
 
     response.set_cookie(
         'access_token',
         access_token,
         httponly=True,
         secure=is_production,
-        samesite='None', # Always 'None' in production
+        samesite=samesite_mode,
         max_age=Config.parse_time_to_seconds(Config.ACCESS_TOKEN_EXPIRETIME),
         domain=Config.COOKIE_DOMAIN
     )
@@ -55,7 +56,7 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         refresh_token,
         httponly=True,
         secure=is_production,
-        samesite='None', # Always 'None' in production
+        samesite=samesite_mode,
         max_age=Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME),
         domain=Config.COOKIE_DOMAIN
     )
