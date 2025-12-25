@@ -127,13 +127,13 @@ def fmt_price(x):
 # Define a pool of models to rotate through for load balancing and fallback.
 # Includes the Gemma 3 variants requested and Gemini 2.0 Flash as a robust backup.
 GEMINI_MODELS = [
-    "gemma-3-1b",
-    "gemma-3-4b",
-    "gemma-3-12b",
-    "gemma-3-27b",
+    "gemma-3-1b-it", 
+    "gemma-3-4b-it",
+    "gemma-3-12b-it",
+    "gemma-3-27b-it",
     "gemini-2.0-flash"
 ]
-
+#helloworld
 def call_gemini_api(prompt: str) -> str:
     """Call the Gemini API, rotating through models to handle rate limits."""
     api_key = Config.GEMINI_API_KEY
