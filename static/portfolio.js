@@ -1,6 +1,7 @@
 import { deps, debounce, getRsiColor } from './config.js';
 import { showNotification } from './notifications.js';
 import { updateChatContextIndicator } from './chat.js';
+import { getAuthHeaders } from './auth.js';
 
 const { DOM, CONFIG, STATE } = deps;
 
@@ -131,7 +132,10 @@ async function fetchAndDisplayPortfolio() {
     portfolioContent.innerHTML = '<div class="loading"><div class="spinner"></div>Fetching portfolio...</div>';
 
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/portfolio`, { credentials: 'include' });
+        const response = await fetch(`${CONFIG.API_BASE_URL}/portfolio`, {
+            credentials: 'include',
+            headers: getAuthHeaders()
+        });
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -171,7 +175,10 @@ async function handleAddPosition(e) {
     try {
         const response = await fetch(`${CONFIG.API_BASE_URL}/positions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
             credentials: 'include',
             body: JSON.stringify(positionData)
         });
@@ -197,7 +204,8 @@ async function executeDeletePosition(positionId) {
     try {
         const response = await fetch(`${CONFIG.API_BASE_URL}/positions/${positionId}`, {
             method: 'DELETE',
-            credentials: 'include'
+            credentials: 'include',
+            headers: getAuthHeaders()
         });
 
         if (!response.ok) {

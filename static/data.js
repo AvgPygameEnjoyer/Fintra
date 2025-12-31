@@ -2,7 +2,7 @@
 import { deps } from './config.js';
 import { showLoading, hideLoading, hideError, showError } from './dom.js';
 import { displayData } from './display.js';
-import { updateAuthUI } from './auth.js';
+import { updateAuthUI, getAuthHeaders } from './auth.js';
  
 const { CONFIG, STATE } = deps;
 
@@ -30,7 +30,8 @@ export async function fetchData() {
             method: "POST",
             credentials: "include",
             headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                ...getAuthHeaders()
             },
             body: JSON.stringify({
                 symbol: STATE.currentSymbol

@@ -28,10 +28,31 @@ export const log = {
 
 const { STATE, DOM, CONFIG } = deps;
 
+// --- NEW: Token Management ---
+function setAuthToken(token) {
+    if (token) {
+        STATE.authToken = token;
+        localStorage.setItem('accessToken', token);
+        log.info('Auth token has been set.');
+    } else {
+        STATE.authToken = null;
+        localStorage.removeItem('accessToken');
+        log.info('Auth token has been cleared.');
+    }
+}
+
+export function getAuthHeaders() {
+    if (STATE.authToken) {
+        return { 'Authorization': `Bearer ${STATE.authToken}` };
+    }
+    return {};
+}
+// --- END NEW ---
+
 export async function handleGoogleLogin() {
     try {
         deps.log.debug('Initiating Google login...');
-        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`, { credentials: 'include' });
+        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/login`);
         const data = await response.json();
         if (response.ok && data.success && data.auth_url && data.state_token) {
             localStorage.setItem(CONFIG.OAUTH_STATE_KEY, data.state_token);
@@ -47,9 +68,41 @@ export async function handleGoogleLogin() {
 }
 
 export async function checkAuthStatus() {
+    log.debug('Checking auth status...');
+    // --- NEW: Token acquisition logic ---
+    // This is the core fix: read the token from the URL after the backend redirect.
+    const queryParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = queryParams.get('access_token');
+
+    if (tokenFromUrl) {
+        log.info('Access token found in URL. Setting auth token.');
+        setAuthToken(tokenFromUrl);
+        // Clean the URL so the token isn't visible in the address bar.
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+        // If no token in URL, check localStorage for a previously saved one.
+        const tokenFromStorage = localStorage.getItem('accessToken');
+        if (tokenFromStorage) {
+            log.debug('Access token found in localStorage.');
+            setAuthToken(tokenFromStorage);
+        }
+    }
+    // --- END NEW ---
+
     try {
-        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/status`, { credentials: 'include' });
+        // --- MODIFIED: Add auth header to fetch call ---
+        const response = await fetch(`${CONFIG.API_BASE_URL}/auth/status`, {
+            credentials: 'include',
+            headers: getAuthHeaders() // Add the token header
+        });
         const data = await response.json();
+
+        // If backend says we are not authenticated, but we have a token, it's invalid.
+        if (!data.authenticated && STATE.authToken) {
+            log.warn('Backend reported unauthenticated status, but a token was present. Clearing invalid token.');
+            setAuthToken(null); // Clear the bad token
+        }
+
         STATE.isAuthenticated = data.authenticated;
         STATE.user = data.user || null;
         updateAuthUI();
@@ -57,6 +110,7 @@ export async function checkAuthStatus() {
         deps.log.error('Auth check error:', error);
         STATE.isAuthenticated = false;
         STATE.user = null;
+        setAuthToken(null); // Clear token on error
         updateAuthUI();
     } finally {
         return STATE.isAuthenticated;
@@ -65,12 +119,18 @@ export async function checkAuthStatus() {
 
 export async function handleLogout(showNotify = true) {
     try {
-        await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
+        // --- MODIFIED: Add auth header to fetch call ---
+        await fetch(`${CONFIG.API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: getAuthHeaders()
+        });
     } catch (error) {
         deps.log.warn('Logout request to backend failed, but logging out on client-side anyway.', error);
     } finally {
         STATE.isAuthenticated = false;
         STATE.user = null;
+        setAuthToken(null); // --- NEW: Clear the token ---
         localStorage.removeItem(CONFIG.SESSION_STORAGE_KEY); // Clear the persisted session
         updateAuthUI();
         if (showNotify) showNotification('Logged out successfully', 'success');
