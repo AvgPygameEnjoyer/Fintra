@@ -205,6 +205,7 @@ def logout():
 @api.route('/auth/status', methods=['GET'])
 def auth_status():
     """Check authentication status with robust token handling"""
+    logger.info("🔍 /auth/status called - Checking for tokens...")
     try:
         access_token = request.cookies.get('access_token')
         refresh_token = request.cookies.get('refresh_token')

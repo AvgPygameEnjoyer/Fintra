@@ -53,9 +53,13 @@ def create_app():
     # Request hooks
     @app.before_request
     def before_request_logging():
-        """Log preflight requests for easier CORS debugging."""
+        """Log request details and incoming cookies for debugging."""
         if request.method == 'OPTIONS':
             logger.info(f"Received PREFLIGHT {request.method} request for {request.path}")
+        elif not request.path.endswith('/health'):
+            # Log cookies and origin for all non-health API requests
+            logger.info(f"📥 [{request.method}] {request.path} | Origin: {request.headers.get('Origin', 'None')}")
+            logger.info(f"   🔑 Incoming Cookies: {list(request.cookies.keys())}")
 
     # Error handlers
     @app.errorhandler(Exception)
@@ -112,7 +116,8 @@ def create_app():
 
         logger.info("=" * 70)
         logger.info(" 🚀 BACKEND SERVER STARTING UP")
-        logger.info(f" 🌍 Environment: Production")
+        logger.info(f" 🌍 Environment Config: IS_PRODUCTION={app.config.get('IS_PRODUCTION')}")
+        logger.info(f" 🍪 Cookie Config: Secure={app.config.get('SESSION_COOKIE_SECURE')}, SameSite={app.config.get('SESSION_COOKIE_SAMESITE')}")
         logger.info(f" 🔐 Google Client ID: {Config.GOOGLE_CLIENT_ID[:10] if Config.GOOGLE_CLIENT_ID else 'NOT SET'}{'...' if Config.GOOGLE_CLIENT_ID else ''}")
         logger.info(f" ↪️ Google Redirect URI: {Config.REDIRECT_URI}")
         logger.info(f" 🌐 Frontend Redirect URL: {Config.CLIENT_REDIRECT_URL}")

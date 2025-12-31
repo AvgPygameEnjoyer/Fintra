@@ -45,6 +45,8 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         logger.warning("⚠️ Configuration Mismatch: Forcing Secure=True because SameSite='None'.")
         is_production = True
 
+    logger.info(f"🍪 Setting Cookies | Secure={is_production} | SameSite={samesite_mode} | Domain=None")
+
     # Explicitly set path='/' to ensure cookies are sent for all API routes
     response.set_cookie(
         'access_token',
