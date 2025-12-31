@@ -166,16 +166,21 @@ def oauth_callback():
         jwt_refresh = generate_jwt_token(user_data_for_jwt, Config.REFRESH_TOKEN_JWT_SECRET,
                                          Config.REFRESH_TOKEN_EXPIRETIME)
 
-        # CHANGE: Use a JS-based redirect (200 OK) instead of HTTP 302.
-        # This ensures the browser processes the Set-Cookie headers reliably
-        # before navigating back to the cross-site frontend.
+        # Generate redirect URL with tokens as query params (Fallback for when cookies are blocked)
+        # This allows the frontend to grab tokens from URL if Set-Cookie fails.
+        redirect_params = {
+            'access_token': jwt_access,
+            'refresh_token': jwt_refresh
+        }
+        redirect_url = f"{Config.CLIENT_REDIRECT_URL}?{urlencode(redirect_params)}"
+
         html_content = f"""
         <!DOCTYPE html>
         <html>
             <head><title>Redirecting...</title></head>
             <body>
                 <p>Authentication successful. Redirecting you to the app...</p>
-                <script>window.location.href = "{Config.CLIENT_REDIRECT_URL}";</script>
+                <script>window.location.href = "{redirect_url}";</script>
             </body>
         </html>
         """

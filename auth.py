@@ -97,6 +97,12 @@ def require_auth():
     logger.debug("--- Stateless Auth check initiated ---")
     access_token = request.cookies.get('access_token')
 
+    # 1a. Fallback: Check Authorization Header if cookie is missing
+    if not access_token:
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith("Bearer "):
+            access_token = auth_header.split(" ")[1]
+
     # 1. Try access token
     if access_token:
         payload = verify_jwt_token(access_token, Config.ACCESS_TOKEN_JWT_SECRET)
