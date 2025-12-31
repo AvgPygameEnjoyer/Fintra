@@ -53,8 +53,7 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         secure=is_production,
         samesite=samesite_mode,
         max_age=Config.parse_time_to_seconds(Config.ACCESS_TOKEN_EXPIRETIME),
-        domain=Config.COOKIE_DOMAIN,
-        path='/' 
+        domain=a'
     )
 
     response.set_cookie(
@@ -64,13 +63,11 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         secure=is_production,
         samesite=samesite_mode,
         max_age=Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME),
-        domain=Config.COOKIE_DOMAIN,
-        path='/'
-    )
+        domain=None,
+        path='/
 
-    logger.info(f"🍪 Cookies set. Secure={is_production}, SameSite={samesite_mode}, Domain={Config.COOKIE_DOMAIN}")
+    logger.info(f"🍪 Cookies set. Secure={is_production}, SameSite={samesite_mode}, Domain=None (HostOnly)")
 
-    return response
 
 def require_auth():
     """

@@ -84,9 +84,7 @@ class Config:
     # Cookie Domain
     # In production, set this to your parent domain (e.g., ".yourdomain.com") if frontend and backend are on subdomains.
     # If frontend (Vercel) and backend (Render) are on different domains, leave this as None to default to the backend host.
-    COOKIE_DOMAIN = os.getenv('COOKIE_DOMAIN') # e.g., ".yourdomain.com"
-    if COOKIE_DOMAIN == "" or COOKIE_DOMAIN == "None":
-        COOKIE_DOMAIN = None
+    COOKIE_DOMAIN = None
 
     @staticmethod
     def parse_time_to_seconds(time_str: str) -> int:
