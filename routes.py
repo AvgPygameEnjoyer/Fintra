@@ -225,8 +225,16 @@ def auth_status():
     """Check authentication status with robust token handling"""
     logger.info("🔍 /auth/status called - Checking for tokens...")
     try:
+        # Prioritize cookie, but fall back to Authorization header.
+        # This makes the endpoint compatible with both cookie-based sessions and the URL token fallback.
         access_token = request.cookies.get('access_token')
         refresh_token = request.cookies.get('refresh_token')
+
+        if not access_token:
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith("Bearer "):
+                logger.info("Auth status: No cookie found, using 'Authorization: Bearer' header.")
+                access_token = auth_header.split(" ")[1]
         
         # 1. Try Access Token
         if access_token:
