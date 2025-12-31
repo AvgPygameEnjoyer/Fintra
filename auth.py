@@ -45,8 +45,6 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         logger.warning("⚠️ Configuration Mismatch: Forcing Secure=True because SameSite='None'.")
         is_production = True
 
-    logger.info(f"🍪 Setting Cookies | Secure={is_production} | SameSite={samesite_mode} | Domain=None")
-
     # Explicitly set path='/' to ensure cookies are sent for all API routes
     response.set_cookie(
         'access_token',
@@ -56,7 +54,7 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         samesite=samesite_mode,
         max_age=Config.parse_time_to_seconds(Config.ACCESS_TOKEN_EXPIRETIME),
         domain=None,
-        path='/'
+        path='/' 
     )
 
     response.set_cookie(
@@ -72,6 +70,24 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
 
     logger.info(f"🍪 Cookies set. Secure={is_production}, SameSite={samesite_mode}, Domain=None (HostOnly)")
 
+    # --- FIX: Add 'Partitioned' attribute for Cross-Site Tracking (CHIPS) ---
+    # Modern browsers (Chrome 110+) require cookies in cross-site contexts (Vercel -> Render)
+    # to be 'Partitioned' if third-party cookies are restricted.
+    if is_production and samesite_mode == 'None':
+        cookie_headers = response.headers.getlist("Set-Cookie")
+        new_cookie_headers = []
+        for header in cookie_headers:
+            if "Partitioned" not in header:
+                new_cookie_headers.append(header + "; Partitioned")
+            else:
+                new_cookie_headers.append(header)
+        
+        del response.headers["Set-Cookie"]
+        for header in new_cookie_headers:
+            response.headers.add("Set-Cookie", header)
+        logger.info("🍪 Added 'Partitioned' attribute to cookies for CHIPS support.")
+
+    return response
 
 def require_auth():
     """
