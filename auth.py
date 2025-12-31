@@ -53,7 +53,8 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         secure=is_production,
         samesite=samesite_mode,
         max_age=Config.parse_time_to_seconds(Config.ACCESS_TOKEN_EXPIRETIME),
-        domain=a'
+        domain=None,
+        path='/'
     )
 
     response.set_cookie(
@@ -64,7 +65,8 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         samesite=samesite_mode,
         max_age=Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME),
         domain=None,
-        path='/
+        path='/'
+    )
 
     logger.info(f"🍪 Cookies set. Secure={is_production}, SameSite={samesite_mode}, Domain=None (HostOnly)")
 
