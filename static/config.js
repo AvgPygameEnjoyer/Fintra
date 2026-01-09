@@ -1,7 +1,7 @@
 // ==================== CONFIGURATION & CONSTANTS ====================
 const IS_LOCALHOST = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 // Use a relative path for local dev to go through the proxy, and a full URL for production.
-const API_BASE_URL = IS_LOCALHOST ? '/api' : 'https://stock-dashboard-fqtn.onrender.com/api';
+const API_BASE_URL = IS_LOCALHOST ? '/api' : 'https://your-app-name.onrender.com/api'; // ⚠️ UPDATE THIS to your actual Render Backend URL
 
 export const CONFIG = {
     API_BASE_URL: API_BASE_URL,
