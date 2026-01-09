@@ -4,6 +4,21 @@ Fintra is a comprehensive stock market dashboard that combines traditional techn
 
 ![Fintra Dashboard](static/fintralogo.png)
 
+
+Why I Built Fintra
+
+Before building Fintra, I was a regular investor and trader like most people. While analyzing stocks, I kept wishing for a tool that could show all key technical indicators with a single click. I wanted something clean, fast, and visually intuitive, without the user interface getting in the way.
+
+When I could not find anything that fully matched what I had in mind, I decided to build it myself.
+
+Fintra started as a simple interface that displayed RSI, MACD, and moving averages. At that stage, there were no charts and no deeper analysis, just raw indicators. From there, I added an AI based review system to provide higher level insights. After that, I built a more in depth technical analysis engine designed to be context aware and to complement the AI review rather than replace it. Visualization came next, with interactive charts to make the data easier to interpret at a glance.
+
+At that point, Fintra could tell you what the indicators suggested, but it could not explain why. You could not ask follow up questions such as why a specific price level might be a good entry point. To solve this, I introduced a chatbot. The first version was messy and often picked up the wrong context, producing generic AI responses. I fixed this by building a context indicator that clearly shows what data the chatbot is using, allowing users to select and compare multiple stocks with full transparency.
+
+The final major addition was the Positions tab, which became one of the most challenging and most valuable features. It tracks open positions and, for each one, displays the previous day’s candlestick data along with RSI, MACD, and moving average status specific to that position. Multiple positions can also be fed into the chatbot alongside any searched stock, enabling direct comparisons between positions or against new opportunities.
+
+Fintra ultimately became the tool I originally wanted to use myself: fast, transparent, context aware, and built to support real decision making rather than simply display data.
+
 ## 🚀 Features
 
 ### 📊 Advanced Market Intelligence
