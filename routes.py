@@ -166,8 +166,26 @@ def oauth_callback():
         jwt_refresh = generate_jwt_token(user_data_for_jwt, Config.REFRESH_TOKEN_JWT_SECRET,
                                          Config.REFRESH_TOKEN_EXPIRETIME)
 
-        # Use standard HTTP redirect. Browsers handle Set-Cookie on 302s correctly.
-        response = redirect(Config.CLIENT_REDIRECT_URL)
+        # Generate redirect URL with tokens as query params (Fallback for when cookies are blocked)
+        # This allows the frontend to grab tokens from URL if Set-Cookie fails.
+        redirect_params = {
+            'access_token': jwt_access,
+            'refresh_token': jwt_refresh
+        }
+        redirect_url = f"{Config.CLIENT_REDIRECT_URL}?{urlencode(redirect_params)}"
+
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+            <head><title>Redirecting...</title></head>
+            <body>
+                <p>Authentication successful. Redirecting you to the app...</p>
+                <script>window.location.href = "{redirect_url}";</script>
+            </body>
+        </html>
+        """
+        response = make_response(html_content)
+        response.headers['Content-Type'] = 'text/html'
         set_token_cookies(response, jwt_access, jwt_refresh)
 
         logger.info("--- OAuth Callback End: Success ---")
@@ -205,9 +223,18 @@ def logout():
 @api.route('/auth/status', methods=['GET'])
 def auth_status():
     """Check authentication status with robust token handling"""
+    logger.info("🔍 /auth/status called - Checking for tokens...")
     try:
+        # Prioritize cookie, but fall back to Authorization header.
+        # This makes the endpoint compatible with both cookie-based sessions and the URL token fallback.
         access_token = request.cookies.get('access_token')
         refresh_token = request.cookies.get('refresh_token')
+
+        if not access_token:
+            auth_header = request.headers.get('Authorization')
+            if auth_header and auth_header.startswith("Bearer "):
+                logger.info("Auth status: No cookie found, using 'Authorization: Bearer' header.")
+                access_token = auth_header.split(" ")[1]
         
         # 1. Try Access Token
         if access_token:

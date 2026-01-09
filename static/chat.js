@@ -1,6 +1,6 @@
 // ==================== CHATBOT ====================
 import { deps, generateSessionId, checkDependencies } from './config.js';
-import { saveSessionState } from './auth.js';
+import { saveSessionState, getAuthHeaders } from './auth.js';
 import { showNotification } from './notifications.js';
 import { showAuthOverlay } from './auth.js';
 
@@ -82,7 +82,8 @@ function handleChatSubmit() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                ...getAuthHeaders()
             },
             body: JSON.stringify({
                 query: text,

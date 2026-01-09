@@ -23,6 +23,7 @@ export const STATE = {
     currentSymbol: null,
     isLoading: false,
     isAuthenticated: false,
+    authToken: null, // NEW: For storing the JWT
     user: null,
     chatHistory: [], // Add chat history to the global state
     portfolio: [] // Initialize portfolio state
