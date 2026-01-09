@@ -29,6 +29,7 @@ Fintra ultimately became the tool I originally wanted to use myself: **fast, tra
   - **MACD (12, 26, 9):** Identifies trend reversals, momentum shifts, and signal line crossovers.
   - **Moving Averages:** Tracks SMA-5 and SMA-10 for short-term trend alignment and crossover detection.
 - **Interactive Visualization:** Dynamic Chart.js implementations for Price/Volume, MA overlays, RSI zones, and MACD histograms with date-range filtering.
+- - **Comprehensive Sidebar:** The sidebar contains 2500+ Indian stocks and ETFs to have a wide range of usability
 
 ### 🤖 AI-Powered Quant Analyst
 - **Multi-Model Architecture:** Rotates between Google's **Gemini 2.0 Flash** and **Gemma 3** models for high availability and diverse insights.
