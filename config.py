@@ -53,8 +53,12 @@ class Config:
 
     # Centralized URL Configuration
     # Set these in Render/Vercel to control CORS and Redirects
-    CLIENT_ORIGIN = os.getenv('CLIENT_ORIGIN', 'http://localhost:5000').rstrip('/')
-    BACKEND_ORIGIN = os.getenv('BACKEND_ORIGIN', 'http://localhost:5000').rstrip('/')
+    # Default to production URLs if running on Render (IS_PRODUCTION is True)
+    _default_client = 'https://fintraio.vercel.app' if IS_PRODUCTION else 'http://localhost:5000'
+    CLIENT_ORIGIN = os.getenv('CLIENT_ORIGIN', _default_client).rstrip('/')
+    
+    _default_backend = 'https://stock-dashboard-fqtn.onrender.com' if IS_PRODUCTION else 'http://localhost:5000'
+    BACKEND_ORIGIN = os.getenv('BACKEND_ORIGIN', _default_backend).rstrip('/')
 
     # Production OAuth Redirect URI
     REDIRECT_URI = f"{BACKEND_ORIGIN}/api/oauth2callback"
