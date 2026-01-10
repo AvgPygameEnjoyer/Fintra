@@ -5,6 +5,7 @@ import { fetchData } from './data.js';
 import { handleGoogleLogin, handleLogout } from './auth.js';
 import { renderChart } from './charts.js';
 import { setSidebarCollapsed } from './sidebar.js';
+import { updateChatContextIndicator } from './chat.js';
 
 export function initialize() {
     DOM.symbol.addEventListener('input', handleSearchInput);
@@ -71,5 +72,10 @@ function handleSearchInput(e) {
 
 function handleSearchSubmit(e) {
     e.preventDefault();
-    fetchData();
+    const symbol = DOM.symbol.value.trim().toUpperCase();
+    if (symbol) {
+        STATE.currentSymbol = symbol;
+        updateChatContextIndicator(symbol);
+        fetchData();
+    }
 }
