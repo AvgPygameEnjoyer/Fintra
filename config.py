@@ -69,7 +69,7 @@ class Config:
     REDIRECT_URI = f"{BACKEND_ORIGIN}/api/oauth2callback"
 
     # Production Frontend URL
-    CLIENT_REDIRECT_URL = f"{CLIENT_ORIGIN}/"
+    CLIENT_REDIRECT_URL = f"{CLIENT_ORIGIN}/dashboard"
 
     # JWT Configuration
     # These MUST be loaded from the environment for stability across restarts.

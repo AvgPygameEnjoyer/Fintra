@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="google-site-verification" content="XmQDL75OuD9CZmZDbM2GJsqb2xlBpOE-eB8zO7CuAIY" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fintra - Dashboard</title>
+    <link rel="icon" type="image/png" href="/fintralogo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <!-- Auth Overlay Removed: Handled by Landing Page -->
+    
+    <div id="user-info-bar" class="hidden">
+        <img id="user-avatar" src="" alt="User Avatar" class="user-avatar">
+        <div class="user-details">
+            <div class="user-name" id="user-name"></div>
+        </div> 
+        <button id="logout-btn" class="logout-btn">Logout</button>
+    </div>
+    
+    <div id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h3>Stock Navigator</h3>
+            <button id="sidebarToggle" class="sidebar-toggle">×</button>
+        </div>
+        <div class="sidebar-search">
+            <input type="text" id="sidebarSearch" class="sidebar-search-input" placeholder="Filter stocks...">
+        </div>
+        <div id="sidebarStocks" class="sidebar-content"></div>
+    </div>
+
+    <button id="mobile-sidebar-toggle" class="mobile-sidebar-toggle">☰</button>
+    <button id="desktop-sidebar-toggle" class="desktop-sidebar-toggle"></button>
+
+    <div class="main-container container hidden">
+        <header class="header">
+            <h1>Fintra</h1>
+            <p>Intelligent Market Analysis, Simplified.</p>
+        </header>
+
+        <div class="view-tabs">
+            <button id="search-tab-btn" class="view-tab active">🔍 Search</button>
+            <button id="portfolio-tab-btn" class="view-tab">💼 My Portfolio</button>
+        </div>
+
+        <div id="search-view">
+            <div class="search-card">
+                <form class="search-form">
+                    <div class="input-wrapper">
+                        <input type="text" id="symbol" class="search-input" placeholder="Enter stock symbol (e.g., AAPL, RELIANCE)">
+                        <button type="button" id="clearSearchBtn" class="clear-search-btn" title="Clear search">×</button>
+                        <div id="autocomplete" class="autocomplete-dropdown"></div>
+                    </div>
+                    <button id="searchBtn" class="search-btn" type="submit">Search</button>
+                </form>
+            </div>
+
+            <div id="loading" class="loading">Loading data...</div>
+            <div id="error" class="error"></div>
+            <div id="output"></div>
+        </div>
+
+        <div id="portfolio-view" style="display: none;">
+            <div class="portfolio-header">
+                <h2>Your Holdings</h2>
+                <button id="add-position-btn" class="add-position-btn">+ Add Position</button>
+            </div>
+            <div id="portfolio-content">
+                <!-- Portfolio cards will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <dialog id="add-position-modal" class="add-position-modal">
+        <form id="add-position-form">
+            <h3>Add New Position</h3>
+            <div class="input-wrapper">
+                <input type="text" id="add-position-symbol-input" name="symbol" placeholder="Stock Symbol (e.g., AAPL)" required autocomplete="off">
+                <div id="modal-autocomplete" class="autocomplete-dropdown"></div>
+            </div>
+            <input type="number" name="quantity" placeholder="Quantity" step="any" min="0" required>
+            <div class="input-wrapper">
+                <input type="number" id="add-position-entry-price" name="entry_price" placeholder="Average Entry Price" step="any" required>
+                <span id="current-price-indicator" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #6b7280; font-size: 0.9rem; display: none;"></span>
+            </div>
+            <input type="date" name="entry_date">
+            <textarea name="notes" placeholder="Notes (optional)"></textarea>
+            <div class="modal-actions">
+                <button type="button" id="close-modal-btn" class="btn-secondary">Cancel</button>
+                <button type="submit" class="btn-primary">Save Position</button>
+                </div>
+        </form>
+    </dialog>
+
+    <dialog id="delete-modal" class="add-position-modal">
+        <div style="padding: 32px; text-align: center;">
+            <h3 style="text-align: center;">Confirm Deletion</h3>
+            <p style="color: #F0F4F8; margin-bottom: 24px;">Are you sure you want to remove this position from your portfolio?</p>
+            <div class="modal-actions" style="justify-content: center;">
+                <button id="cancel-delete-btn" class="btn-secondary">Cancel</button>
+                <button id="confirm-delete-btn" class="btn-primary" style="background-color: #ef4444;">Delete</button>
+            </div>
+        </div>
+    </dialog>
+    </div>
+    
+    <div id="chatbot">
+        <div id="chat-window">
+            <div id="chat-header">
+                <span id="chat-title">Fintra AI Chat</span>
+                <span id="chat-context-header">Context: None</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="chat-portfolio-wrapper" style="position: relative;">
+                        <button id="chat-portfolio-btn" class="icon-btn" title="Select Position Context">💼</button>
+                        <div id="chat-portfolio-menu" class="chat-portfolio-menu"></div>
+                    </div>
+                    <input type="checkbox" id="chat-use-portfolio" style="display: none;">
+                    <button id="chat-refresh" title="Refresh Context">🔄</button>
+                    <button id="chat-close">✖</button>
+                </div>
+            </div>
+            <div id="chat-messages"></div>
+            <div id="chat-footer"> 
+                <input type="text" id="chat-input" placeholder="Ask about the current stock...">
+                <button id="chat-send">Send</button>
+            </div>
+        </div>
+        
+        <button id="chat-toggle" class="chat-toggle">
+            💬
+        </button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script type="module" src="/main.js"></script>
+
+</body>
+</html>

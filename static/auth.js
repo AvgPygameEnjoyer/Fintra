@@ -105,7 +105,22 @@ export async function checkAuthStatus() {
 
         STATE.isAuthenticated = data.authenticated;
         STATE.user = data.user || null;
-        updateAuthUI();
+        
+        // --- NEW: Redirect Logic ---
+        const path = window.location.pathname;
+        if (STATE.isAuthenticated) {
+            if (path === '/' || path === '/index.html') {
+                window.location.href = '/dashboard';
+            }
+        } else {
+            if (path.includes('/dashboard')) {
+                window.location.href = '/';
+            }
+        }
+        
+        if (path.includes('/dashboard')) {
+            updateAuthUI();
+        }
     } catch (error) {
         deps.log.error('Auth check error:', error);
         STATE.isAuthenticated = false;
@@ -132,31 +147,21 @@ export async function handleLogout(showNotify = true) {
         STATE.user = null;
         setAuthToken(null); // --- NEW: Clear the token ---
         localStorage.removeItem(CONFIG.SESSION_STORAGE_KEY); // Clear the persisted session
-        updateAuthUI();
-        if (showNotify) showNotification('Logged out successfully', 'success');
+        window.location.href = '/'; // Redirect to landing page
     }
 }
 
 export function updateAuthUI() {
-    const authOverlay = document.getElementById('auth-overlay');
     const userInfoBar = document.getElementById('user-info-bar');
-    const googleBtn = document.getElementById('google-signin-btn');
     const mainContainer = document.querySelector('.container');
 
     if (STATE.isAuthenticated && STATE.user) {
-        authOverlay?.classList.add('hidden');
         if (userInfoBar) {
             userInfoBar.classList.remove('hidden');
             document.getElementById('user-name').textContent = STATE.user.name;
             document.getElementById('user-avatar').src = STATE.user.picture ||
                 `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23e2e8f0'/><text x='50' y='55' font-size='40' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'>👤</text></svg>`;
         }
-    } else {
-        authOverlay?.classList.remove('hidden');
-        mainContainer?.classList.add('hidden'); // Hide main content when auth overlay is visible
-        userInfoBar?.classList.add('hidden');
-        // The button is only visible when not authenticated, so we ensure it's not in a loading state.
-        googleBtn?.classList.remove('loading');
     }
     
     // Once the auth state is determined, always show the main container.
@@ -164,7 +169,8 @@ export function updateAuthUI() {
 }
 
 export function showAuthOverlay() {
-    document.getElementById('auth-overlay')?.classList.remove('hidden');
+    // Deprecated: Redirect to landing page instead
+    window.location.href = '/';
 }
 
 // ==================== SESSION MANAGEMENT (MERGED) ====================

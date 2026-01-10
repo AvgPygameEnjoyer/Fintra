@@ -89,13 +89,21 @@ def create_app():
         response.status_code = 500
         return response
 
+    @app.route('/')
+    def landing_page():
+        return app.send_static_file("index.html")
+
+    @app.route('/dashboard')
+    def dashboard_page():
+        return app.send_static_file("dashboard.html")
+
     @app.errorhandler(404)
     def not_found(e):
         # If the path starts with /api, it's a genuine API 404 error.
         if request.path.startswith('/api/'):
             return jsonify(error="API endpoint not found"), 404
         else:
-            # Otherwise, it's a frontend route; serve the main app.
+            # Otherwise, redirect to landing
             return app.send_static_file("index.html")
 
     # Add a startup log to display critical configuration
