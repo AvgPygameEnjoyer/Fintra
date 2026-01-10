@@ -5,7 +5,11 @@ export function renderChart(chartId, data) {
     // Store data globally for easy access by tab click events
     window.currentChartData = data;
     
-    const ohlcvData = data.OHLCV.slice(-CONFIG.MAX_CHART_POINTS);
+    // On mobile, load only 7 days of data to prevent cramping
+    const isMobile = window.innerWidth < 768;
+    const pointsToLoad = isMobile ? 7 : CONFIG.MAX_CHART_POINTS;
+    
+    const ohlcvData = data.OHLCV.slice(-pointsToLoad);
     
     switch (chartId) {
         case 'ohlcv':
@@ -13,17 +17,17 @@ export function renderChart(chartId, data) {
             break;
         case 'rsi':
             if (data.RSI?.length) {
-                createRSIChart(data.RSI.slice(-CONFIG.MAX_CHART_POINTS), ohlcvData);
+                createRSIChart(data.RSI.slice(-pointsToLoad), ohlcvData);
             }
             break;
         case 'movingAverages':
             if (data.MA?.length) {
-                createMovingAveragesChart(data.MA.slice(-CONFIG.MAX_CHART_POINTS), ohlcvData);
+                createMovingAveragesChart(data.MA.slice(-pointsToLoad), ohlcvData);
             }
             break;
         case 'macd':
             if (data.MACD?.length) {
-                createMACDChart(data.MACD.slice(-CONFIG.MAX_CHART_POINTS), ohlcvData);
+                createMACDChart(data.MACD.slice(-pointsToLoad), ohlcvData);
             }
             break;
     }

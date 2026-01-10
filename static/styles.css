@@ -908,6 +908,21 @@ body {
     .chart-card {
         padding: 16px;
     }
+
+    /* Mobile User Info Bar */
+    #user-info-bar {
+        position: static;
+        width: 100%;
+        margin-bottom: 20px;
+        justify-content: space-between;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+    #user-info-bar .user-name {
+        color: white;
+    }
 }
 
 @media (min-width: 769px) {
