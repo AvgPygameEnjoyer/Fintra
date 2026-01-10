@@ -179,19 +179,21 @@ function createMaRsiContent(maData, rsiData) {
     if (maData?.length) {
         content += `
             <h4>Moving Averages (Latest)</h4>
-            <div class="data-table data-table-ma">
-                <table>
-                    <thead><tr><th>Date</th><th>MA5</th><th>MA10</th></tr></thead>
-                    <tbody>
-                        ${maData.map((item, index) => `
-                            <tr style="${index < maData.length - 7 ? 'display: none;' : ''}">
-                                <td>${item.Date || 'N/A'}</td>
-                                <td>${formatPrice(item.MA5)}</td>
-                                <td>${formatPrice(item.MA10)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+            <div class="table-scroll-wrapper">
+                <div class="data-table data-table-ma">
+                    <table>
+                        <thead><tr><th>Date</th><th>MA5</th><th>MA10</th></tr></thead>
+                        <tbody>
+                            ${maData.map((item, index) => `
+                                <tr style="${index < maData.length - 7 ? 'display: none;' : ''}">
+                                    <td>${item.Date || 'N/A'}</td>
+                                    <td>${formatPrice(item.MA5)}</td>
+                                    <td>${formatPrice(item.MA10)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         `;
     }
@@ -210,28 +212,30 @@ function createMaRsiContent(maData, rsiData) {
 function createRsiTable(rsiData) {
     return `
         <h4>Relative Strength Index (RSI) - Latest</h4>
-        <div class="data-table data-table-rsi">
-            <table>
-                <thead><tr><th>Date</th><th>RSI</th><th>Status</th></tr></thead>
-                <tbody>
-                    ${rsiData.map((item, index) => {
-                        const rsi = item.RSI;
-                        const color = getRsiColor(rsi);
-                        const background = getRsiBackground(rsi);
-                        let status = 'Neutral';
-                        if (rsi > 70) status = 'Overbought';
-                        if (rsi < 30) status = 'Oversold';
+        <div class="table-scroll-wrapper">
+            <div class="data-table data-table-rsi">
+                <table>
+                    <thead><tr><th>Date</th><th>RSI</th><th>Status</th></tr></thead>
+                    <tbody>
+                        ${rsiData.map((item, index) => {
+                            const rsi = item.RSI;
+                            const color = getRsiColor(rsi);
+                            const background = getRsiBackground(rsi);
+                            let status = 'Neutral';
+                            if (rsi > 70) status = 'Overbought';
+                            if (rsi < 30) status = 'Oversold';
 
-                        return `
-                            <tr style="${index < rsiData.length - 7 ? 'display: none;' : ''}">
-                                <td>${item.Date || 'N/A'}</td>
-                                <td style="color: ${color}; font-weight: 700;">${rsi != null ? rsi.toFixed(2) : 'N/A'}</td>
-                                <td style="background: ${background}; color: ${color}; font-weight: 600; border-radius: 6px; padding: 4px 8px; font-size: 0.9em; text-align: center;">${status}</td>
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
+                            return `
+                                <tr style="${index < rsiData.length - 7 ? 'display: none;' : ''}">
+                                    <td>${item.Date || 'N/A'}</td>
+                                    <td style="color: ${color}; font-weight: 700;">${rsi != null ? rsi.toFixed(2) : 'N/A'}</td>
+                                    <td style="background: ${background}; color: ${color}; font-weight: 600; border-radius: 6px; padding: 4px 8px; font-size: 0.9em; text-align: center;">${status}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
         </div>
         <p style="font-size: 0.85rem; color: #6b7280; margin-top: 10px;">RSI above 70 is considered Overbought, below 30 is Oversold.</p>
     `;
@@ -244,23 +248,25 @@ function createMacdTable(data) {
 
     return `
         <h4>Moving Average Convergence Divergence (MACD) - Latest</h4>
-        <div class="data-table data-table-macd">
-            <table>
-                <thead><tr><th>Date</th><th>MACD</th><th>Signal</th><th>Histogram</th></tr></thead>
-                <tbody>
-                    ${data.map((item, index) => {
-                        const histClass = item.Histogram > 0 ? 'positive-hist' : (item.Histogram < 0 ? 'negative-hist' : '');
-                        return `
-                            <tr style="${index < data.length - 7 ? 'display: none;' : ''}">
-                                <td>${item.Date || 'N/A'}</td>
-                                <td>${item.MACD != null ? item.MACD.toFixed(2) : 'N/A'}</td>
-                                <td>${item.Signal != null ? item.Signal.toFixed(2) : 'N/A'}</td>
-                                <td class="${histClass}">${item.Histogram != null ? item.Histogram.toFixed(2) : 'N/A'}</td>
-                            </tr>
-                        `;
-                    }).join('')}
-                </tbody>
-            </table>
+        <div class="table-scroll-wrapper">
+            <div class="data-table data-table-macd">
+                <table>
+                    <thead><tr><th>Date</th><th>MACD</th><th>Signal</th><th>Histogram</th></tr></thead>
+                    <tbody>
+                        ${data.map((item, index) => {
+                            const histClass = item.Histogram > 0 ? 'positive-hist' : (item.Histogram < 0 ? 'negative-hist' : '');
+                            return `
+                                <tr style="${index < data.length - 7 ? 'display: none;' : ''}">
+                                    <td>${item.Date || 'N/A'}</td>
+                                    <td>${item.MACD != null ? item.MACD.toFixed(2) : 'N/A'}</td>
+                                    <td>${item.Signal != null ? item.Signal.toFixed(2) : 'N/A'}</td>
+                                    <td class="${histClass}">${item.Histogram != null ? item.Histogram.toFixed(2) : 'N/A'}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
         </div>
         <p style="font-size: 0.85rem; color: #6b7280; margin-top: 10px;">Histogram is MACD minus Signal line. Positive suggests upward momentum.</p>
     `;
