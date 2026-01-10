@@ -597,7 +597,7 @@ def get_portfolio():
 
     _, db_user = get_user_from_token()
     if not db_user:
-        return jsonify(error="Database user not found for this session."), 404
+        return jsonify(error="Database user not found for this session."), 401
 
     try:
         positions = Position.query.filter_by(user_id=db_user.id).order_by(Position.symbol).all()
@@ -716,7 +716,7 @@ def add_position():
     if auth_response: return auth_response
     
     _, db_user = get_user_from_token()
-    if not db_user: return jsonify(error="Database user not found."), 404
+    if not db_user: return jsonify(error="Database user not found."), 401
 
     data = request.get_json()
     # Basic validation
@@ -756,7 +756,7 @@ def delete_position(position_id):
     if auth_response: return auth_response
     
     _, db_user = get_user_from_token()
-    if not db_user: return jsonify(error="Database user not found."), 404
+    if not db_user: return jsonify(error="Database user not found."), 401
 
     position = Position.query.get_or_404(position_id)
     if position.user_id != db_user.id:

@@ -51,11 +51,20 @@ class Config:
     # Gemini API Key
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+    # Centralized URL Configuration
+    # Set these in Render/Vercel to control CORS and Redirects
+    # Default to production URLs if running on Render (IS_PRODUCTION is True)
+    _default_client = 'https://fintraio.vercel.app' if IS_PRODUCTION else 'http://localhost:5000'
+    CLIENT_ORIGIN = os.getenv('CLIENT_ORIGIN', _default_client).rstrip('/')
+    
+    _default_backend = 'https://stock-dashboard-fqtn.onrender.com' if IS_PRODUCTION else 'http://localhost:5000'
+    BACKEND_ORIGIN = os.getenv('BACKEND_ORIGIN', _default_backend).rstrip('/')
+
     # Production OAuth Redirect URI
-    REDIRECT_URI = os.getenv('REDIRECT_URI', 'http://localhost:5000/api/oauth2callback')
+    REDIRECT_URI = f"{BACKEND_ORIGIN}/api/oauth2callback"
 
     # Production Frontend URL
-    CLIENT_REDIRECT_URL = os.getenv('CLIENT_REDIRECT_URL', 'http://localhost:5000/')
+    CLIENT_REDIRECT_URL = f"{CLIENT_ORIGIN}/"
 
     # JWT Configuration
     # These MUST be loaded from the environment for stability across restarts.
@@ -79,11 +88,9 @@ class Config:
     # CORS Configuration
     CORS_ORIGINS = [
         "http://localhost:5000",
-        "http://127.0.0.1:5000"
+        "http://127.0.0.1:5000",
+        CLIENT_ORIGIN
     ]
-
-    if os.getenv('CLIENT_ORIGIN'):
-        CORS_ORIGINS.append(os.getenv('CLIENT_ORIGIN'))
 
     # Cookie Domain
     # In production, set this to your parent domain (e.g., ".yourdomain.com") if frontend and backend are on subdomains.
