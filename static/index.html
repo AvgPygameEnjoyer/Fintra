@@ -160,8 +160,8 @@
     </script>
 
     <script type="module">
-        import { handleGoogleLogin, checkAuthStatus } from './auth.js';
-        import { deps, log } from './config.js';
+        import { handleGoogleLogin, checkAuthStatus, log } from './auth.js';
+        import { deps } from './config.js';
         
         // Initialize minimal deps for auth.js to work
         deps.log = log; 
