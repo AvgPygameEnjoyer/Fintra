@@ -38,6 +38,13 @@ api = Blueprint('api', __name__)
 def get_user_from_token():
     """Helper to get user_id and db_user from access token."""
     access_token = request.cookies.get('access_token')
+
+    # Fallback: Check Authorization Header if cookie is missing
+    if not access_token:
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith("Bearer "):
+            access_token = auth_header.split(" ")[1]
+
     if not access_token:
         return None, None
 
@@ -50,6 +57,8 @@ def get_user_from_token():
         return None, None
 
     db_user = User.query.filter_by(google_user_id=user_id).first()
+    if not db_user:
+        logger.warning(f"⚠️ Auth Debug: Token valid for user_id '{user_id}', but User not found in DB.")
     return user_id, db_user
 
 
