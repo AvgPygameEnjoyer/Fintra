@@ -110,7 +110,7 @@ export async function checkAuthStatus() {
         const path = window.location.pathname;
         if (STATE.isAuthenticated) {
             if (path === '/' || path === '/index.html') {
-                window.location.href = '/dashboard';
+                window.location.href = '/dashboard.html';
             }
         } else {
             if (path.includes('/dashboard')) {
