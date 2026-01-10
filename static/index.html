@@ -1,158 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta name="google-site-verification" content="XmQDL75OuD9CZmZDbM2GJsqb2xlBpOE-eB8zO7CuAIY" />
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fintra - AI Market Analysis</title>
+    <title>Welcome to Fintra | AI Analyst</title>
     <link rel="icon" type="image/png" href="/fintralogo.png">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.2.1/dist/chartjs-plugin-annotation.min.js"></script>
-    <link rel="stylesheet" href="./styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background-color: #020617; 
+            color: white;
+            overflow-x: hidden;
+        }
+
+        #cursor-glow {
+            position: fixed;
+            top: 0; left: 0;
+            width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(0,0,0,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            transition: transform 0.1s ease-out;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(59, 130, 246, 0.5);
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .stat-badge {
+            background: rgba(34, 197, 94, 0.1);
+            color: #4ade80;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
 </head>
-<body>
-    <div id="auth-overlay">
-        <div class="auth-card">
-            <h1>Welcome to Fintra</h1>
-            <p>Sign in to unlock your personal AI analyst.</p> 
-            <button id="google-signin-btn" class="google-signin-btn loading">
-                <div class="spinner"></div>
-                <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h6.38c-.29 1.48-1.12 2.7-2.31 3.56v2.78h3.58c2.1-1.93 3.32-4.78 3.32-8.35z" fill="#4285f4"/>
-                    <path d="M12 23c3.27 0 6.02-1.07 8.03-2.92l-3.58-2.78c-.99.66-2.24 1.05-3.45 1.05-2.66 0-4.94-1.79-5.77-4.22H2.92v2.85C4.94 20.5 8.16 23 12 23z" fill="#34a853"/>
-                    <path d="M6.23 13.91c-.24-.71-.38-1.46-.38-2.19s.14-1.48.38-2.19V6.78H2.92C2.11 8.35 1.67 10.12 1.67 12c0 1.88.44 3.65 1.25 5.22l3.31-2.85z" fill="#fbbc05"/>
-                    <path d="M12 5.82c1.78 0 3.25.61 4.45 1.79l3.14-3.04C18.02 2.92 15.27 2 12 2 8.16 2 4.94 4.5 2.92 7.78l3.31 2.85C7.06 7.61 9.34 5.82 12 5.82z" fill="#ea4335"/>
-                </svg>
-                Sign in with Google
-            </button>
-        </div>
-    </div>
-    
-    <div id="user-info-bar" class="hidden">
-        <img id="user-avatar" src="" alt="User Avatar" class="user-avatar">
-        <div class="user-details">
-            <div class="user-name" id="user-name"></div>
-        </div> 
-        <button id="logout-btn" class="logout-btn">Logout</button>
-    </div>
-    
-    <div id="sidebar" class="sidebar">
-        <div class="sidebar-header">
-            <h3>Stock Navigator</h3>
-            <button id="sidebarToggle" class="sidebar-toggle">×</button>
-        </div>
-        <div class="sidebar-search">
-            <input type="text" id="sidebarSearch" class="sidebar-search-input" placeholder="Filter stocks...">
-        </div>
-        <div id="sidebarStocks" class="sidebar-content"></div>
-    </div>
+<body class="flex flex-col lg:flex-row min-h-screen">
 
-    <button id="mobile-sidebar-toggle" class="mobile-sidebar-toggle">☰</button>
-    <button id="desktop-sidebar-toggle" class="desktop-sidebar-toggle"></button>
+    <div id="cursor-glow"></div>
 
-    <div class="main-container container hidden">
-        <header class="header">
-            <h1>Fintra</h1>
-            <p>Intelligent Market Analysis, Simplified.</p>
-        </header>
-
-        <div class="view-tabs">
-            <button id="search-tab-btn" class="view-tab active">🔍 Search</button>
-            <button id="portfolio-tab-btn" class="view-tab">💼 My Portfolio</button>
-        </div>
-
-        <div id="search-view">
-            <div class="search-card">
-                <form class="search-form">
-                    <div class="input-wrapper">
-                        <input type="text" id="symbol" class="search-input" placeholder="Enter stock symbol (e.g., AAPL, RELIANCE)">
-                        <button type="button" id="clearSearchBtn" class="clear-search-btn" title="Clear search">×</button>
-                        <div id="autocomplete" class="autocomplete-dropdown"></div>
-                    </div>
-                    <button id="searchBtn" class="search-btn" type="submit">Search</button>
-                </form>
+    <main class="relative z-10 flex flex-col justify-center w-full lg:w-7/12 p-8 lg:p-16 space-y-12">
+        <div>
+            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-6">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                </span>
+                <span>V2.0 Intelligence Now Live</span>
             </div>
-
-            <div id="loading" class="loading">Loading data...</div>
-            <div id="error" class="error"></div>
-            <div id="output"></div>
+            <h1 class="text-5xl lg:text-6xl font-bold mb-6 tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-500">
+                Unlock your personal <br>AI analyst.
+            </h1>
+            <p class="text-gray-400 text-lg max-w-lg leading-relaxed">
+                Fintra combines institutional-grade quant models with generative AI to give you a competitive edge in the markets.
+            </p>
         </div>
 
-        <div id="portfolio-view" style="display: none;">
-            <div class="portfolio-header">
-                <h2>Your Holdings</h2>
-                <button id="add-position-btn" class="add-position-btn">+ Add Position</button>
-            </div>
-            <div id="portfolio-content">
-                <!-- Portfolio cards will be rendered here -->
-            </div>
-        </div>
-    </div>
-
-    <dialog id="add-position-modal" class="add-position-modal">
-        <form id="add-position-form">
-            <h3>Add New Position</h3>
-            <div class="input-wrapper">
-                <input type="text" id="add-position-symbol-input" name="symbol" placeholder="Stock Symbol (e.g., AAPL)" required autocomplete="off">
-                <div id="modal-autocomplete" class="autocomplete-dropdown"></div>
-            </div>
-            <input type="number" name="quantity" placeholder="Quantity" step="any" min="0" required>
-            <div class="input-wrapper">
-                <input type="number" id="add-position-entry-price" name="entry_price" placeholder="Average Entry Price" step="any" required>
-                <span id="current-price-indicator" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #6b7280; font-size: 0.9rem; display: none;"></span>
-            </div>
-            <input type="date" name="entry_date">
-            <textarea name="notes" placeholder="Notes (optional)"></textarea>
-            <div class="modal-actions">
-                <button type="button" id="close-modal-btn" class="btn-secondary">Cancel</button>
-                <button type="submit" class="btn-primary">Save Position</button>
+        <div class="grid grid-cols-1 gap-4 max-w-2xl">
+            <div class="glass-card p-6 rounded-2xl flex items-start space-x-4">
+                <div class="p-3 bg-blue-500/10 rounded-lg text-blue-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                 </div>
-        </form>
-    </dialog>
-
-    <dialog id="delete-modal" class="add-position-modal">
-        <div style="padding: 32px; text-align: center;">
-            <h3 style="text-align: center;">Confirm Deletion</h3>
-            <p style="color: #F0F4F8; margin-bottom: 24px;">Are you sure you want to remove this position from your portfolio?</p>
-            <div class="modal-actions" style="justify-content: center;">
-                <button id="cancel-delete-btn" class="btn-secondary">Cancel</button>
-                <button id="confirm-delete-btn" class="btn-primary" style="background-color: #ef4444;">Delete</button>
-            </div>
-        </div>
-    </dialog>
-    </div>
-    
-    <div id="chatbot">
-        <div id="chat-window">
-            <div id="chat-header">
-                <span id="chat-title">Fintra AI Chat</span>
-                <span id="chat-context-header">Context: None</span>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div class="chat-portfolio-wrapper" style="position: relative;">
-                        <button id="chat-portfolio-btn" class="icon-btn" title="Select Position Context">💼</button>
-                        <div id="chat-portfolio-menu" class="chat-portfolio-menu"></div>
-                    </div>
-                    <input type="checkbox" id="chat-use-portfolio" style="display: none;">
-                    <button id="chat-refresh" title="Refresh Context">🔄</button>
-                    <button id="chat-close">✖</button>
+                <div>
+                    <h3 class="font-semibold text-lg text-white">Real-time Quant Insights</h3>
+                    <p class="text-sm text-gray-500">Automated technical analysis and sentiment tracking across 500+ assets.</p>
                 </div>
             </div>
-            <div id="chat-messages"></div>
-            <div id="chat-footer"> 
-                <input type="text" id="chat-input" placeholder="Ask about the current stock...">
-                <button id="chat-send">Send</button>
+
+            <div class="glass-card p-6 rounded-2xl flex items-start space-x-4">
+                <div class="p-3 bg-purple-500/10 rounded-lg text-purple-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-lg text-white">Predictive Modeling</h3>
+                    <p class="text-sm text-gray-500">Leverage AI to simulate market scenarios and risk-adjusted returns.</p>
+                </div>
             </div>
         </div>
+    </main>
+
+    <section class="relative z-10 flex flex-col w-full lg:w-5/12 bg-slate-900/40 backdrop-blur-2xl border-l border-white/5">
         
-        <button id="chat-toggle" class="chat-toggle">
-            💬
-        </button>
-    </div>
+        <div class="p-8 lg:p-12 border-b border-white/5">
+            <div class="w-full max-w-sm mx-auto space-y-8">
+                <div>
+                    <h2 class="text-2xl font-bold tracking-tight text-white">Welcome back</h2>
+                    <p class="mt-1 text-gray-400 text-sm">Sign in to your Fintra dashboard</p>
+                </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script type="module" src="/main.js"></script>
+                <button id="landing-google-btn" class="w-full flex items-center justify-center space-x-3 py-3.5 px-4 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all duration-300 transform active:scale-[0.98] shadow-xl shadow-white/5">
+                    <img src="https://www.svgrepo.com/show/355037/google.svg" class="w-5 h-5" alt="Google">
+                    <span>Continue with Google</span>
+                </button>
 
+                <p class="text-center text-[10px] text-gray-500 uppercase tracking-widest font-medium">
+                    Secure 256-bit encrypted authentication
+                </p>
+            </div>
+        </div>
+
+        <div class="flex-grow p-8 lg:p-12 overflow-y-auto">
+            <div class="w-full max-w-sm mx-auto">
+                <h4 class="text-xs font-bold text-blue-400 uppercase tracking-widest mb-6">Market Pulse</h4>
+                
+                <div class="space-y-4">
+                    <div class="glass-card p-4 rounded-xl border border-white/5">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-xs font-medium text-gray-400">BTC/USD Analysis</span>
+                            <span class="stat-badge">+4.2% Strength</span>
+                        </div>
+                        <p class="text-sm text-gray-300">AI detects bullish divergence on 4H timeframe. Support holding at $68,400.</p>
+                    </div>
+
+                    <div class="glass-card p-4 rounded-xl border border-white/5">
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-xs font-medium text-gray-400">Sentiment Engine</span>
+                            <span class="text-xs font-bold text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded">High Volatility</span>
+                        </div>
+                        <p class="text-sm text-gray-300">Institutional flow into Tech ETFs increased by 12% in the last hour.</p>
+                    </div>
+
+                    <div class="pt-4">
+                        <div class="flex items-center space-x-4 mb-4">
+                            <div class="flex -space-x-2">
+                                <div class="w-8 h-8 rounded-full border-2 border-slate-900 bg-blue-600 flex items-center justify-center text-[10px] font-bold">JD</div>
+                                <div class="w-8 h-8 rounded-full border-2 border-slate-900 bg-purple-600 flex items-center justify-center text-[10px] font-bold">MK</div>
+                                <div class="w-8 h-8 rounded-full border-2 border-slate-900 bg-emerald-600 flex items-center justify-center text-[10px] font-bold">TS</div>
+                            </div>
+                            <p class="text-xs text-gray-400">Join <span class="text-white font-semibold">2,400+</span> traders today.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const glow = document.getElementById('cursor-glow');
+        document.addEventListener('mousemove', (e) => {
+            glow.style.left = e.clientX + 'px';
+            glow.style.top = e.clientY + 'px';
+        });
+    </script>
+
+    <script type="module">
+        import { handleGoogleLogin, checkAuthStatus } from './auth.js';
+        import { deps, log } from './config.js';
+        
+        // Initialize minimal deps for auth.js to work
+        deps.log = log; 
+        deps.DOM = {}; // Empty DOM object to prevent errors if auth.js tries to access it
+
+        document.getElementById('landing-google-btn').addEventListener('click', handleGoogleLogin);
+        
+        // Check if already logged in, if so redirect to dashboard
+        checkAuthStatus();
+    </script>
 </body>
 </html>
