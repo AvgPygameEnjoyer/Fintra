@@ -911,18 +911,27 @@ body {
 
     /* Mobile User Info Bar */
     #user-info-bar {
-        position: static;
-        width: 100%;
-        margin-bottom: 20px;
-        margin-top: 20px;
-        justify-content: space-between;
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: white;
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: auto;
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        backdrop-filter: none;
+        z-index: 1002;
     }
-    #user-info-bar .user-name {
-        color: white;
+    #user-info-bar .user-avatar,
+    #user-info-bar .user-details {
+        display: none;
+    }
+    #user-info-bar .logout-btn {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+        background-color: #ef4444;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
 }
 
