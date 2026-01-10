@@ -36,8 +36,7 @@ export function destroyExistingCharts() {
 
 function createOHLCVChart(ohlcvData) {
     const priceCtx = document.getElementById('ohlcvChart')?.getContext('2d');
-    const volumeCtx = document.getElementById('volumeChart')?.getContext('2d');
-    if (!priceCtx || !volumeCtx) return;
+    if (!priceCtx) return;
 
     const dates = ohlcvData.map(item => item.Date?.substring(5) || 'N/A');
     const closes = ohlcvData.map(item => item.Close);
@@ -56,7 +55,18 @@ function createOHLCVChart(ohlcvData) {
                     borderWidth: 3,
                     tension: 0.4,
                     fill: 'origin',
-                    pointRadius: 4
+                    pointRadius: 4,
+                    yAxisID: 'y',
+                    order: 1
+                },
+                {
+                    type: 'bar',
+                    label: 'Volume',
+                    data: volumes,
+                    backgroundColor: 'rgba(55, 65, 81, 0.3)',
+                    yAxisID: 'y1',
+                    order: 2,
+                    barPercentage: 0.5
                 }
             ]
         },
@@ -64,51 +74,31 @@ function createOHLCVChart(ohlcvData) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false },
-                title: { display: true, text: 'Price Movement', color: '#374151' }
+                legend: { display: true },
+                title: { display: true, text: 'Price & Volume', color: '#374151' }
+            },
+            interaction: {
+                mode: 'index',
+                intersect: false,
             },
             scales: {
                 x: {
                     title: { display: true, text: 'Date' }
                 },
                 y: {
-                    title: { display: true, text: 'Price ($)' },
-                    position: 'right'
-                }
-            }
-        }
-    });
-
-    STATE.charts.volume = new Chart(volumeCtx, {
-        type: 'bar',
-        data: {
-            labels: dates,
-            datasets: [
-                {
-                    label: 'Volume',
-                    data: volumes,
-                    backgroundColor: 'rgba(55, 65, 81, 0.5)',
-                    borderColor: 'rgba(55, 65, 81, 0.8)',
-                    borderWidth: 1,
-                    barPercentage: 0.8,
-                    categoryPercentage: 0.8,
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                title: { display: true, text: 'Trading Volume', color: '#374151', padding: { top: 0, bottom: 0 } }
-            },
-            scales: {
-                x: {
-                    display: false
-                },
-                y: {
-                    title: { display: false },
+                    type: 'linear',
+                    display: true,
                     position: 'right',
+                    title: { display: true, text: 'Price ($)' },
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                    title: { display: true, text: 'Volume' },
                     ticks: {
                         callback: function(value) {
                             return value.toExponential(0);

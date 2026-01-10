@@ -1,7 +1,7 @@
 import { deps, debounce, getRsiColor } from './config.js';
 import { showNotification } from './notifications.js';
 import { updateChatContextIndicator } from './chat.js';
-import { getAuthHeaders } from './auth.js';
+import { getAuthHeaders, handleLogout } from './auth.js';
 
 const { DOM, CONFIG, STATE } = deps;
 
@@ -22,7 +22,7 @@ export function initializePortfolio() {
         }
     });
 
-    // --- Delegated Event Listener for Portfolio Cards ---
+    // --- Delegated Event Listener for Portfolio Cards -
     DOM.portfolioContent?.addEventListener('click', (e) => {
         const deleteBtn = e.target.closest('.delete-position-btn');
         const searchBtn = e.target.closest('.search-position-btn');
@@ -108,7 +108,7 @@ export function initializePortfolio() {
         } catch (error) {
             DOM.currentPriceIndicator.style.display = 'none';
         }
-    }, 500);
+    }, 1000); // Increased debounce to 1s to prevent 429 Rate Limit errors
     DOM.addPositionSymbolInput?.addEventListener('input', debouncedPriceFetch);
 }
 
@@ -137,6 +137,11 @@ async function fetchAndDisplayPortfolio() {
             headers: getAuthHeaders()
         });
         if (!response.ok) {
+            if (response.status === 401) {
+                showNotification('Session expired or invalid. Please sign in again.', 'error');
+                handleLogout(false); // Force logout to clear invalid token
+                return;
+            }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         const positions = await response.json();
@@ -186,6 +191,12 @@ async function handleAddPosition(e) {
         const result = await response.json();
 
         if (!response.ok) {
+            if (response.status === 401) {
+                showNotification('Session expired. Please sign in again.', 'error');
+                DOM.addPositionModal.close();
+                handleLogout(false);
+                return;
+            }
             throw new Error(result.error || 'Failed to add position.');
         }
 
@@ -209,6 +220,11 @@ async function executeDeletePosition(positionId) {
         });
 
         if (!response.ok) {
+            if (response.status === 401) {
+                showNotification('Session expired.', 'error');
+                handleLogout(false);
+                return;
+            }
             const result = await response.json();
             throw new Error(result.error || 'Failed to delete position.');
         }

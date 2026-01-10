@@ -44,6 +44,34 @@ export function displayData(data) {
         grid.appendChild(card);
     });
     document.getElementById('output').appendChild(grid);
+
+    // Add event listeners for chart tabs
+    const tabs = document.querySelectorAll('.chart-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            const chartType = e.target.dataset.chart;
+            
+            // Update active tab UI
+            tabs.forEach(t => t.classList.remove('active'));
+            e.target.classList.add('active');
+            
+            // Hide all chart containers
+            document.querySelectorAll('.chart-container').forEach(c => {
+                c.classList.remove('active');
+                c.style.display = 'none';
+            });
+            
+            // Show and render selected chart
+            const activeContainer = document.getElementById(`chart-${chartType}`);
+            if (activeContainer) {
+                activeContainer.classList.add('active');
+                activeContainer.style.display = 'block';
+                if (window.currentChartData) {
+                    renderChart(chartType, window.currentChartData);
+                }
+            }
+        });
+    });
 }
 
 function createDataCard({ id, title, icon, contentHtml, isOpen }) {
@@ -94,7 +122,6 @@ function createVisualizationContent(data) {
     const chartContainers = `
         <div class="chart-container active" id="chart-ohlcv">
             <canvas id="ohlcvChart"></canvas>
-            <canvas id="volumeChart" style="height: 100px; margin-top: 10px;"></canvas>
         </div>
         <div class="chart-container" id="chart-movingAverages">
             <canvas id="movingAveragesChart"></canvas>
