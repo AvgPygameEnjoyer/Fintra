@@ -43,13 +43,13 @@ function setMode(mode) {
     currentMode = mode;
     
     if (mode === 'beginner') {
-        DOM.beginnerModeBtn?.classList.add('active');
-        DOM.advancedModeBtn?.classList.remove('active');
-        DOM.advancedParams?.style.display = 'none';
+        if (DOM.beginnerModeBtn) DOM.beginnerModeBtn.classList.add('active');
+        if (DOM.advancedModeBtn) DOM.advancedModeBtn.classList.remove('active');
+        if (DOM.advancedParams) DOM.advancedParams.style.display = 'none';
     } else {
-        DOM.advancedModeBtn?.classList.add('active');
-        DOM.beginnerModeBtn?.classList.remove('active');
-        DOM.advancedParams?.style.display = 'block';
+        if (DOM.advancedModeBtn) DOM.advancedModeBtn.classList.add('active');
+        if (DOM.beginnerModeBtn) DOM.beginnerModeBtn.classList.remove('active');
+        if (DOM.advancedParams) DOM.advancedParams.style.display = 'block';
     }
 }
 
