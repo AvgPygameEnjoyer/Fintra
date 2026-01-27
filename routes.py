@@ -840,7 +840,7 @@ def run_backtest():
                     - Win Rate: {(len(trades_df[trades_df['Result'] == 'Win']) / len(trades_df) * 100):.1f}%
                     
                     Trade Details:
-                    {trades_df[['Entry Date', 'Exit Date', 'Entry Price', 'Exit Price', 'P&L %', 'Result', 'Reason']].to_string(index=False)}
+                    {trades_df[['Entry Date', 'Exit Date', 'Entry Price', 'Exit Price', 'P&L %', 'result', 'Reason']].to_string(index=False)}
                     """
                     
                     ai_prompt = f"""
