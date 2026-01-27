@@ -826,6 +826,10 @@ def run_backtest():
                 # Format data for AI analysis
                 trades_df = performance.get('trades_df', pd.DataFrame())
                 if not trades_df.empty:
+                    # Ensure 'result' column exists
+                    if 'result' not in trades_df.columns:
+                        trades_df['result'] = trades_df.get('result', pd.Series(['Loss'] * len(trades_df)))
+                    
                     performance_summary = f"""
                     Backtest Results Summary for {symbol}:
                     - Strategy: {strategy}
