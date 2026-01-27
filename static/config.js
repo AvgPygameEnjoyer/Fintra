@@ -33,6 +33,15 @@ export const STATE = {
     portfolio: [] // Initialize portfolio state
 };
 
+// Export helper for auth headers
+export function getAuthHeaders() {
+    if (STATE.authToken) {
+        return { 'Authorization': `Bearer ${STATE.authToken}` };
+    }
+    return {};
+}
+
+
 export const DOM = {};
 
 export let sessionTimerInterval = null;

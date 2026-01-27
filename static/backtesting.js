@@ -1,4 +1,5 @@
-import { deps, getAuthHeaders, handleLogout } from './config.js';
+import { deps, getAuthHeaders } from './config.js';
+import { handleLogout } from './auth.js';
 import { showNotification } from './notifications.js';
 import { handleAutocompleteInput, handleAutocompleteKeydown, hideAutocomplete } from './autocomplete.js';
 
