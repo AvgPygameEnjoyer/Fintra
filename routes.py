@@ -837,7 +837,7 @@ def run_backtest():
                     - Sharpe Ratio: {performance['sharpe_ratio']:.2f}
                     - Max Drawdown: {performance['max_drawdown_pct']:.2f}%
                     - Total Trades: {len(trades_df)}
-                    - Win Rate: {(len(trades_df[trades_df['Result'] == 'Win']) / len(trades_df) * 100):.1f}%
+                    - Win Rate: {(len(trades_df[trades_df['result'] == 'Win']) / len(trades_df) * 100):.1f}%
                     
                     Trade Details:
                     {trades_df[['Entry Date', 'Exit Date', 'Entry Price', 'Exit Price', 'P&L %', 'result', 'Reason']].to_string(index=False)}
