@@ -6,9 +6,13 @@ export function initialize() {
         'symbol', 'autocomplete', 'output', 'loading', 'error', 'searchBtn', 
         'sidebar', 'sidebarStocks', 'sidebarSearch', 'clearSearchBtn', 'chat-toggle', 'chat-window', 
         'chat-messages', 'chat-input', 'chat-send', 'chat-close', 'chat-refresh', 'sidebarToggle',
-        'context-symbol', 'logout-btn', 'search-view', 'portfolio-view', 'add-position-symbol-input',
+        'context-symbol', 'logout-btn', 'search-view', 'portfolio-view', 'backtesting-view', 'add-position-symbol-input',
         'modal-autocomplete', 'add-position-entry-price', 'current-price-indicator',
-        'search-tab-btn', 'portfolio-tab-btn', 'add-position-btn', 'portfolio-content',
+        'search-tab-btn', 'portfolio-tab-btn', 'backtesting-tab-btn', 'add-position-btn', 'portfolio-content',
+        'backtesting-symbol', 'backtesting-autocomplete', 'clear-backtesting-btn', 'backtesting-form',
+        'beginner-mode-btn', 'advanced-mode-btn', 'strategy-select', 'atr-multiplier', 'risk-per-trade',
+        'start-date', 'end-date', 'initial-balance', 'run-backtest-btn', 'backtesting-loading',
+        'backtesting-error', 'backtesting-results',
         'add-position-modal', 'add-position-form', 'close-modal-btn',
         // Add the missing sidebar toggle buttons
         'mobile-sidebar-toggle', 'desktop-sidebar-toggle'

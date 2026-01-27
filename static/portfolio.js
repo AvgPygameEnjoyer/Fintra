@@ -11,6 +11,7 @@ export function initializePortfolio() {
     // Event Listeners for portfolio functionality
     DOM.portfolioTabBtn?.addEventListener('click', showPortfolioView);
     DOM.searchTabBtn?.addEventListener('click', showSearchView);
+    DOM.backtestingTabBtn?.addEventListener('click', showBacktestingView);
     DOM.addPositionBtn?.addEventListener('click', () => DOM.addPositionModal.showModal());
     DOM.closeModalBtn?.addEventListener('click', () => DOM.addPositionModal.close());
     DOM.addPositionForm?.addEventListener('submit', handleAddPosition);
@@ -115,16 +116,29 @@ export function initializePortfolio() {
 function showSearchView() {
     DOM.searchView.style.display = 'block';
     DOM.portfolioView.style.display = 'none';
+    DOM.backtestingView.style.display = 'none';
     DOM.searchTabBtn.classList.add('active');
     DOM.portfolioTabBtn.classList.remove('active');
+    DOM.backtestingTabBtn.classList.remove('active');
 }
 
 function showPortfolioView() {
     DOM.searchView.style.display = 'none';
     DOM.portfolioView.style.display = 'block';
+    DOM.backtestingView.style.display = 'none';
     DOM.searchTabBtn.classList.remove('active');
     DOM.portfolioTabBtn.classList.add('active');
+    DOM.backtestingTabBtn.classList.remove('active');
     fetchAndDisplayPortfolio();
+}
+
+function showBacktestingView() {
+    DOM.searchView.style.display = 'none';
+    DOM.portfolioView.style.display = 'none';
+    DOM.backtestingView.style.display = 'block';
+    DOM.searchTabBtn.classList.remove('active');
+    DOM.portfolioTabBtn.classList.remove('active');
+    DOM.backtestingTabBtn.classList.add('active');
 }
 
 async function fetchAndDisplayPortfolio() {

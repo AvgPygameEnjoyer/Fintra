@@ -27,6 +27,7 @@ from analysis import (
     get_gemini_ai_analysis, get_gemini_position_summary,
     find_recent_macd_crossover
 )
+from backtesting import BacktestEngine, load_stock_data
 
 logger = logging.getLogger(__name__)
 
@@ -774,3 +775,105 @@ def delete_position(position_id):
     db.session.delete(position)
     db.session.commit()
     return jsonify(message="Position deleted successfully"), 200
+
+@api.route('/backtest', methods=['POST'])
+def run_backtest():
+    """
+    Run backtest strategy on historical data.
+    """
+    auth_response = require_auth()
+    if auth_response:
+        return auth_response
+    
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol', '').upper().strip()
+        strategy = data.get('strategy', 'composite')
+        initial_balance = float(data.get('initial_balance', 100000))
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        mode = data.get('mode', 'beginner')
+        atr_multiplier = float(data.get('atr_multiplier', 3.0))
+        risk_per_trade = float(data.get('risk_per_trade', 0.02))
+        
+        if not symbol:
+            return jsonify(error="No symbol provided"), 400
+        
+        # Load stock data
+        df = load_stock_data(symbol)
+        if df is None:
+            return jsonify(error=f"Data not found for symbol {symbol}. Please check if it's a valid Indian stock."), 404
+        
+        try:
+            # Initialize backtest engine
+            engine = BacktestEngine(df)
+            
+            # Run selected strategy
+            result_df = engine.run_strategy(strategy)
+            
+            # Get performance summary
+            performance = engine.get_performance_summary(
+                initial_capital=initial_balance,
+                is_long_only=True,
+                start_date=start_date,
+                end_date=end_date,
+                atr_multiplier=atr_multiplier,
+                tax_rate=0.002
+            )
+            
+            # Add AI analysis using existing Gemini integration
+            if not performance.get("error"):
+                # Format data for AI analysis
+                trades_df = performance.get('trades_df', pd.DataFrame())
+                if not trades_df.empty:
+                    performance_summary = f"""
+                    Backtest Results Summary for {symbol}:
+                    - Strategy: {strategy}
+                    - Period: {start_date} to {end_date}
+                    - Initial Capital: ₹{initial_balance:,.2f}
+                    - Final Value: ₹{performance['final_portfolio_value']:,.2f}
+                    - Total Return: {performance['strategy_return_pct']:.2f}%
+                    - Buy & Hold Return: {performance['market_return_pct']:.2f}%
+                    - Sharpe Ratio: {performance['sharpe_ratio']:.2f}
+                    - Max Drawdown: {performance['max_drawdown_pct']:.2f}%
+                    - Total Trades: {len(trades_df)}
+                    - Win Rate: {(len(trades_df[trades_df['Result'] == 'Win']) / len(trades_df) * 100):.1f}%
+                    
+                    Trade Details:
+                    {trades_df[['Entry Date', 'Exit Date', 'Entry Price', 'Exit Price', 'P&L %', 'Result', 'Reason']].to_string(index=False)}
+                    """
+                    
+                    ai_prompt = f"""
+                    As an expert trading analyst, analyze this backtest performance for {symbol}:
+                    
+                    Performance Metrics:
+                    {performance_summary}
+                    
+                    Please provide insights on:
+                    1. Strategy effectiveness and why it succeeded/failed
+                    2. Risk management effectiveness
+                    3. Key improvement suggestions
+                    4. Market conditions impact
+                    5. Specific trade analysis (biggest wins/losses)
+                    
+                    Keep analysis concise but actionable for traders.
+                    Focus on practical insights that can improve real trading performance.
+                    """
+                    
+                    try:
+                        ai_analysis = call_gemini_api(ai_prompt)
+                        performance['ai_analysis'] = ai_analysis
+                    except Exception as e:
+                        logger.error(f"AI analysis failed: {e}")
+                        performance['ai_analysis'] = "AI analysis temporarily unavailable. Please try again later."
+            
+            return jsonify(performance)
+            
+        except ValueError as e:
+            return jsonify(error=str(e)), 400
+        except Exception as e:
+            logger.error(f"❌ Backtest error: {e}")
+            return jsonify(error=f"Server error: {str(e)}"), 500
+    except Exception as e:
+        logger.error(f"❌ Backtest route error: {e}")
+        return jsonify(error=f"Server error: {str(e)}"), 500

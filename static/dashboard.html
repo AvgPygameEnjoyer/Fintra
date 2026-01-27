@@ -46,6 +46,7 @@
         <div class="view-tabs">
             <button id="search-tab-btn" class="view-tab active">🔍 Search</button>
             <button id="portfolio-tab-btn" class="view-tab">💼 My Portfolio</button>
+            <button id="backtesting-tab-btn" class="view-tab">🧪 Backtesting</button>
         </div>
 
         <div id="search-view">
@@ -73,6 +74,87 @@
             <div id="portfolio-content">
                 <!-- Portfolio cards will be rendered here -->
             </div>
+        </div>
+
+        <div id="backtesting-view" style="display: none;">
+            <div class="backtesting-header">
+                <h2>Strategy Backtesting</h2>
+                <p>Test trading strategies on historical data</p>
+            </div>
+            
+            <div class="backtesting-card">
+                <form id="backtesting-form" class="backtesting-form">
+                    <div class="form-section">
+                        <h3>Stock Selection</h3>
+                        <div class="input-wrapper">
+                            <input type="text" id="backtesting-symbol" class="search-input" placeholder="Enter stock symbol (e.g., RELIANCE)" required autocomplete="off">
+                            <button type="button" id="clear-backtesting-btn" class="clear-search-btn" title="Clear symbol">×</button>
+                            <div id="backtesting-autocomplete" class="autocomplete-dropdown"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Strategy Configuration</h3>
+                        <div class="mode-toggle">
+                            <button type="button" id="beginner-mode-btn" class="mode-btn active">Beginner</button>
+                            <button type="button" id="advanced-mode-btn" class="mode-btn">Advanced</button>
+                        </div>
+                        
+                        <div class="strategy-selector">
+                            <label for="strategy-select">Trading Strategy:</label>
+                            <select id="strategy-select" name="strategy">
+                                <option value="composite">Composite (MA + MACD + Volume)</option>
+                                <option value="golden_cross">Golden Cross (SMA 50/200)</option>
+                                <option value="rsi">RSI (Oversold/Overbought)</option>
+                                <option value="macd">MACD Crossover</option>
+                                <option value="momentum">Momentum Strategy</option>
+                                <option value="mean_reversion">Mean Reversion</option>
+                                <option value="breakout">Breakout Trading</option>
+                            </select>
+                        </div>
+
+                        <div class="advanced-params" style="display: none;">
+                            <div class="param-group">
+                                <label for="atr-multiplier">ATR Multiplier for Stop Loss:</label>
+                                <input type="number" id="atr-multiplier" name="atr_multiplier" value="3.0" step="0.1" min="1.0" max="10.0">
+                            </div>
+                            <div class="param-group">
+                                <label for="risk-per-trade">Risk Per Trade (%):</label>
+                                <input type="number" id="risk-per-trade" name="risk_per_trade" value="2.0" step="0.1" min="0.1" max="10.0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Time Period</h3>
+                        <div class="date-inputs">
+                            <div class="param-group">
+                                <label for="start-date">Start Date:</label>
+                                <input type="date" id="start-date" name="start_date" required>
+                            </div>
+                            <div class="param-group">
+                                <label for="end-date">End Date:</label>
+                                <input type="date" id="end-date" name="end_date" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Capital Allocation</h3>
+                        <div class="param-group">
+                            <label for="initial-balance">Initial Capital (₹):</label>
+                            <input type="number" id="initial-balance" name="initial_balance" value="100000" step="1000" min="1000" max="10000000" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="run-backtest-btn" class="backtesting-submit-btn">Run Backtest</button>
+                </form>
+            </div>
+
+            <div id="backtesting-loading" class="loading" style="display: none;">
+                Running backtest...</div>
+            <div id="backtesting-error" class="error" style="display: none;"></div>
+            <div id="backtesting-results" class="backtesting-results" style="display: none;"></div>
         </div>
     </div>
 
