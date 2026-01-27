@@ -368,18 +368,17 @@ class BacktestEngine:
             "trades_df": pd.DataFrame(trades)
         }
 
-def get_parquet_path(symbol: str) -> str:
+def get_parquet_path(symbol: str) -> Optional[str]:
     """
-    Get the file path for a stock symbol's parquet data file.
+    Get the absolute file path for a stock symbol's parquet data file.
     """
-    # Extract first letter for directory structure
+    # Use absolute path relative to this file's directory
+    base_dir = os.path.dirname(__file__)
     if not symbol or len(symbol) == 0:
         logger.error(f"Invalid symbol: {symbol}")
         return None
-    
     first_char = symbol[0].upper()
-    file_path = os.path.join('data', first_char, f"{symbol}.parquet")
-    
+    file_path = os.path.join(base_dir, 'data', first_char, f"{symbol}.parquet")
     return file_path
 
 def load_stock_data(symbol: str) -> Optional[pd.DataFrame]:
@@ -396,7 +395,7 @@ def load_stock_data(symbol: str) -> Optional[pd.DataFrame]:
             return None
         
         logger.info(f"Loading data from {file_path}")
-        df = pd.read_parquet(file_path)
+        df = pd.read_parquet(file_path, engine='pyarrow')
         
         # Ensure the DataFrame has a DatetimeIndex
         if not isinstance(df.index, pd.DatetimeIndex):
