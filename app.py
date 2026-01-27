@@ -13,7 +13,7 @@ from sqlalchemy import text
 from config import Config
 from database import db
 from routes import api
-
+#easter egg
 # ==================== LOGGING SETUP ====================
 logging.basicConfig(
     level=logging.INFO,
