@@ -356,17 +356,17 @@ class BacktestEngine:
         drawdown = (equity_curve - rolling_max) / rolling_max
         max_drawdown = drawdown.min() * 100
 
-return {
-    "error": False,
-    "final_portfolio_value": float(equity_curve.iloc[-1]),
-    "market_buy_hold_value": float(market_curve.iloc[-1]),
-    "strategy_return_pct": float(strategy_roi),
-    "market_return_pct": float(market_roi),
-    "sharpe_ratio": float(sharpe_ratio),
-    "max_drawdown_pct": float(max_drawdown),
-    "trades": trades,
-    "trades_df": pd.DataFrame(trades).assign(result=lambda df: df["pnl_pct"].apply(lambda x: "Win" if x > 0 else "Loss"))
-}
+        return {
+            "error": False,
+            "final_portfolio_value": float(equity_curve.iloc[-1]),
+            "market_buy_hold_value": float(market_curve.iloc[-1]),
+            "strategy_return_pct": float(strategy_roi),
+            "market_return_pct": float(market_roi),
+            "sharpe_ratio": float(sharpe_ratio),
+            "max_drawdown_pct": float(max_drawdown),
+            "trades": trades,
+            "trades_df": pd.DataFrame(trades).assign(result=lambda df: df["pnl_pct"].apply(lambda x: "Win" if x > 0 else "Loss"))
+        }
 
 
 def get_parquet_path(symbol: str) -> Optional[str]:
