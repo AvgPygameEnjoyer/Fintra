@@ -854,6 +854,12 @@ def run_backtest():
 
                 Keep analysis concise but actionable for traders.
                 Focus on practical insights that can improve real trading performance.
+
+                IMPORTANT: Format your response using markdown with:
+                - Headers (##, ###)
+                - Bullet points
+                - Bold text for key metrics
+                - Code blocks for any data tables
                 """
 
                 try:
