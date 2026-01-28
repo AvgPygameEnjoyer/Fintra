@@ -632,7 +632,7 @@ def get_portfolio():
                 hist = pd.DataFrame()
                 # 1. Try extracting from batch
                 if tickers_hist is not None and not tickers_hist.empty:
-                    try:
+
                         if len(symbols) > 1:
                             hist = tickers_hist[p.symbol]
                         else:
@@ -877,11 +877,11 @@ def run_backtest():
     return jsonify(performance)        
 
             
-        except ValueError as e:
-            return jsonify(error=str(e)), 400
-        except Exception as e:
-            logger.error(f"❌ Backtest error: {e}")
-            return jsonify(error=f"Server error: {str(e)}"), 500
+    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except Exception as e:
+        logger.error(f"❌ Backtest error: {e}")
+        return jsonify(error=f"Server error: {str(e)}"), 500
     except Exception as e:
         logger.error(f"❌ Backtest route error: {e}")
         return jsonify(error=f"Server error: {str(e)}"), 500
