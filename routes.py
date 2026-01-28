@@ -871,7 +871,11 @@ def run_backtest():
                         logger.error(f"AI analysis failed: {e}")
                         performance['ai_analysis'] = "AI analysis temporarily unavailable. Please try again later."
             
-            return jsonify(performance)
+    # Remove the DataFrame from the response to avoid serialization issues
+    performance.pop('trades_df', None)
+
+    return jsonify(performance)        
+
             
         except ValueError as e:
             return jsonify(error=str(e)), 400
