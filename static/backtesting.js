@@ -144,10 +144,11 @@ function displayBacktestResults(results, params) {
     
     let aiSummary = '';
     if (results.ai_analysis) {
+        const aiHtml = marked.parse(results.ai_analysis);
         aiSummary = `
             <div class="backtest-ai-summary">
                 <h3>🤖 AI Strategy Analysis</h3>
-                <div class="ai-content">${results.ai_analysis}</div>
+                <div class="ai-content">${aiHtml}</div>
             </div>
         `;
     }

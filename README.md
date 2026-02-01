@@ -48,6 +48,13 @@ Fintra ultimately became the tool I originally wanted to use myself: **fast, tra
 - **Mini-Charts:** Sparkline-style charts for every position in your portfolio view.
 - **Secure Storage:** User data linked securely to Google accounts via PostgreSQL (Production) or SQLite (Dev).
 
+### 📈 Strategy Backtesting Engine
+- **Event-Driven Simulation:** Executes trades at next-day open prices to prevent look-ahead bias.
+- **7 Trading Strategies:** Golden Cross, RSI, MACD, Composite, Momentum, Mean Reversion, and Breakout.
+- **Risk Management:** Dynamic ATR-based position sizing (2% risk per trade) and trailing stop-losses.
+- **Performance Metrics:** Sharpe ratio, max drawdown, win/loss tracking, and benchmark comparison.
+- **Transaction Cost Simulation:** Configurable slippage and tax modeling for realistic results.
+
 ### 💬 Context-Aware Trading Chatbot ("QuantAI")
 - **Contextual Awareness:** The chatbot "sees" the stock you are currently analyzing.
 - **Portfolio Integration:** Ask "How are my tech stocks doing?" and it analyzes your specific holdings.
