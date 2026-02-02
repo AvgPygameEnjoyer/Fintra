@@ -397,7 +397,7 @@ def get_data():
 
 @api.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
-    """Handle AI chat queries"""
+    """Handle AI chat queries
     # For complex requests, the browser sends a preflight OPTIONS request first.
     # We must allow this request to pass through without authentication checks.
     if request.method == 'OPTIONS':
@@ -574,6 +574,8 @@ Respond now:"""
         logger.error(f"❌ Chat handler error: {e}")
         logger.error(traceback.format_exc())
         return jsonify(error=f"Server error: {str(e)}"), 500
+"""
+
 
 
 @api.route('/price/<symbol>', methods=['GET'])
