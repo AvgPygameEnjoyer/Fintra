@@ -113,9 +113,25 @@ async function handleBacktestSubmit(e) {
             throw new Error(errorData.error || 'Failed to run backtest');
         }
         
-        const results = await response.json();
-        displayBacktestResults(results, backtestData);
-        showNotification('Backtest completed successfully!', 'success');
+const results = await response.json();
+    
+    // Store results for Monte Carlo
+    window.currentBacktestData = {
+        ...backtestData,
+        trades: results.trades || [],
+        strategy_return_pct: results.strategy_return_pct || 0,
+        sharpe_ratio: results.sharpe_ratio || 0,
+        max_drawdown_pct: results.max_drawdown_pct || 0,
+        final_portfolio_value: results.final_portfolio_value || 0
+    };
+    
+    displayBacktestResults(results, backtestData);
+    showNotification('Backtest completed successfully!', 'success');
+    
+    // Show Monte Carlo section
+    import('./monte_carlo.js').then(mc => {
+        mc.initializeMonteCarloVisualizations();
+    });
         
     } catch (error) {
         console.error('❌ Backtest error:', error);
@@ -250,10 +266,42 @@ function displayBacktestResults(results, params) {
                 </div>
             </div>
             
-            ${aiSummary}
-            ${tradesSection}
+${aiSummary}
+    ${tradesSection}
+    
+    <!-- Monte Carlo Analysis Section -->
+    <div class="monte-carlo-intro">
+        <h3>🎲 Monte Carlo Analysis</h3>
+        <p>Determine if your strategy's performance is due to skill or luck by running thousands of randomized simulations.</p>
+        <div class="mc-buttons">
+            <button id="mcQuickBtn" class="btn-secondary" onclick="runQuickMonteCarlo()">
+                ⚡ Quick Analysis (1K sims)
+            </button>
+            <button id="mcFullBtn" class="btn-primary" onclick="runFullMonteCarlo()">
+                🔬 Full Analysis (10K sims)
+            </button>
         </div>
+    </div>
+    
+    <!-- Monte Carlo Results Container -->
+    <div id="monteCarloSection" class="monte-carlo-section hidden">
+        <!-- Monte Carlo results will be rendered here -->
+    </div>
+    </div>
     `;
+}
+
+// Monte Carlo trigger functions
+async function runQuickMonteCarlo() {
+    const { MCState } = await import('./monte_carlo.js');
+    document.getElementById('mcSimulationCount').value = '1000';
+    document.getElementById('mcRunBtn')?.click();
+}
+
+async function runFullMonteCarlo() {
+    const { MCState } = await import('./monte_carlo.js');
+    document.getElementById('mcSimulationCount').value = '10000';
+    document.getElementById('mcRunBtn')?.click();
 }
 
 function showLoading() {

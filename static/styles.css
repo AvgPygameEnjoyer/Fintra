@@ -2272,3 +2272,914 @@ footer {
     }
 }
 EOF'
+
+/* ==================== MONTE CARLO STYLES ==================== */
+
+.monte-carlo-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-radius: 12px;
+    border: 1px solid #374151;
+}
+
+.monte-carlo-section.hidden {
+    display: none;
+}
+
+.mc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #374151;
+}
+
+.mc-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f9fafb;
+    margin: 0;
+}
+
+.mc-risk-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mc-risk-badge.green {
+    background: #10b981;
+    color: white;
+}
+
+.mc-risk-badge.amber {
+    background: #f59e0b;
+    color: white;
+}
+
+.mc-risk-badge.red {
+    background: #ef4444;
+    color: white;
+}
+
+.mc-controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #111827;
+    border-radius: 8px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.control-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.control-group select,
+.control-group input[type="range"] {
+    padding: 0.5rem;
+    background: #1f2937;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    color: #f9fafb;
+    font-size: 0.875rem;
+}
+
+.mc-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.mc-metric {
+    background: #111827;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #374151;
+    transition: all 0.3s ease;
+}
+
+.mc-metric:hover {
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+}
+
+.mc-metric.large {
+    grid-column: span 2;
+}
+
+.mc-metric.highlight {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    border-color: #3b82f6;
+}
+
+.mc-metric label {
+    display: block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.mc-metric value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f9fafb;
+}
+
+.mc-metric value.positive {
+    color: #10b981;
+}
+
+.mc-metric value.negative {
+    color: #ef4444;
+}
+
+.mc-metric value.strong-signal {
+    color: #10b981;
+}
+
+.mc-metric value.moderate-signal {
+    color: #f59e0b;
+}
+
+.mc-metric value.weak-signal {
+    color: #fbbf24;
+}
+
+.mc-metric value.no-signal {
+    color: #ef4444;
+}
+
+.mc-metric small {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+.mc-interpretation {
+    margin-bottom: 1.5rem;
+}
+
+.interpretation-box {
+    background: linear-gradient(135deg, #1e3a5f 0%, #1e3a8a 100%);
+    padding: 1.25rem;
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6;
+}
+
+.interpretation-box h4 {
+    margin: 0 0 0.75rem 0;
+    color: #60a5fa;
+    font-size: 1rem;
+}
+
+.interpretation-box p {
+    margin: 0;
+    color: #e5e7eb;
+    line-height: 1.6;
+}
+
+.mc-visualization-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #374151;
+    padding-bottom: 0.5rem;
+}
+
+.mc-visualization-tabs .tab-btn {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    transition: all 0.3s ease;
+}
+
+.mc-visualization-tabs .tab-btn:hover {
+    background: #374151;
+    color: #f9fafb;
+}
+
+.mc-visualization-tabs .tab-btn.active {
+    background: #3b82f6;
+    color: white;
+}
+
+.mc-visualization-content {
+    min-height: 400px;
+}
+
+.mc-chart-container {
+    display: none;
+    animation: fadeIn 0.5s ease;
+}
+
+.mc-chart-container.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.mc-chart-container canvas {
+    width: 100%;
+    height: 400px;
+    background: #111827;
+    border-radius: 8px;
+}
+
+.mc-chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.color-box {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.mc-path-controls {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #111827;
+    border-radius: 6px;
+}
+
+.mc-path-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+    cursor: pointer;
+}
+
+.mc-path-controls input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #3b82f6;
+}
+
+.mc-comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.comparison-card {
+    background: #111827;
+    padding: 1.25rem;
+    border-radius: 8px;
+    border: 1px solid #374151;
+}
+
+.comparison-card.strategy {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+}
+
+.comparison-card.best {
+    border-color: #10b981;
+}
+
+.comparison-card.worst {
+    border-color: #ef4444;
+}
+
+.comparison-card h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: #f9fafb;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #374151;
+}
+
+.metric-row:last-child {
+    border-bottom: none;
+}
+
+.metric-row span {
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.metric-row value {
+    font-weight: 700;
+    color: #f9fafb;
+}
+
+.metric-row value.positive {
+    color: #10b981;
+}
+
+.metric-row value.negative {
+    color: #ef4444;
+}
+
+.mc-risk-details {
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    background: #111827;
+    border-radius: 8px;
+    border: 1px solid #374151;
+}
+
+.mc-risk-details h4 {
+    margin: 0 0 1rem 0;
+    color: #f9fafb;
+    font-size: 1.125rem;
+}
+
+.risk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.risk-item {
+    padding: 1rem;
+    background: #1f2937;
+    border-radius: 6px;
+}
+
+.risk-item label {
+    display: block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.risk-item value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f9fafb;
+    margin-bottom: 0.25rem;
+}
+
+.risk-item value.negative {
+    color: #ef4444;
+}
+
+.risk-item small {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.mc-export-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #374151;
+}
+
+.btn-text {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    color: #9ca3af;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-text:hover {
+    background: #374151;
+    color: #f9fafb;
+    border-color: #6b7280;
+}
+
+@media (max-width: 768px) {
+    .mc-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .mc-metric.large {
+        grid-column: span 2;
+    }
+    
+    .mc-controls {
+        flex-direction: column;
+    }
+    
+    .mc-visualization-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .mc-visualization-tabs .tab-btn {
+        flex: 1;
+        min-width: 100px;
+    }
+    
+    .mc-comparison-grid {
+        grid-template-columns: 1fr;
+    }
+}
+EOF'
+
+/* ==================== MONTE CARLO STYLES ==================== */
+
+.monte-carlo-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-radius: 12px;
+    border: 1px solid #374151;
+}
+
+.monte-carlo-section.hidden {
+    display: none;
+}
+
+.mc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #374151;
+}
+
+.mc-header h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f9fafb;
+    margin: 0;
+}
+
+.mc-risk-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mc-risk-badge.green {
+    background: #10b981;
+    color: white;
+}
+
+.mc-risk-badge.amber {
+    background: #f59e0b;
+    color: white;
+}
+
+.mc-risk-badge.red {
+    background: #ef4444;
+    color: white;
+}
+
+.mc-controls {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #111827;
+    border-radius: 8px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.control-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.control-group select,
+.control-group input[type="range"] {
+    padding: 0.5rem;
+    background: #1f2937;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    color: #f9fafb;
+    font-size: 0.875rem;
+}
+
+.mc-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.mc-metric {
+    background: #111827;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #374151;
+    transition: all 0.3s ease;
+}
+
+.mc-metric:hover {
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+}
+
+.mc-metric.large {
+    grid-column: span 2;
+}
+
+.mc-metric.highlight {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    border-color: #3b82f6;
+}
+
+.mc-metric label {
+    display: block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.mc-metric value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f9fafb;
+}
+
+.mc-metric value.positive {
+    color: #10b981;
+}
+
+.mc-metric value.negative {
+    color: #ef4444;
+}
+
+.mc-metric value.strong-signal {
+    color: #10b981;
+}
+
+.mc-metric value.moderate-signal {
+    color: #f59e0b;
+}
+
+.mc-metric value.weak-signal {
+    color: #fbbf24;
+}
+
+.mc-metric value.no-signal {
+    color: #ef4444;
+}
+
+.mc-metric small {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+}
+
+.mc-interpretation {
+    margin-bottom: 1.5rem;
+}
+
+.interpretation-box {
+    background: linear-gradient(135deg, #1e3a5f 0%, #1e3a8a 100%);
+    padding: 1.25rem;
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6;
+}
+
+.interpretation-box h4 {
+    margin: 0 0 0.75rem 0;
+    color: #60a5fa;
+    font-size: 1rem;
+}
+
+.interpretation-box p {
+    margin: 0;
+    color: #e5e7eb;
+    line-height: 1.6;
+}
+
+.mc-visualization-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #374151;
+    padding-bottom: 0.5rem;
+}
+
+.mc-visualization-tabs .tab-btn {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    border: none;
+    color: #9ca3af;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    transition: all 0.3s ease;
+}
+
+.mc-visualization-tabs .tab-btn:hover {
+    background: #374151;
+    color: #f9fafb;
+}
+
+.mc-visualization-tabs .tab-btn.active {
+    background: #3b82f6;
+    color: white;
+}
+
+.mc-visualization-content {
+    min-height: 400px;
+}
+
+.mc-chart-container {
+    display: none;
+    animation: fadeIn 0.5s ease;
+}
+
+.mc-chart-container.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.mc-chart-container canvas {
+    width: 100%;
+    height: 400px;
+    background: #111827;
+    border-radius: 8px;
+}
+
+.mc-chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.color-box {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.mc-path-controls {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #111827;
+    border-radius: 6px;
+}
+
+.mc-path-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #9ca3af;
+    cursor: pointer;
+}
+
+.mc-path-controls input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #3b82f6;
+}
+
+.mc-comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.comparison-card {
+    background: #111827;
+    padding: 1.25rem;
+    border-radius: 8px;
+    border: 1px solid #374151;
+}
+
+.comparison-card.strategy {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+}
+
+.comparison-card.best {
+    border-color: #10b981;
+}
+
+.comparison-card.worst {
+    border-color: #ef4444;
+}
+
+.comparison-card h4 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: #f9fafb;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #374151;
+}
+
+.metric-row:last-child {
+    border-bottom: none;
+}
+
+.metric-row span {
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.metric-row value {
+    font-weight: 700;
+    color: #f9fafb;
+}
+
+.metric-row value.positive {
+    color: #10b981;
+}
+
+.metric-row value.negative {
+    color: #ef4444;
+}
+
+.mc-risk-details {
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    background: #111827;
+    border-radius: 8px;
+    border: 1px solid #374151;
+}
+
+.mc-risk-details h4 {
+    margin: 0 0 1rem 0;
+    color: #f9fafb;
+    font-size: 1.125rem;
+}
+
+.risk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.risk-item {
+    padding: 1rem;
+    background: #1f2937;
+    border-radius: 6px;
+}
+
+.risk-item label {
+    display: block;
+    font-size: 0.75rem;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.risk-item value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f9fafb;
+    margin-bottom: 0.25rem;
+}
+
+.risk-item value.negative {
+    color: #ef4444;
+}
+
+.risk-item small {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.mc-export-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #374151;
+}
+
+.btn-text {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid #4b5563;
+    border-radius: 6px;
+    color: #9ca3af;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-text:hover {
+    background: #374151;
+    color: #f9fafb;
+    border-color: #6b7280;
+}
+
+@media (max-width: 768px) {
+    .mc-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .mc-metric.large {
+        grid-column: span 2;
+    }
+    
+    .mc-controls {
+        flex-direction: column;
+    }
+    
+    .mc-visualization-tabs {
+        flex-wrap: wrap;
+    }
+    
+    .mc-visualization-tabs .tab-btn {
+        flex: 1;
+        min-width: 100px;
+    }
+    
+    .mc-comparison-grid {
+        grid-template-columns: 1fr;
+    }
+}

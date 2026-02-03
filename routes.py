@@ -28,6 +28,7 @@ from analysis import (
     find_recent_macd_crossover
 )
 from backtesting import BacktestEngine, load_stock_data
+from mc_engine import MonteCarloEngine, SimulationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -878,4 +879,105 @@ def run_backtest():
         return jsonify(error=str(e)), 400
     except Exception as e:
         logger.error(f"❌ Backtest error: {e}")
+        return jsonify(error=f"Server error: {str(e)}"), 500    except ValueError as e:
+        return jsonify(error=str(e)), 400
+    except Exception as e:
+        logger.error(f"❌ Backtest error: {e}")
         return jsonify(error=f"Server error: {str(e)}"), 500
+
+
+@api.route('/backtest/monte_carlo', methods=['POST'])
+def run_monte_carlo():
+    """
+    Run Monte Carlo simulation analysis on backtest results.
+    
+    This endpoint analyzes whether backtest results are due to luck or skill
+    by running thousands of randomized simulations.
+    """
+    auth_response = require_auth()
+    if auth_response:
+        return auth_response
+    
+    data = request.get_json()
+    
+    # Required parameters
+    trades = data.get('trades', [])
+    prices = data.get('prices', [])  # List of historical prices
+    
+    # Optional parameters
+    num_simulations = int(data.get('num_simulations', 10000))
+    seed = int(data.get('seed', 0))
+    initial_capital = float(data.get('initial_capital', 100000))
+    
+    # Original strategy metrics for comparison
+    original_return = float(data.get('original_return', 0))
+    original_sharpe = float(data.get('original_sharpe', 0))
+    original_max_dd = float(data.get('original_max_dd', 0))
+    
+    if not trades or len(trades) < 2:
+        return jsonify(error="At least 2 trades required for Monte Carlo analysis"), 400
+    
+    try:
+        logger.info(f"🎲 Starting Monte Carlo analysis: {num_simulations} simulations")
+        
+        # Initialize Monte Carlo engine
+        mc_engine = MonteCarloEngine(seed=seed)
+        mc_engine.set_trades(trades)
+        
+        # Set daily returns if prices provided
+        if prices and len(prices) > 1:
+            import pandas as pd
+            price_series = pd.Series(prices)
+            mc_engine.set_daily_returns(price_series)
+        
+        # Configure simulation
+        config = SimulationConfig(
+            num_simulations=num_simulations,
+            seed=mc_engine.seed,
+            initial_capital=initial_capital
+        )
+        
+        # Run analysis
+        start_time = datetime.now()
+        analysis = mc_engine.run_analysis(config)
+        
+        # Calculate p-values and update interpretation
+        analysis = mc_engine.calculate_p_values(
+            analysis, 
+            original_return, 
+            original_sharpe
+        )
+        
+        elapsed_time = (datetime.now() - start_time).total_seconds()
+        
+        # Prepare response
+        response = analysis.to_dict()
+        response['performance'] = {
+            'elapsed_time_seconds': elapsed_time,
+            'simulations_per_second': round(num_simulations / elapsed_time, 2)
+        }
+        
+        logger.info(f"✅ Monte Carlo analysis complete in {elapsed_time:.2f}s")
+        
+        return jsonify(response), 200
+        
+    except Exception as e:
+        logger.error(f"❌ Monte Carlo analysis error: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify(error=f"Monte Carlo analysis failed: {str(e)}"), 500
+
+
+@api.route('/backtest/quick_mc', methods=['POST'])
+def run_quick_monte_carlo():
+    """
+    Quick Monte Carlo analysis (1,000 simulations) for fast preview.
+    """
+    auth_response = require_auth()
+    if auth_response:
+        return auth_response
+    
+    data = request.get_json()
+    data['num_simulations'] = 1000  # Force 1k simulations
+    
+    # Forward to main endpoint
+    return run_monte_carlo()
