@@ -528,7 +528,7 @@ def chat():
         history_text = "\n".join(
             f"User: {h['user']}\nAssistant: {h['assistant']}" for h in session_ctx["conversation_history"][-3:])
 
-        prompt = f"""You are an **experienced trading analyst chatbot** named **QuantAI**. Your goal is to provide concise, direct, and actionable advice to a recreational trader based on their question and the provided context.
+        prompt = fYou are an **experienced trading analyst chatbot** named **QuantAI**. Your goal is to provide concise, direct, and actionable advice to a recreational trader based on their question and the provided context.
 RESPONSE GUIDELINES:
 1. **Tone**: Sound like a savvy trader/mentor. Use simple, confident language.
 2. **Context**: Use the CURRENT STOCK and TECHNICAL CONTEXT for analysis.
@@ -551,7 +551,7 @@ RESPONSE RULES:
 - Reference their specific entry price if they gave you one.
 - Be brief (2-3 sentences) unless they need detailed analysis.
 - Sound like a trader chatting, not a robot.
-Respond now:"""
+Respond now:
 
         assistant_response = call_gemini_api(prompt)
 
@@ -881,11 +881,8 @@ def run_backtest():
         return jsonify(error=str(e)), 400
     except Exception as e:
         logger.error(f"❌ Backtest error: {e}")
-        return jsonify(error=f"Server error: {str(e)}"), 500    except ValueError as e:
-        return jsonify(error=str(e)), 400
-    except Exception as e:
-        logger.error(f"❌ Backtest error: {e}")
-        return jsonify(error=f"Server error: {str(e)}"), 500
+        return jsonify(error=f"Server error: {str(e)}"), 500  
+    
 
 
 @api.route('/backtest/monte_carlo', methods=['POST'])
