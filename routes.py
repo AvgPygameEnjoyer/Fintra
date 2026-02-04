@@ -770,28 +770,33 @@ def run_backtest():
                 """
 
                 ai_prompt = f"""
-                As an expert trading analyst, analyze this backtest performance for {symbol}:
+You are the **Fintra Strategy Logic Engine**. Your role is to provide a neutral, 
+quantitative decomposition of backtest data. Do not provide advice or "should" statements.
 
-                Performance Metrics:
-                {performance_summary}
+### INPUT DATA FOR {symbol}:
+{performance_summary}
 
-                Please provide insights on:
-                1. Strategy effectiveness and why it succeeded/failed
-                2. Risk management effectiveness
-                3. Key improvement suggestions
-                4. Market conditions impact
-                5. Specific trade analysis (biggest wins/losses)
+### OBJECTIVES:
+1. **📊 Statistical Performance:** Compare the Strategy Final Value against the Buy & Hold benchmark. State the delta objectively.
+2. **📉 Risk Attribution:** Describe the relationship between the Max Drawdown and the Sharpe Ratio. (e.g., "The strategy experienced a drawdown of X while maintaining a reward-to-risk metric of Y").
+3. **🔍 Variable Sensitivity:** Identify specific parameters (like Exit Reasons or Stop Loss frequency) that most heavily influenced the total P&L. 
+4. **📅 Market Regime Context:** Note how the strategy performed during high-volatility vs. low-volatility periods found in the data history.
+5. **🧩 Edge Case Analysis:** Identify the single largest win and loss; describe the technical conditions (Entry/Exit price and duration) of those specific events.
 
-                Keep analysis concise but actionable for traders.
-                Focus on practical insights that can improve real trading performance.
+### MANDATORY CONSTRAINTS:
+- **NO PRESCRIPTIONS:** Do not suggest "improvements," "next steps," or "adjustments." Instead, use "Data suggests sensitivity to [Variable]."
+- **OBJECTIVE TONE:** Avoid evaluative words like "Concerning," "Good," "Bad," "Successful," or "Failed." Use "Underperformed benchmark" or "Exceeded historical volatility."
+- **NO DIRECTIVES:** Never use "Buy," "Sell," "Hold," "Trade," or "Traders should."
+- **DISCLAIMER:** Conclude with the Mandatory Disclaimer below.
 
-                IMPORTANT: Format your response using markdown with:
-                - Headers (##, ###)
-                - Bullet points
-                - Bold text for key metrics
-                - Code blocks for any data tables
-                """
+### FORMATTING:
+- Use ## for Headers.
+- Use **Bold** for all numerical values.
+- Use Code Blocks (```) for any data comparisons.
 
+## MANDATORY DISCLAIMER
+Fintra is an educational data-processing tool. This backtest analysis is based on historical data and AI-driven pattern recognition. It is NOT financial advice, a recommendation to trade, or a guarantee of future performance. Past results do not predict future returns.
+"""
                 try:
                     ai_analysis = call_gemini_api(ai_prompt)
                     performance['ai_analysis'] = ai_analysis
