@@ -218,18 +218,32 @@ def format_data_for_ai_skimmable(symbol: str, data: list) -> str:
 
 
 def get_gemini_ai_analysis(symbol: str, data: list) -> str:
-    """Get AI-powered analysis from Gemini."""
+    """Get AI-powered analysis from Gemini as a Data-Analyst persona."""
     data_summary = format_data_for_ai_skimmable(symbol, data)
-    prompt = f"""You are a **top-tier quant analyst**. Analyze {symbol} in a **trader-friendly, skimmable way**. Provide:
-1. **🎯 Executive Summary:** 1-2 sentences max, key insight.
-2. **📊 Momentum & Trend:** Micro/short-term trends, bullish/bearish signals.
-3. **⚡ Key Levels:** Support/resistance, MA alignment.
-4. **📈 Volume Analysis:** Accumulation/distribution.
-5. **🚨 Risks:** Top 3 immediate/medium-term risks.
-6. **💡 Actionable Advice:** Clear entry, stop, targets for aggressive/conservative traders.
-Use **bold, professional and robotic words**. Make it concise and **easy to read for recreational traders**.
+    
+    prompt = f"""
+You are the **Fintra Quantitative Engine**. You act as a neutral data interpreter, not a financial advisor.
+Analyze {symbol} in a **skimmable, logic-driven format**.
+
+### OBJECTIVES:
+1. **🎯 Executive Summary:** 1-2 sentences on current price behavior relative to history.
+2. **📊 Momentum & Trend:** Identify technical patterns (e.g., Bullish Engulfing, RSI Divergence).
+3. **⚡ Key Levels:** Define current Support and Resistance boundaries based on data.
+4. **📈 Volume Analysis:** Analyze current volume flow (Accumulation vs. Distribution).
+5. **🚨 Risks:** Identify technical "failure points" where current trends might invalidate.
+6. **🔍 Strategic Scenarios:** - Describe a "Bullish Thesis" (e.g., "If price breaks [Level] on high volume, analysts often look toward [Level]").
+   - Describe a "Bearish Thesis" (e.g., "If price fails to hold [Level], the next historical support is at [Level]").
+   - Include a mathematical **Risk-Reward Ratio** based on these levels.
+
+### MANDATORY CONSTRAINTS:
+- **NO DIRECTIVES:** Do not use "Buy," "Sell," "Hold," or "Set stop-loss."
+- **NO PERSONAS:** Do not categorize advice for "Aggressive" or "Conservative" users.
+- **LANGUAGE:** Use professional, objective, and analytical terminology. 
+- **DISCLAIMER:** Every response MUST conclude with: "Analysis for educational purposes. Fintra does not provide investment advice."
+
 ## MARKET DATA
-{data_summary}"""
+{data_summary}
+"""
     return call_gemini_api(prompt)
 
 
@@ -347,27 +361,31 @@ def generate_rule_based_analysis(symbol: str, latest_data: List[Dict], lookback:
             bullish_signals - bearish_signals) >= 2 else "low"
 
         # Generate recommendation
+       # Generate STRATEGIC SCENARIOS (Safe & Educational)
         conservative_stop = max(ma10, recent_low)
+        support_level = fmt_price(conservative_stop)
+        resistance_level = fmt_price(recent_high)
+        
         if "BULLISH" in overall_sentiment and confidence == "high":
-            recommendation = f"**BUY** (scale-in allowed) – Trend confirmed. Entry near {fmt_price(close_price)}. Stop at {fmt_price(conservative_stop)}."
+            logic = f"Technical setup shows positive momentum alignment. Analysts often observe this as a potential trend continuation toward {resistance_level}, provided the support at {support_level} holds."
         elif "BEARISH" in overall_sentiment and confidence == "high":
-            recommendation = f"**SELL/SHORT** – Trend confirmed. Entry near {fmt_price(close_price)}. Stop at {fmt_price(recent_high)}."
+            logic = f"Technical setup shows bearish distribution. This pattern is frequently interpreted as a potential test of the {support_level} support zone, with {resistance_level} acting as the overhead ceiling."
         else:
-            recommendation = f"**HOLD / RANGE TRADE** – Neutral signals. Price consolidating between {fmt_price(recent_low)} and {fmt_price(recent_high)}."
+            logic = f"Market is currently in a consolidation phase. Price action is oscillating between the historical boundaries of {support_level} and {resistance_level}."
 
         return "\n".join([
             f"### {sentiment_emoji} Technical Analysis for {symbol}", "",
-            f"**Overall Sentiment:** {overall_sentiment} ({confidence} confidence)", "",
+            f"**Data-Driven Sentiment:** {overall_sentiment} ({confidence} confidence)", "",
             f"**Current Price:** {fmt_price(close_price)}", "",
-            "#### 📊 Price Position Analysis",
-            f"- Trading **{price_vs_ma5} MA5 ({fmt_price(ma5)})** and **{price_vs_ma10} MA10 ({fmt_price(ma10)})**",
-            f"- **MA Alignment:** {ma_trend} (spread {ma_spread_pct:.2f}%)", "",
-            "#### 📈 RSI Analysis",
-            f"- RSI at **{rsi:.2f}** {rsi_emoji} – {rsi_note}", "",
-            "#### 💡 Recommendation", f"{recommendation}", "",
-            "#### 🧠 Key Levels",
-            f"- **Support:** {fmt_price(recent_low)}",
-            f"- **Resistance:** {fmt_price(recent_high)}"
+            "#### 📊 Momentum Summary",
+            f"- Price vs Benchmarks: Trading **{price_vs_ma5} MA5** and **{price_vs_ma10} MA10**.",
+            f"- RSI ({rsi:.2f}): {rsi_note}", "",
+            "#### 🔍 Market Scenarios",
+            f"{logic}", "",
+            "#### 🧠 Key Structural Levels",
+            f"- **Floor (Support):** {support_level}",
+            f"- **Ceiling (Resistance):** {resistance_level}", "",
+            "> *Disclaimer: Fintra is a data-visualization tool. This is automated technical analysis and NOT financial advice.*"
         ])
     except Exception as e:
         logger.error(f"❌ Error in rule-based analysis: {e}")
