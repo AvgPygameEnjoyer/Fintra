@@ -268,40 +268,8 @@ function displayBacktestResults(results, params) {
             
 ${aiSummary}
     ${tradesSection}
-    
-    <!-- Monte Carlo Analysis Section -->
-    <div class="monte-carlo-intro">
-        <h3>🎲 Monte Carlo Analysis</h3>
-        <p>Determine if your strategy's performance is due to skill or luck by running thousands of randomized simulations.</p>
-        <div class="mc-buttons">
-            <button id="mcQuickBtn" class="btn-secondary" onclick="runQuickMonteCarlo()">
-                ⚡ Quick Analysis (1K sims)
-            </button>
-            <button id="mcFullBtn" class="btn-primary" onclick="runFullMonteCarlo()">
-                🔬 Full Analysis (10K sims)
-            </button>
-        </div>
-    </div>
-    
-    <!-- Monte Carlo Results Container -->
-    <div id="monteCarloSection" class="monte-carlo-section hidden">
-        <!-- Monte Carlo results will be rendered here -->
-    </div>
     </div>
     `;
-}
-
-// Monte Carlo trigger functions
-async function runQuickMonteCarlo() {
-    const { MCState } = await import('./monte_carlo.js');
-    document.getElementById('mcSimulationCount').value = '1000';
-    document.getElementById('mcRunBtn')?.click();
-}
-
-async function runFullMonteCarlo() {
-    const { MCState } = await import('./monte_carlo.js');
-    document.getElementById('mcSimulationCount').value = '10000';
-    document.getElementById('mcRunBtn')?.click();
 }
 
 function showLoading() {
