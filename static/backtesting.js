@@ -128,9 +128,9 @@ const results = await response.json();
     displayBacktestResults(results, backtestData);
     showNotification('Backtest completed successfully!', 'success');
     
-    // Show Monte Carlo section
+    // Initialize Monte Carlo section
     import('./monte_carlo.js').then(mc => {
-        mc.initializeMonteCarloVisualizations();
+        mc.initializeMonteCarlo();
     });
         
     } catch (error) {

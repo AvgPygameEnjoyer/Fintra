@@ -3183,3 +3183,170 @@ EOF'
         grid-template-columns: 1fr;
     }
 }
+
+/* Monte Carlo Section */
+.monte-carlo-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #1f2937 0%, #0f172a 100%);
+    border-radius: 12px;
+    border: 1px solid #334155;
+}
+
+.monte-carlo-section.hidden {
+    display: none;
+}
+
+.monte-carlo-section h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #e5e7eb;
+    margin: 0 0 0.5rem 0;
+}
+
+.mc-description {
+    color: #94a3b8;
+    margin: 0 0 1.5rem 0;
+    font-size: 0.95rem;
+}
+
+.mc-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.mc-results {
+    margin-top: 1.5rem;
+}
+
+.mc-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #0f172a;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.mc-risk-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: white;
+}
+
+.mc-meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.875rem;
+    color: #94a3b8;
+}
+
+.mc-interpretation {
+    padding: 1rem;
+    background: linear-gradient(135deg, #1e3a5f 0%, #1e3a8a 100%);
+    border-radius: 8px;
+    border-left: 4px solid #3b82f6;
+    margin-bottom: 1.5rem;
+}
+
+.mc-interpretation p {
+    color: #e5e7eb;
+    margin: 0;
+    line-height: 1.6;
+}
+
+.mc-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.mc-metric-card {
+    padding: 1rem;
+    background: #0f172a;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    text-align: center;
+}
+
+.mc-metric-card.highlight {
+    background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+    border-color: #3b82f6;
+}
+
+.mc-metric-card label {
+    display: block;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.mc-metric-card value {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #e5e7eb;
+}
+
+.mc-metric-card value.positive {
+    color: #10b981;
+}
+
+.mc-metric-card value.negative {
+    color: #ef4444;
+}
+
+.mc-metric-card small {
+    display: block;
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-top: 0.25rem;
+}
+
+.mc-analysis-text {
+    padding: 1rem;
+    background: #0f172a;
+    border-radius: 8px;
+    border: 1px solid #334155;
+}
+
+.mc-analysis-text h4 {
+    color: #e5e7eb;
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+}
+
+.mc-analysis-text p {
+    color: #cbd5e1;
+    line-height: 1.6;
+    margin-bottom: 0.75rem;
+}
+
+.mc-analysis-text strong {
+    color: #60a5fa;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .mc-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .mc-controls {
+        flex-direction: column;
+    }
+    
+    .mc-meta {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}

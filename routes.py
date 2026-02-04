@@ -398,184 +398,81 @@ def get_data():
 
 @api.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
-    """Handle AI chat queries
-    # For complex requests, the browser sends a preflight OPTIONS request first.
-    # We must allow this request to pass through without authentication checks.
+    """Chatbot endpoint for trading queries with optional portfolio context."""
     if request.method == 'OPTIONS':
         return jsonify(success=True), 200
 
     auth_response = require_auth()
     if auth_response:
         return auth_response
-    data = request.get_json()
-    query = data.get('query', '').strip()    
-    user_id, db_user = get_user_from_token()
-    context_symbols = data.get('context_symbols', [])
-    use_portfolio = data.get('use_portfolio', False)
-    current_symbol_hint = data.get('current_symbol')
 
+    data = request.get_json()
+    if not data:
+        return jsonify(error="No data provided"), 400
+
+    query = data.get('query', '').strip()
     if not query:
         return jsonify(error="No query provided"), 400
 
+    # Optional: user explicitly selected a portfolio position
+    selected_position_id = data.get('position_id')
+
     try:
-        if user_id not in conversation_context:
-            conversation_context[user_id] = {
-                "current_symbol": None,
-                "conversation_history": [],
-                "last_active": datetime.now(timezone.utc).isoformat(),
-                "user_positions": {}
-            }
-
-        session_ctx = conversation_context[user_id]
-        if "user_positions" not in session_ctx:
-            session_ctx["user_positions"] = {}
-        session_ctx["last_active"] = datetime.now(timezone.utc).isoformat()
+        # Load system prompt
+        import os
+        BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+        system_prompt_path = os.path.join(BASE_DIR, 'system_prompt.txt')
         
-        # --- NEW: Fetch real portfolio positions from DB ---
-        user_db_positions = []
-        if db_user:
-            user_db_positions = Position.query.filter_by(user_id=db_user.id).all()
-        
-        portfolio_summary = []
-        for p in user_db_positions:
-            portfolio_summary.append(f"{p.symbol} ({p.quantity} @ ${p.entry_price})")
-        portfolio_context_str = ("PORTFOLIO: " + ", ".join(portfolio_summary)) if portfolio_summary else ""
+        try:
+            with open(system_prompt_path, 'r') as f:
+                system_prompt = f.read().strip()
+        except Exception as e:
+            logger.warning(f"Could not load system prompt: {e}")
+            system_prompt = "You are a trading AI assistant. Provide brief, accurate answers based only on the user's question."
 
-        # Enhanced symbol matching: Check portfolio symbols first, then cached data
-        def get_symbol_from_query(q):
-            for p in user_db_positions:
-                if p.symbol.lower() in q.lower(): return p.symbol
-            for s in latest_symbol_data.keys():
-                if s.lower() in q.lower(): return s
-            # Fallback for symbols in text that aren't in cache yet
-            found_symbols = re.findall(r'\b[A-Z]{1,5}\b', q.upper())
-            if found_symbols: return found_symbols[0]
-            return None
+        # Build minimal context
+        context_parts = []
 
-        # Determine the final list of symbols to analyze
-        final_context_symbols = []
-        if context_symbols:
-            final_context_symbols = context_symbols
-        else:
-            # Fallback logic if no context is explicitly passed
-            symbol_from_query = get_symbol_from_query(query)
-            if symbol_from_query:
-                final_context_symbols.append(symbol_from_query)
-            elif current_symbol_hint:
-                final_context_symbols.append(current_symbol_hint)
-            elif session_ctx.get("current_symbol"):
-                final_context_symbols.append(session_ctx["current_symbol"])
+        # Extract stock symbol from query if present
+        symbols = re.findall(r'\b[A-Z]{1,5}\b', query.upper())
+        if symbols:
+            context_parts.append(f"Stock: {symbols[0]}")
 
-        # Deduplicate
-        final_context_symbols = list(set(final_context_symbols))
+        # Only add portfolio context if user explicitly selected a position
+        if selected_position_id:
+            _, db_user = get_user_from_token()
+            if db_user:
+                position = Position.query.filter_by(id=selected_position_id, user_id=db_user.id).first()
+                if position:
+                    # Include only the selected position's data, not entire portfolio
+                    context_parts.append(f"Position: {position.quantity} shares of {position.symbol} at entry price {position.entry_price}")
 
-        # Update session context with the primary symbol (first one)
-        primary_symbol = final_context_symbols[0] if final_context_symbols else None
-        if primary_symbol:
-            session_ctx["current_symbol"] = primary_symbol
+        context_str = " ".join(context_parts) + "." if context_parts else ""
 
-        # --- Build context for all symbols ---
-        technical_summaries = []
-        position_infos = []
-        has_any_position = False
+        # Build safe prompt - portfolio context only if explicitly selected
+        safe_query = query[:500]  # Limit query length
+        prompt = f"{system_prompt}\n\nContext: {context_str}\n\nUser: {safe_query}"
+        prompt = prompt.replace('\n', ' ').replace('\r', ' ')  # Remove newlines to help prevent injection
 
-        for symbol in final_context_symbols:
-            # Fetch data if not in cache
-            if symbol not in latest_symbol_data:
-                logger.info(f"Chat context: No cached data for {symbol}. Fetching now.")
-                try:
-                    ticker = yf.Ticker(symbol)
-                    hist = ticker.history(period="60d", interval="1d")
-                    if not hist.empty:
-                        hist['RSI'] = compute_rsi(hist['Close'])
-                        hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
-                        latest_symbol_data[symbol] = clean_df(hist.dropna(), ['Open', 'High', 'Low', 'Close', 'Volume', 'RSI', 'MACD', 'Signal', 'Histogram'])
-                except Exception as e:
-                    logger.error(f"Chat context fetch failed for {symbol}: {e}")
-
-            # Add technical summary
-            if symbol in latest_symbol_data:
-                tech_summary = generate_rule_based_analysis(symbol, latest_symbol_data[symbol])
-                technical_summaries.append(f"--- CONTEXT FOR {symbol} ---\n{tech_summary}")
-
-            # Add position info
-            db_pos = next((p for p in user_db_positions if p.symbol == symbol), None)
-            if db_pos:
-                has_any_position = True
-                entry = db_pos.entry_price
-                qty = db_pos.quantity
-                
-                current_price = None
-                if symbol in latest_symbol_data and latest_symbol_data[symbol]:
-                    current_price = latest_symbol_data[symbol][-1].get('Close')
-                
-                if current_price:
-                    pnl_dollars = (current_price - entry) * qty
-                    pnl_percent = (current_price - entry) / entry * 100 if entry != 0 else 0
-                    position_infos.append(f"User owns **{qty} shares** of {symbol} at avg price **${entry:.2f}**. Current Price: ${current_price:.2f}. P&L: **${pnl_dollars:.2f} ({pnl_percent:.2f}%)**.")
-                else:
-                    position_infos.append(f"User owns **{qty} shares** of {symbol} at avg price **${entry:.2f}**.")
-
-        # Combine contexts
-        technical_context_str = "\n\n".join(technical_summaries)
-        position_context_str = "\n".join(position_infos)
-
-        # Add a specific instruction for comparison if multiple symbols are present
-        comparison_instruction = ""
-        if len(final_context_symbols) > 1:
-            comparison_instruction = f"The user has provided multiple stocks: {', '.join(final_context_symbols)}. **Your primary goal is to compare them** based on the user's query and the provided context. Use a table or bullet points for easy comparison."
-
-        history_text = "\n".join(
-            f"User: {h['user']}\nAssistant: {h['assistant']}" for h in session_ctx["conversation_history"][-3:])
-
-        prompt = fYou are an **experienced trading analyst chatbot** named **QuantAI**. Your goal is to provide concise, direct, and actionable advice to a recreational trader based on their question and the provided context.
-RESPONSE GUIDELINES:
-1. **Tone**: Sound like a savvy trader/mentor. Use simple, confident language.
-2. **Context**: Use the CURRENT STOCK and TECHNICAL CONTEXT for analysis.
-3. **Position**: If P&L is available, calculate it precisely and state it first. Reference the user's specific holdings.
-4. **Portfolio**: You have access to the user's portfolio. Reference it if they ask about "my stocks" or "my portfolio".
-5. **Comparison**: {comparison_instruction or 'Focus on the single stock in context.'}
-6. **Length**: Be brief (2-3 sentences) unless they need detailed analysis.
-7. If user mentions 'detailed', give a longer more in depth answer preferably in markdown.
-
-STOCKS IN CONTEXT: {', '.join(final_context_symbols) or 'None'}
-{portfolio_context_str}
-{position_context_str}
-TECHNICAL CONTEXT:
-{technical_context_str[:2000] if technical_context_str else 'No technical data available.'}
-CONVERSATION HISTORY (Last 3 turns):
-{history_text}
-USER QUESTION: {query}
-RESPONSE RULES:
-- If they ask about profit/loss and you have their entry price, CALCULATE IT EXACTLY.
-- Reference their specific entry price if they gave you one.
-- Be brief (2-3 sentences) unless they need detailed analysis.
-- Sound like a trader chatting, not a robot.
-Respond now:
-
+        # Call API
         assistant_response = call_gemini_api(prompt)
-
-        session_ctx["conversation_history"].append({
-            "user": query,
-            "assistant": assistant_response,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
-        if len(session_ctx["conversation_history"]) > 15:
-            session_ctx["conversation_history"] = session_ctx["conversation_history"][-15:]
+        
+        if not assistant_response or len(assistant_response) > 1000:
+            assistant_response = "I cannot answer that question. Please try with a clearer query."
 
         return jsonify(
-            response=assistant_response,
+            response=assistant_response[:500],
             context={
-                "current_symbol": primary_symbol,
-                "has_position": has_any_position,
-                "history_length": len(session_ctx["conversation_history"])
+                "current_symbol": symbols[0] if symbols else None,
+                "position_id": selected_position_id  # Only if explicitly selected
             }
         ), 200
+
     except Exception as e:
-        logger.error(f"❌ Chat handler error: {e}")
+        logger.error(f"Chat error: {e}")
         logger.error(traceback.format_exc())
-        return jsonify(error=f"Server error: {str(e)}"), 500
-"""
+        return jsonify(error="Unable to process request"), 500
+
 
 
 
@@ -720,6 +617,36 @@ def get_portfolio():
     except Exception as e:
         logger.error(f"❌ Error fetching portfolio: {e}")
         return jsonify(error="Failed to fetch portfolio data."), 500
+
+
+@api.route('/portfolio/positions/list', methods=['GET'])
+def get_portfolio_positions_list():
+    """Get simplified list of portfolio positions for chat selection."""
+    auth_response = require_auth()
+    if auth_response:
+        return auth_response
+
+    _, db_user = get_user_from_token()
+    if not db_user:
+        return jsonify(error="Database user not found."), 401
+
+    try:
+        positions = Position.query.filter_by(user_id=db_user.id).order_by(Position.symbol).all()
+        
+        positions_list = []
+        for p in positions:
+            positions_list.append({
+                "id": p.id,
+                "symbol": p.symbol,
+                "quantity": p.quantity,
+                "entry_price": p.entry_price,
+                "entry_date": p.entry_date.strftime('%Y-%m-%d')
+            })
+
+        return jsonify(positions_list), 200
+    except Exception as e:
+        logger.error(f"❌ Error fetching positions list: {e}")
+        return jsonify(error="Failed to fetch positions."), 500
 
 
 @api.route('/positions', methods=['POST'])
