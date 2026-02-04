@@ -176,12 +176,6 @@ function renderMCResults(data) {
     `;
 }
 
-// Auto-initialize when DOM is ready
-if (document.readyState === 'DOMContentLoaded') {
-    initializeMonteCarlo();
-} else {
-    document.addEventListener('DOMContentLoaded', initializeMonteCarlo);
-}
-
 // Export for manual initialization
 export { runMonteCarloAnalysis };
+
