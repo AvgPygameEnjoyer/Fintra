@@ -3350,3 +3350,79 @@ EOF'
         gap: 0.5rem;
     }
 }
+
+/* Monte Carlo Button Styles */
+.mc-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1.25rem 2rem;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 180px;
+    font-family: inherit;
+}
+
+.mc-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.mc-btn:active {
+    transform: translateY(0);
+}
+
+.mc-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.mc-btn-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+}
+
+.mc-btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+}
+
+.mc-btn-secondary {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+}
+
+.mc-btn-secondary:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+}
+
+.mc-btn-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.mc-btn-text {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.mc-btn-sub {
+    font-size: 0.75rem;
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .mc-controls {
+        flex-direction: column;
+    }
+    
+    .mc-btn {
+        width: 100%;
+        min-width: unset;
+    }
+}

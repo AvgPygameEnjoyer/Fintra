@@ -128,9 +128,17 @@ const results = await response.json();
     displayBacktestResults(results, backtestData);
     showNotification('Backtest completed successfully!', 'success');
     
-    // Initialize Monte Carlo section
+    // Show Monte Carlo section
+    const mcSection = document.getElementById('monte-carlo-section');
+    if (mcSection) {
+        mcSection.classList.remove('hidden');
+    }
+    
+    // Initialize Monte Carlo buttons
     import('./monte_carlo.js').then(mc => {
         mc.initializeMonteCarlo();
+    }).catch(err => {
+        console.error('Failed to load Monte Carlo module:', err);
     });
         
     } catch (error) {

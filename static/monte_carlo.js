@@ -50,6 +50,12 @@ async function runMonteCarloAnalysis(numSimulations) {
     
     isRunning = true;
     
+    // Disable buttons during analysis
+    const quickBtn = document.getElementById('mc-quick-btn');
+    const fullBtn = document.getElementById('mc-full-btn');
+    if (quickBtn) quickBtn.disabled = true;
+    if (fullBtn) fullBtn.disabled = true;
+    
     // Show loading
     const loadingEl = document.getElementById('mc-loading');
     const errorEl = document.getElementById('mc-error');
@@ -100,6 +106,10 @@ async function runMonteCarloAnalysis(numSimulations) {
     } finally {
         isRunning = false;
         if (loadingEl) loadingEl.classList.add('hidden');
+        
+        // Re-enable buttons
+        if (quickBtn) quickBtn.disabled = false;
+        if (fullBtn) fullBtn.disabled = false;
     }
 }
 
