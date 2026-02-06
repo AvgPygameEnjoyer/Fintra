@@ -1,0 +1,7 @@
+{
+  "id": "market_phases",
+  "title": "Market Phases - Accumulation, Markup, Distribution, Markdown",
+  "category": "patterns",
+  "content": "Markets move in four phases: 1) Accumulation - Smart money buys while price is flat/low after a downtrend. Volume may increase. 2) Markup - Price trends upward as more buyers enter. This is the best time for long positions. 3) Distribution - Smart money sells to late entrants. Price becomes range-bound at highs. 4) Markdown - Price declines as selling pressure dominates. Short sellers profit. Understanding these phases helps identify where a stock might be in its cycle. Different strategies work better in different phases. Trend-following works in markup/markdown, range trading in accumulation/distribution.",
+  "tags": ["market phases", "accumulation", "distribution", "markup", "markdown", "market cycle"]
+}

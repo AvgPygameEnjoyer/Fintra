@@ -1,0 +1,7 @@
+{
+  "id": "backtesting_education",
+  "title": "Backtesting - Educational Guide",
+  "category": "education",
+  "content": "Backtesting evaluates trading strategies using historical data. It shows how a strategy would have performed in the past. Important metrics: Total Return, Sharpe Ratio (risk-adjusted returns), Max Drawdown (largest peak-to-trough decline), Win Rate (percentage of profitable trades). Limitations of backtesting: 1) Past performance doesn't guarantee future results. 2) Curve fitting - over-optimizing for historical data. 3) Market conditions change. 4) Slippage and transaction costs may not be fully accounted for. Use backtesting for learning and strategy development, not as a guarantee of future profits. Fintra provides backtesting tools with 31-day historical data lag for educational purposes.",
+  "tags": ["backtesting", "sharpe ratio", "drawdown", "historical data", "strategy testing"]
+}

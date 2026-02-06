@@ -1,0 +1,7 @@
+{
+  "id": "volume_analysis",
+  "title": "Volume Analysis - Basics",
+  "category": "indicators",
+  "content": "Volume represents the number of shares traded in a given period. High volume confirms the strength of a price move. Price increase with high volume suggests strong buying interest. Price decrease with high volume suggests strong selling pressure. Low volume during price moves suggests weak conviction and potential reversal. Volume should increase in the direction of the trend. Volume spikes often occur at market turning points. Average volume over 20-30 days provides a baseline for comparison.",
+  "tags": ["volume", "liquidity", "confirmation", "market strength"]
+}

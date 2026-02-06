@@ -1,0 +1,7 @@
+{
+  "id": "candlestick_patterns",
+  "title": "Candlestick Patterns - Basics",
+  "category": "patterns",
+  "content": "Candlestick charts display price movements with bodies (open-close range) and wicks (high-low range). Common patterns: Doji (indecision, open=close), Hammer (bullish reversal at bottom), Shooting Star (bearish reversal at top), Engulfing (current candle completely covers previous), Morning Star (3-candle bullish reversal), Evening Star (3-candle bearish reversal). Bullish candles close higher than open (usually green/white). Bearish candles close lower than open (usually red/black). Patterns should be confirmed with volume and other indicators. Single candlestick patterns are less reliable than multi-candle patterns.",
+  "tags": ["candlestick", "doji", "hammer", "engulfing", "chart patterns"]
+}

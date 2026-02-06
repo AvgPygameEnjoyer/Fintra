@@ -1,0 +1,7 @@
+{
+  "id": "trend_analysis",
+  "title": "Trend Analysis - Basics",
+  "category": "patterns",
+  "content": "Trend is the general direction of price movement. Uptrend: Higher highs and higher lows. Downtrend: Lower highs and lower lows. Sideways/Range-bound: Price oscillates between support and resistance. 'Trend is your friend' - trading in the direction of the trend increases probability of success. Trendlines connect significant highs (downtrend) or lows (uptrend). Break of trendline suggests potential trend change. Multiple timeframes should be checked to confirm trend direction. Major trends consist of smaller counter-trend moves.",
+  "tags": ["trend", "uptrend", "downtrend", "trendline", "market direction"]
+}

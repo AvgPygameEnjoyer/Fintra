@@ -17,3 +17,9 @@ psycopg2-binary>=2.9.9
 pandas>=2.2.0
 numpy>=1.26.0
 pyarrow>=22.0.0
+
+# Redis and Vector Search
+redis>=5.0.0
+redisvl>=0.3.0
+sentence-transformers>=2.5.0
+flask-limiter>=3.5.0

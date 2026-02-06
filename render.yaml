@@ -5,7 +5,28 @@ services:
     plan: free
     runtime: python
     buildCommand: "./build.sh"
-    startCommand: "gunicorn app:app --bind 0.0.0.0:10000 --workers 1 --timeout 60"
+    startCommand: "gunicorn app:app --bind 0.0.0.0:10000 --workers 1 --timeout 120"
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.4"
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: fintra-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: fintra-redis
+          property: port
+      - key: REDIS_PASSWORD
+        fromService:
+          type: redis
+          name: fintra-redis
+          property: password
+
+  - type: redis
+    name: fintra-redis
+    region: oregon
+    plan: free
+    ipAllowList: []  # Required for private services

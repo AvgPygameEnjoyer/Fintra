@@ -1,0 +1,7 @@
+{
+  "id": "support_resistance_basics",
+  "title": "Support and Resistance - Basics",
+  "category": "patterns",
+  "content": "Support is a price level where buying interest is strong enough to overcome selling pressure, causing the price to stop falling. Resistance is a price level where selling pressure overcomes buying interest, causing the price to stop rising. These levels are identified by looking at historical price points where the price has reversed multiple times. Support becomes resistance once broken (and vice versa). The more times a level is tested, the stronger it becomes. Volume often increases near support/resistance levels as traders take positions.",
+  "tags": ["support", "resistance", "price levels", "technical analysis"]
+}

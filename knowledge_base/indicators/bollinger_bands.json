@@ -1,0 +1,7 @@
+{
+  "id": "bollinger_bands",
+  "title": "Bollinger Bands - Basics",
+  "category": "indicators",
+  "content": "Bollinger Bands consist of a middle band (20-day SMA) and two outer bands (2 standard deviations above and below the middle band). The bands expand during high volatility and contract during low volatility. Price touching the upper band suggests overbought conditions. Price touching the lower band suggests oversold conditions. The 'Bollinger Squeeze' (narrow bands) often precedes significant price moves. Price moving outside the bands can indicate continuation of trend. Mean reversion strategies use moves to the bands as potential reversal signals.",
+  "tags": ["bollinger bands", "volatility", "standard deviation", "mean reversion"]
+}

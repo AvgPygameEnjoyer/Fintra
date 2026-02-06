@@ -1,0 +1,7 @@
+{
+  "id": "sebi_compliance_education",
+  "title": "SEBI Compliance - Educational Platform Guidelines",
+  "category": "compliance",
+  "content": "SEBI (Securities and Exchange Board of India) regulations require educational platforms to maintain certain standards. Key requirements: 1) 31-day data lag - All displayed data must be at least 31 days old. 2) No investment advice - Platforms cannot recommend buy, sell, or hold decisions. 3) Educational purpose only - All content must be clearly labeled as educational, not advisory. 4) Risk disclosure - Users must be informed that past performance doesn't guarantee future results. 5) No real-time trading signals - Cannot provide timing recommendations. Fintra complies by providing historical data analysis for learning purposes only.",
+  "tags": ["sebi", "compliance", "regulations", "31-day lag", "educational"]
+}

@@ -3,6 +3,7 @@ Routes Module
 Defines all Flask routes and API endpoints.
 """
 import logging
+import os
 import secrets
 import traceback
 import jwt
@@ -29,6 +30,15 @@ from analysis import (
 )
 from backtesting import BacktestEngine, load_stock_data, check_data_availability, DATA_LAG_DAYS
 from mc_engine import MonteCarloEngine, SimulationConfig
+
+# Redis and RAG imports
+try:
+    from redis_client import redis_client, init_redis, ChatCache, RateLimiter, DataCache
+    from rag_engine import rag_engine, init_rag
+    REDIS_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Redis/RAG modules not available: {e}")
+    REDIS_AVAILABLE = False
 
 # Helper function to apply SEBI compliance lag to yfinance data
 def apply_sebi_lag_to_data(hist_df):
@@ -484,13 +494,28 @@ def get_data():
 
 @api.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
-    """Chatbot endpoint for trading queries with optional portfolio context."""
+    """
+    Chatbot endpoint with Redis caching, rate limiting, and RAG.
+    Provides educational responses about technical analysis.
+    """
     if request.method == 'OPTIONS':
         return jsonify(success=True), 200
 
     auth_response = require_auth()
     if auth_response:
         return auth_response
+
+    # Get user ID for rate limiting
+    user_id = request.cookies.get('access_token', 'anonymous')
+    
+    # Rate limiting check (30 requests per minute)
+    if REDIS_AVAILABLE and RateLimiter.is_allowed(user_id, 'chat', max_requests=30):
+        remaining = RateLimiter.get_remaining(user_id, 'chat', max_requests=30)
+    else:
+        return jsonify(
+            error="Rate limit exceeded. Please wait a moment before sending more messages.",
+            retry_after=60
+        ), 429
 
     data = request.get_json()
     if not data:
@@ -500,10 +525,31 @@ def chat():
     if not query:
         return jsonify(error="No query provided"), 400
 
-    # Optional: user explicitly selected a portfolio position
-    selected_position_id = data.get('position_id')
+    # Get context mode and related data
+    mode = data.get('mode', 'none')  # 'none', 'market', or 'portfolio'
+    symbol = data.get('symbol')  # For market mode
+    selected_position_id = data.get('position_id')  # For portfolio mode
+
+    # Build cache key context
+    cache_context = {
+        "mode": mode,
+        "symbol": symbol,
+        "position_id": selected_position_id
+    }
 
     try:
+        # Check cache first
+        if REDIS_AVAILABLE:
+            cached_response = ChatCache.get(query, cache_context)
+            if cached_response:
+                logger.debug("Chat cache hit - returning cached response")
+                return jsonify(
+                    response=cached_response,
+                    context=cache_context,
+                    cached=True,
+                    rate_limit_remaining=remaining
+                ), 200
+
         # Load system prompt
         import os
         BASE_DIR = os.path.dirname(os.path.dirname(__file__))
@@ -514,44 +560,80 @@ def chat():
                 system_prompt = f.read().strip()
         except Exception as e:
             logger.warning(f"Could not load system prompt: {e}")
-            system_prompt = "You are a trading AI assistant. Provide brief, accurate answers based only on the user's question."
+            system_prompt = "You are Fintra, a friendly AI assistant helping users learn about stock market technical analysis. Be conversational and educational."
 
-        # Build minimal context
-        context_parts = []
+        # Build context based on mode
+        context_str = ""
+        current_context = {"mode": mode}
 
-        # Extract stock symbol from query if present
-        symbols = re.findall(r'\b[A-Z]{1,5}\b', query.upper())
-        if symbols:
-            context_parts.append(f"Stock: {symbols[0]}")
-
-        # Only add portfolio context if user explicitly selected a position
-        if selected_position_id:
+        if mode == 'market' and symbol:
+            # Market mode - user selected a stock
+            context_str = f"\n[MARKET CONTEXT]: The user is asking about {symbol}. This is historical data (31-day lag per SEBI). Current stock: {symbol}"
+            current_context["symbol"] = symbol
+            
+        elif mode == 'portfolio' and selected_position_id:
+            # Portfolio mode - user selected a position
             _, db_user = get_user_from_token()
             if db_user:
                 position = Position.query.filter_by(id=selected_position_id, user_id=db_user.id).first()
                 if position:
-                    # Include only the selected position's data, not entire portfolio
-                    context_parts.append(f"Position: {position.quantity} shares of {position.symbol} at entry price {position.entry_price}")
+                    context_str = f"\n[PORTFOLIO CONTEXT]: The user has a position in {position.symbol} - {position.quantity} shares at entry price ₹{position.entry_price}. This is historical performance data (31-day lag per SEBI)."
+                    current_context["position"] = {
+                        "symbol": position.symbol,
+                        "quantity": position.quantity,
+                        "entry_price": float(position.entry_price)
+                    }
+        else:
+            # General chat mode - no specific context
+            context_str = "\n[GENERAL CHAT]: No specific stock or position context. Answer general educational questions."
+            current_context["mode"] = "none"
 
-        context_str = " ".join(context_parts) + "." if context_parts else ""
+        # RAG: Retrieve relevant knowledge
+        rag_context = ""
+        sources = []
+        if REDIS_AVAILABLE and rag_engine.model:
+            try:
+                retrieved_docs = rag_engine.search(query, top_k=2)
+                if retrieved_docs:
+                    rag_context = rag_engine.assemble_context(query, retrieved_docs)
+                    sources = [doc['title'] for doc in retrieved_docs]
+                    logger.debug(f"RAG retrieved {len(retrieved_docs)} documents")
+            except Exception as e:
+                logger.warning(f"RAG retrieval failed: {e}")
 
-        # Build safe prompt - portfolio context only if explicitly selected
+        # Build prompt
         safe_query = query[:500]  # Limit query length
-        prompt = f"{system_prompt}\n\nContext: {context_str}\n\nUser: {safe_query}"
-        prompt = prompt.replace('\n', ' ').replace('\r', ' ')  # Remove newlines to help prevent injection
+        
+        # Construct full prompt with RAG context if available
+        if rag_context:
+            full_prompt = f"{system_prompt}\n\n{rag_context}\n{context_str}\n\nUser: {safe_query}\n\nUse the knowledge base information above to provide an accurate, educational response."
+        elif mode == 'none':
+            # General chat - no forced context
+            full_prompt = f"{system_prompt}\n\nUser: {safe_query}"
+        else:
+            # Context-aware chat
+            full_prompt = f"{system_prompt}{context_str}\n\nUser: {safe_query}"
+        
+        full_prompt = full_prompt.replace('\r', ' ')  # Remove carriage returns
 
         # Call API
-        assistant_response = call_gemini_api(prompt)
+        assistant_response = call_gemini_api(full_prompt)
         
-        if not assistant_response or len(assistant_response) > 1000:
-            assistant_response = "I cannot answer that question. Please try with a clearer query."
+        if not assistant_response:
+            assistant_response = "I'm sorry, I couldn't generate a response. Please try asking in a different way."
+        elif len(assistant_response) > 1000:
+            assistant_response = assistant_response[:997] + "..."
+
+        # Cache the response
+        if REDIS_AVAILABLE:
+            ChatCache.set(query, cache_context, assistant_response)
 
         return jsonify(
-            response=assistant_response[:500],
-            context={
-                "current_symbol": symbols[0] if symbols else None,
-                "position_id": selected_position_id  # Only if explicitly selected
-            }
+            response=assistant_response,
+            context=current_context,
+            sources=sources if sources else None,
+            rate_limit_remaining=remaining,
+            cached=False
         ), 200
 
     except Exception as e:
@@ -1031,3 +1113,134 @@ def run_quick_monte_carlo():
     
     # Forward to main endpoint
     return run_monte_carlo()
+
+
+@api.route('/admin/init-redis', methods=['POST'])
+def admin_init_redis():
+    """
+    Admin endpoint to initialize Redis and index knowledge base.
+    This is a workaround for Render free tier which doesn't support Shell access.
+    
+    Usage:
+    - POST to /api/admin/init-redis with admin key
+    - Or access via browser: GET /api/admin/init-redis?key=YOUR_ADMIN_KEY
+    
+    Security: Requires ADMIN_KEY environment variable
+    """
+    # Check admin key
+    admin_key = request.args.get('key') or request.headers.get('X-Admin-Key')
+    expected_key = os.getenv('ADMIN_KEY')
+    
+    if not expected_key:
+        return jsonify(
+            error="ADMIN_KEY not configured",
+            message="Set ADMIN_KEY environment variable to use this endpoint"
+        ), 500
+    
+    if admin_key != expected_key:
+        logger.warning(f"Unauthorized admin access attempt from {request.remote_addr}")
+        return jsonify(error="Unauthorized"), 401
+    
+    try:
+        results = {
+            "timestamp": datetime.now().isoformat(),
+            "steps": []
+        }
+        
+        # Step 1: Initialize Redis
+        results["steps"].append({"step": 1, "action": "Initialize Redis connection"})
+        if REDIS_AVAILABLE:
+            if redis_client.is_connected():
+                results["steps"][-1]["status"] = "✅ Already connected"
+            else:
+                try:
+                    redis_client.connect()
+                    results["steps"][-1]["status"] = "✅ Connected"
+                except Exception as e:
+                    results["steps"][-1]["status"] = f"❌ Failed: {str(e)}"
+                    return jsonify(results), 500
+        else:
+            results["steps"][-1]["status"] = "❌ Redis module not available"
+            return jsonify(results), 500
+        
+        # Step 2: Initialize RAG index
+        results["steps"].append({"step": 2, "action": "Create vector search index"})
+        try:
+            if rag_engine.create_index():
+                results["steps"][-1]["status"] = "✅ Index ready"
+            else:
+                results["steps"][-1]["status"] = "⚠️ Index may already exist"
+        except Exception as e:
+            results["steps"][-1]["status"] = f"⚠️ {str(e)}"
+        
+        # Step 3: Index knowledge base
+        results["steps"].append({"step": 3, "action": "Index knowledge base documents"})
+        try:
+            import subprocess
+            import sys
+            
+            # Run indexing script
+            result = subprocess.run(
+                [sys.executable, "scripts/index_knowledge.py"],
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minute timeout
+            )
+            
+            if result.returncode == 0:
+                results["steps"][-1]["status"] = "✅ Knowledge base indexed"
+                results["steps"][-1]["output"] = result.stdout[-500:]  # Last 500 chars
+            else:
+                results["steps"][-1]["status"] = f"❌ Indexing failed"
+                results["steps"][-1]["error"] = result.stderr[-500:]
+                
+        except Exception as e:
+            results["steps"][-1]["status"] = f"❌ Error: {str(e)}"
+        
+        # Step 4: Verify index
+        results["steps"].append({"step": 4, "action": "Verify index contents"})
+        try:
+            stats = rag_engine.get_stats()
+            results["steps"][-1]["status"] = f"✅ {stats.get('document_count', 0)} documents indexed"
+            results["stats"] = stats
+        except Exception as e:
+            results["steps"][-1]["status"] = f"⚠️ {str(e)}"
+        
+        # Overall status
+        success = all("❌" not in step.get("status", "") for step in results["steps"])
+        results["success"] = success
+        
+        return jsonify(results), 200 if success else 500
+        
+    except Exception as e:
+        logger.error(f"Admin init error: {e}")
+        return jsonify(
+            error="Initialization failed",
+            message=str(e)
+        ), 500
+
+
+@api.route('/admin/redis-status', methods=['GET'])
+def admin_redis_status():
+    """
+    Check Redis and RAG status.
+    Can be accessed without auth to verify deployment.
+    """
+    status = {
+        "timestamp": datetime.now().isoformat(),
+        "redis_available": REDIS_AVAILABLE,
+        "redis_connected": False,
+        "rag_ready": False,
+        "knowledge_base": {}
+    }
+    
+    if REDIS_AVAILABLE:
+        try:
+            status["redis_connected"] = redis_client.is_connected()
+            if status["redis_connected"]:
+                status["rag_ready"] = rag_engine.model is not None
+                status["knowledge_base"] = rag_engine.get_stats()
+        except Exception as e:
+            status["error"] = str(e)
+    
+    return jsonify(status), 200

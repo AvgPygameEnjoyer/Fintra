@@ -50,6 +50,84 @@ def create_app():
     # Register blueprints
     app.register_blueprint(api, url_prefix='/api')
 
+    # ==================== INITIALIZE REDIS & RAG (RENDER FREE TIER) ====================
+    # Auto-initialize on startup with retry logic for Render's ephemeral Redis
+    def init_services_background():
+        """Initialize Redis and index knowledge base in background thread"""
+        import threading
+        import time
+        
+        def init_worker():
+            """Worker thread to initialize services without blocking startup"""
+            try:
+                # Import here to avoid circular imports
+                from redis_client import redis_client, init_redis
+                from rag_engine import init_rag, rag_engine
+                
+                logger.info("🔄 Background initialization started...")
+                
+                # Retry logic for Redis connection (Render Redis takes time to be ready)
+                for attempt in range(5):
+                    try:
+                        if init_redis():
+                            logger.info("✅ Redis connected")
+                            break
+                    except Exception as e:
+                        logger.warning(f"⚠️ Redis connection attempt {attempt + 1}/5 failed: {e}")
+                        if attempt < 4:
+                            time.sleep(5)  # Wait 5 seconds before retry
+                
+                # Initialize RAG index
+                try:
+                    if init_rag():
+                        logger.info("✅ RAG index ready")
+                except Exception as e:
+                    logger.warning(f"⚠️ RAG initialization: {e}")
+                
+                # Check if knowledge base needs indexing
+                try:
+                    if redis_client.is_connected():
+                        stats = rag_engine.get_stats()
+                        doc_count = stats.get('document_count', 0)
+                        
+                        if doc_count == 0:
+                            logger.info("📚 Knowledge base empty, indexing documents...")
+                            # Run indexing script
+                            import subprocess
+                            import sys
+                            
+                            result = subprocess.run(
+                                [sys.executable, "scripts/index_knowledge.py"],
+                                capture_output=True,
+                                text=True,
+                                timeout=300  # 5 minutes
+                            )
+                            
+                            if result.returncode == 0:
+                                logger.info("✅ Knowledge base indexed successfully")
+                            else:
+                                logger.error(f"❌ Knowledge base indexing failed: {result.stderr[-200:]}")
+                        else:
+                            logger.info(f"✅ Knowledge base already indexed ({doc_count} documents)")
+                            
+                except Exception as e:
+                    logger.error(f"❌ Knowledge base check/index error: {e}")
+                    
+                logger.info("🎉 Background initialization complete!")
+                
+            except ImportError as e:
+                logger.warning(f"⚠️ Redis/RAG modules not available: {e}")
+            except Exception as e:
+                logger.error(f"❌ Background initialization error: {e}")
+        
+        # Start initialization in background thread so it doesn't block app startup
+        thread = threading.Thread(target=init_worker, daemon=True)
+        thread.start()
+        logger.info("🚀 Background service initialization started (non-blocking)")
+    
+    # Trigger background initialization
+    init_services_background()
+
     # Request hooks
     @app.before_request
     def before_request_logging():

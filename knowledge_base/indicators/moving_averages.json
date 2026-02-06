@@ -1,0 +1,7 @@
+{
+  "id": "moving_averages_basics",
+  "title": "Moving Averages (MA) - Basics",
+  "category": "indicators",
+  "content": "Moving averages smooth out price data to show the underlying trend. Simple Moving Average (SMA) calculates the average price over a specific period. Exponential Moving Average (EMA) gives more weight to recent prices. Common periods: MA5 (short-term), MA10 (short-term), MA50 (medium-term), MA200 (long-term). Golden Cross (MA50 crosses above MA200) is bullish. Death Cross (MA50 crosses below MA200) is bearish. Price above MA indicates uptrend, below indicates downtrend. Moving averages act as dynamic support and resistance levels.",
+  "tags": ["moving average", "sma", "ema", "trend", "golden cross", "death cross"]
+}

@@ -1,0 +1,7 @@
+{
+  "id": "macd_basics",
+  "title": "MACD (Moving Average Convergence Divergence) - Basics",
+  "category": "indicators",
+  "content": "MACD is a trend-following momentum indicator that shows the relationship between two moving averages of a stock's price. It consists of the MACD line (12-day EMA minus 26-day EMA), the Signal line (9-day EMA of MACD), and the Histogram (MACD minus Signal). A bullish signal occurs when MACD crosses above the signal line. A bearish signal occurs when MACD crosses below the signal line. Divergence between MACD and price can indicate potential reversals. MACD is best used in trending markets rather than sideways markets.",
+  "tags": ["macd", "trend", "momentum", "crossover", "divergence"]
+}

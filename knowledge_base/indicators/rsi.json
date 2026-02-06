@@ -1,0 +1,7 @@
+{
+  "id": "rsi_basics",
+  "title": "RSI (Relative Strength Index) - Basics",
+  "category": "indicators",
+  "content": "RSI (Relative Strength Index) is a momentum oscillator that measures the speed and change of price movements. It ranges from 0 to 100. Traditional interpretation: RSI above 70 indicates overbought conditions (potential for price correction), RSI below 30 indicates oversold conditions (potential for price bounce). RSI between 30-70 is considered neutral. The default period is 14 days. RSI helps identify when a stock might be due for a reversal, but should be used with other indicators for confirmation.",
+  "tags": ["rsi", "momentum", "oscillator", "overbought", "oversold"]
+}

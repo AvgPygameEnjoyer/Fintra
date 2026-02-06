@@ -3985,3 +3985,186 @@ body {
         gap: 2px;
     }
 }
+
+/* ============================================
+   CHATBOT CONTEXT TOGGLE STYLES
+   ============================================ */
+
+/* Context Toggles Container */
+#context-toggles {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+/* Toggle Wrapper with Tooltip */
+.context-toggle-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+/* Toggle Button */
+.context-toggle {
+    background: #374151;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 1.4rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.context-toggle:hover {
+    background: #4b5563;
+    border-color: #6b7280;
+    transform: scale(1.05);
+}
+
+.context-toggle.active {
+    background: #3b82f6;
+    border-color: #60a5fa;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+.context-toggle.active:hover {
+    background: #2563eb;
+}
+
+/* Tooltip */
+.context-tooltip {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: #f3f4f6;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid #374151;
+    transition: opacity 0.2s, visibility 0.2s;
+    pointer-events: none;
+}
+
+.context-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #1f2937 transparent transparent transparent;
+}
+
+.context-toggle-wrapper:hover .context-tooltip {
+    visibility: visible;
+    opacity: 1;
+}
+
+.context-tooltip strong {
+    display: block;
+    color: #60a5fa;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.context-tooltip span {
+    display: block;
+    color: #d1d5db;
+    font-size: 0.8rem;
+}
+
+/* Context Indicator */
+#chat-context-header {
+    font-size: 0.9rem;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(59, 130, 246, 0.1);
+    transition: color 0.2s;
+}
+
+/* Portfolio Context Modal */
+#portfolio-context-modal {
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.portfolio-context-item {
+    transition: all 0.2s ease;
+}
+
+.portfolio-context-item:hover {
+    background: #374151 !important;
+    transform: translateX(4px);
+}
+
+/* Chat Welcome Message */
+.msg-welcome {
+    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    margin: 10px;
+}
+
+.msg-welcome strong {
+    font-size: 1.2rem;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.msg-welcome p {
+    margin: 8px 0;
+    opacity: 0.9;
+}
+
+/* Improved Chat Messages */
+.msg-bot {
+    background: #1f2937;
+    border-left: 3px solid #3b82f6;
+    padding: 12px 16px;
+    margin: 8px 0;
+    border-radius: 0 12px 12px 12px;
+    line-height: 1.6;
+}
+
+.msg-user {
+    background: #3b82f6;
+    color: white;
+    padding: 12px 16px;
+    margin: 8px 0 8px auto;
+    border-radius: 12px 0 12px 12px;
+    max-width: 80%;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .context-toggle {
+        min-width: 40px;
+        min-height: 40px;
+        font-size: 1.2rem;
+        padding: 6px 8px;
+    }
+    
+    .context-tooltip {
+        font-size: 0.75rem;
+        padding: 8px 10px;
+    }
+}
