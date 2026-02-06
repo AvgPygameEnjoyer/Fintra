@@ -3,6 +3,7 @@ import { deps } from './config.js';
 import { showLoading, hideLoading, hideError, showError } from './dom.js';
 import { displayData } from './display.js';
 import { updateAuthUI, getAuthHeaders } from './auth.js';
+import { updateAnalysisDataInfo } from './data_transparency.js';
  
 const { CONFIG, STATE } = deps;
 
@@ -54,6 +55,10 @@ export async function fetchData() {
             deps.log.warn(`API returned an error for ${STATE.currentSymbol}:`, data.error);
         } else {
             displayData(data);
+            // Add transparency indicators for data lag
+            if (data.sebi_compliance) {
+                updateAnalysisDataInfo(data);
+            }
             deps.log.debug(`Successfully displayed data for ${STATE.currentSymbol}`);
         }
 

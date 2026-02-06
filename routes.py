@@ -826,32 +826,42 @@ def run_backtest():
                 """
 
                 ai_prompt = f"""
-You are the **Fintra Strategy Logic Engine**. Your role is to provide a neutral, 
-quantitative decomposition of backtest data. Do not provide advice or "should" statements.
+You are the **Fintra Historical Strategy Analysis Engine**. Your role is to provide a neutral, 
+quantitative decomposition of HISTORICAL backtest data. This is pure historical analysis, not current market assessment.
 
-### INPUT DATA FOR {symbol}:
+**⚠️ CRITICAL CONTEXT: HISTORICAL BACKTEST ONLY ⚠️**
+- This is a backtest of historical data from {start_date} to {end_date}
+- Data includes a mandatory 30-day SEBI compliance lag
+- This analysis examines what happened in the past, not what to do now
+- All performance metrics are hypothetical historical simulations
+
+### HISTORICAL INPUT DATA FOR {symbol} (Period: {start_date} to {end_date}):
 {performance_summary}
 
-### OBJECTIVES:
-1. **📊 Statistical Performance:** Compare the Strategy Final Value against the Buy & Hold benchmark. State the delta objectively.
-2. **📉 Risk Attribution:** Describe the relationship between the Max Drawdown and the Sharpe Ratio. (e.g., "The strategy experienced a drawdown of X while maintaining a reward-to-risk metric of Y").
-3. **🔍 Variable Sensitivity:** Identify specific parameters (like Exit Reasons or Stop Loss frequency) that most heavily influenced the total P&L. 
-4. **📅 Market Regime Context:** Note how the strategy performed during high-volatility vs. low-volatility periods found in the data history.
-5. **🧩 Edge Case Analysis:** Identify the single largest win and loss; describe the technical conditions (Entry/Exit price and duration) of those specific events.
+### OBJECTIVES - HISTORICAL ANALYSIS ONLY:
+1. **📊 Historical Statistical Performance:** Compare the Strategy Final Value against the Buy & Hold benchmark during the historical period {start_date} to {end_date}. State the historical delta objectively using past tense.
+2. **📉 Historical Risk Attribution:** Describe the historical relationship between the Max Drawdown and Sharpe Ratio. (e.g., "During the backtest period from {start_date} to {end_date}, the strategy experienced a drawdown of X while maintaining a reward-to-risk metric of Y").
+3. **🔍 Historical Variable Sensitivity:** Identify which historical parameters (like Exit Reasons or Stop Loss frequency) most heavily influenced the total historical P&L during this period. 
+4. **📅 Historical Market Regime Context:** Note how the strategy performed during specific historical market conditions (high-volatility vs. low-volatility periods) found in the data from {start_date} to {end_date}.
+5. **🧩 Historical Edge Case Analysis:** Identify the single largest historical win and loss during {start_date} to {end_date}; describe the technical conditions of those specific historical events.
 
 ### MANDATORY CONSTRAINTS:
-- **NO PRESCRIPTIONS:** Do not suggest "improvements," "next steps," or "adjustments." Instead, use "Data suggests sensitivity to [Variable]."
-- **OBJECTIVE TONE:** Avoid evaluative words like "Concerning," "Good," "Bad," "Successful," or "Failed." Use "Underperformed benchmark" or "Exceeded historical volatility."
-- **NO DIRECTIVES:** Never use "Buy," "Sell," "Hold," "Trade," or "Traders should."
+- **⏰ TIME CONTEXT:** ALWAYS reference the historical period ({start_date} to {end_date}) and use past tense
+- **📖 HISTORICAL FRAMING:** Use "During the backtest period...", "In this historical simulation...", "From {start_date} to {end_date}..."
+- **🚫 NO CURRENT REFERENCES:** Never imply this is current or applicable to today's market
+- **🚫 NO PRESCRIPTIONS:** Do not suggest "improvements," "next steps," or "adjustments." Instead, use "Historical data suggests sensitivity to [Variable] during this period."
+- **📊 OBJECTIVE TONE:** Avoid evaluative words like "Concerning," "Good," "Bad," "Successful," or "Failed." Use "Underperformed benchmark" or "Exceeded historical volatility."
+- **🚫 NO DIRECTIVES:** Never use "Buy," "Sell," "Hold," "Trade," or "Traders should."
 - **DISCLAIMER:** Conclude with the Mandatory Disclaimer below.
 
 ### FORMATTING:
 - Use ## for Headers.
 - Use **Bold** for all numerical values.
 - Use Code Blocks (```) for any data comparisons.
+- Include date range ({start_date} to {end_date}) in section headers.
 
 ## MANDATORY DISCLAIMER
-Fintra is an educational data-processing tool. This backtest analysis is based on historical data and AI-driven pattern recognition. It is NOT financial advice, a recommendation to trade, or a guarantee of future performance. Past results do not predict future returns.
+⚠️ **HISTORICAL BACKTEST ALERT:** This analysis is based on historical data from {start_date} to {end_date} with a mandatory 30+ day lag per SEBI regulations. This is a hypothetical historical simulation, NOT a current market assessment, NOT financial advice, and NOT a recommendation to trade. Past results do not predict future returns. All trading involves substantial risk.
 """
                 try:
                     ai_analysis = call_gemini_api(ai_prompt)
