@@ -167,7 +167,7 @@ function groupStocksByCategory(stocks) {
         const nameUpper = stock.name.toUpperCase();
         const isStockETF = symbolUpper.endsWith('ETF') || nameUpper.includes('ETF') || nameUpper.includes('EXCHANGE TRADED FUND');
 
-        if (symbolUpper === 'RELIANCE' || symbolUpper === 'TCS' || symbolUpper === 'HDFCBANK' || symbolUpper === 'INFY' || symbolUpper === 'AAPL' || symbolUpper === 'MSFT') {
+        if (symbolUpper === 'RELIANCE' || symbolUpper === 'TCS' || symbolUpper === 'HDFCBANK' || symbolUpper === 'INFY' || symbolUpper === 'SBIN' || symbolUpper === 'BHARTIARTL') {
             groups.mostPopular.push(stock);
         }
 

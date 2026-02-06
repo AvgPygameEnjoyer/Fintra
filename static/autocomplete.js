@@ -7,10 +7,20 @@ export function handleAutocompleteInput(e, dropdownElement) {
         hideAutocomplete(dropdownElement);
         return;
     }
-    STATE.filteredStocks = STATE.stockDatabase
-        .filter(stock => stock.symbol.toUpperCase().includes(query) || stock.name.toUpperCase().includes(query))
+    
+    // Prioritize ticker symbol matches, then name matches
+    const tickerMatches = STATE.stockDatabase
+        .filter(stock => stock.symbol.toUpperCase().startsWith(query))
+        .sort((a, b) => a.symbol.length - b.symbol.length);
+    
+    const nameMatches = STATE.stockDatabase
+        .filter(stock => !stock.symbol.toUpperCase().startsWith(query) && stock.name.toUpperCase().includes(query));
+    
+    // Combine: ticker matches first, then name matches
+    STATE.filteredStocks = [...tickerMatches, ...nameMatches]
         .slice(0, CONFIG.MAX_AUTOCOMPLETE_ITEMS);
-    STATE.filteredStocks.length > 0 ? showAutocomplete(STATE.filteredStocks, dropdownElement, e.target) : hideAutocomplete(dropdownElement);
+    
+    STATE.filteredStocks.length > 0 ? showAutocomplete(STATE.filteredStocks, dropdownElement, e.target, query) : hideAutocomplete(dropdownElement);
 }
 
 export function handleAutocompleteKeydown(e, dropdownElement) {
@@ -36,14 +46,19 @@ export function handleAutocompleteKeydown(e, dropdownElement) {
     }
 }
 
-export function showAutocomplete(stocks, dropdownElement, inputElement) {
+export function showAutocomplete(stocks, dropdownElement, inputElement, query = '') {
     STATE.selectedIndex = -1;
-    dropdownElement.innerHTML = stocks.map(stock => `
+    dropdownElement.innerHTML = stocks.map(stock => {
+        // Highlight matching parts
+        const highlightedSymbol = query ? stock.symbol.replace(new RegExp(`^(${query})`, 'i'), '<mark>$1</mark>') : stock.symbol;
+        const highlightedName = query ? stock.name.replace(new RegExp(`(${query})`, 'gi'), '<mark>$1</mark>') : stock.name;
+        
+        return `
         <div class="autocomplete-item" data-symbol="${stock.symbol}">
-            <div class="ticker-symbol">${stock.symbol}</div>
-            <div class="company-name">${stock.name}</div>
+            <div class="ticker-symbol">${highlightedSymbol}</div>
+            <div class="company-name">${highlightedName}</div>
         </div>
-    `).join('');
+    `}).join('');
 
     dropdownElement.querySelectorAll('.autocomplete-item').forEach(item => {
         item.addEventListener('click', () => {

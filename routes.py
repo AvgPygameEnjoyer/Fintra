@@ -36,8 +36,13 @@ def apply_sebi_lag_to_data(hist_df):
     if hist_df.empty:
         return hist_df
     
-    lag_date = datetime.now() - timedelta(days=DATA_LAG_DAYS)
+    # Create lag date with UTC timezone to match yfinance data
+    lag_date = datetime.now(timezone.utc) - timedelta(days=DATA_LAG_DAYS)
     original_count = len(hist_df)
+    
+    # Convert index to UTC if timezone-aware, or keep as-is if naive
+    if hist_df.index.tz is not None:
+        lag_date = lag_date.astimezone(hist_df.index.tz)
     
     # Filter to only include data up to lag date
     filtered_df = hist_df[hist_df.index <= lag_date].copy()
