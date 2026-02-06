@@ -27,8 +27,25 @@ from analysis import (
     get_gemini_ai_analysis, get_gemini_position_summary,
     find_recent_macd_crossover
 )
-from backtesting import BacktestEngine, load_stock_data
+from backtesting import BacktestEngine, load_stock_data, check_data_availability, DATA_LAG_DAYS
 from mc_engine import MonteCarloEngine, SimulationConfig
+
+# Helper function to apply SEBI compliance lag to yfinance data
+def apply_sebi_lag_to_data(hist_df):
+    """Apply 30-day SEBI compliance lag to yfinance DataFrame."""
+    if hist_df.empty:
+        return hist_df
+    
+    lag_date = datetime.now() - timedelta(days=DATA_LAG_DAYS)
+    original_count = len(hist_df)
+    
+    # Filter to only include data up to lag date
+    filtered_df = hist_df[hist_df.index <= lag_date].copy()
+    
+    if len(filtered_df) < original_count:
+        logger.info(f"Applied {DATA_LAG_DAYS}-day SEBI lag to yfinance data: {original_count - len(filtered_df)} rows excluded")
+    
+    return filtered_df
 
 logger = logging.getLogger(__name__)
 
@@ -334,6 +351,24 @@ def ping():
     return "ok", 200
 
 
+@api.route('/data/availability', methods=['GET'])
+def get_data_availability():
+    """
+    Get data availability information including SEBI compliance lag status.
+    Returns information about available data range and compliance.
+    """
+    try:
+        availability = check_data_availability()
+        return jsonify(availability), 200
+    except Exception as e:
+        logger.error(f"Error getting data availability: {e}")
+        return jsonify({
+            'available': False,
+            'error': str(e),
+            'lag_days': DATA_LAG_DAYS
+        }), 500
+
+
 # ==================== DATA & ANALYSIS ROUTES ====================
 @api.route('/get_data', methods=['POST'])
 def get_data():
@@ -355,6 +390,12 @@ def get_data():
 
         if hist.empty:
             return jsonify(error=f"Could not retrieve data for {symbol}"), 404
+        
+        # Apply 30-day SEBI compliance lag
+        hist = apply_sebi_lag_to_data(hist)
+        
+        if hist.empty:
+            return jsonify(error=f"No data available for {symbol} within SEBI compliance lag period ({DATA_LAG_DAYS} days)"), 404
 
         hist['MA5'] = hist['Close'].rolling(window=5).mean()
         hist['MA10'] = hist['Close'].rolling(window=10).mean()
@@ -382,6 +423,10 @@ def get_data():
             conversation_context[user_id]["current_symbol"] = symbol
             conversation_context[user_id]["last_active"] = datetime.now(timezone.utc).isoformat()
 
+        # Prepare compliance information
+        lag_date = datetime.now() - timedelta(days=DATA_LAG_DAYS)
+        effective_date = hist.index.max().strftime('%Y-%m-%d') if not hist.empty else None
+        
         return jsonify(
             ticker=symbol,
             OHLCV=clean_df(hist_display, ['Open', 'High', 'Low', 'Close', 'Volume']),
@@ -389,7 +434,13 @@ def get_data():
             RSI=clean_df(hist_display, ['RSI']),
             MACD=clean_df(hist_display, ['MACD', 'Signal', 'Histogram']),
             AI_Review=gemini_analysis,
-            Rule_Based_Analysis=rule_based_text
+            Rule_Based_Analysis=rule_based_text,
+            sebi_compliance={
+                'data_lag_days': DATA_LAG_DAYS,
+                'effective_last_date': effective_date,
+                'lag_date': lag_date.strftime('%Y-%m-%d'),
+                'compliance_notice': f"This analysis uses historical data with a mandatory {DATA_LAG_DAYS}-day lag in accordance with SEBI regulations. No current market data is included."
+            }
         ), 200
     except Exception as e:
         logger.error(f"❌ Error in /api/get_data: {e}")
@@ -729,7 +780,7 @@ def run_backtest():
         return jsonify(error="No symbol provided"), 400
 
     try:
-        df = load_stock_data(symbol)
+        df, compliance_info = load_stock_data(symbol, apply_lag=True)
         if df is None:
             return jsonify(error=f"Data not found for symbol {symbol}. Please check if it's a valid Indian stock."), 404
 
@@ -806,6 +857,15 @@ Fintra is an educational data-processing tool. This backtest analysis is based o
 
         # Remove the DataFrame from the response to avoid serialization issues
         performance.pop('trades_df', None)
+        
+        # Add SEBI compliance information to response
+        performance['sebi_compliance'] = {
+            'data_lag_days': DATA_LAG_DAYS,
+            'data_range': compliance_info.get('date_range'),
+            'rows_excluded_for_compliance': compliance_info.get('rows_excluded', 0),
+            'effective_end_date': compliance_info.get('effective_end_date'),
+            'compliance_notice': f"This analysis uses historical data with a mandatory {DATA_LAG_DAYS}-day lag in accordance with SEBI regulations. No current market data is included."
+        }
 
         return jsonify(performance)
 

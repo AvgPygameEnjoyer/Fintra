@@ -1,10 +1,119 @@
 import pandas as pd
 import numpy as np
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# SEBI Compliance Constants
+DATA_LAG_DAYS = 30
+
+
+def get_data_lag_date() -> datetime:
+    """Get the effective date with 30-day SEBI compliance lag."""
+    return datetime.now() - pd.Timedelta(days=DATA_LAG_DAYS)
+
+
+def check_data_availability(symbol: str = None) -> Dict:
+    """
+    Check data availability across parquet files.
+    Returns information about data freshness and range.
+    """
+    try:
+        data_dir = os.path.join(os.path.dirname(__file__), 'data')
+        
+        # Sample files to check date range
+        sample_files = []
+        for letter_dir in os.listdir(data_dir):
+            letter_path = os.path.join(data_dir, letter_dir)
+            if os.path.isdir(letter_path):
+                files = [f for f in os.listdir(letter_path) if f.endswith('.parquet')]
+                if files:
+                    sample_files.append(os.path.join(letter_path, files[0]))
+                if len(sample_files) >= 3:
+                    break
+        
+        if not sample_files:
+            return {
+                'available': False,
+                'message': 'No data files found',
+                'data_range': None,
+                'lag_days': DATA_LAG_DAYS
+            }
+        
+        # Check first file for date range
+        df = pd.read_parquet(sample_files[0])
+        
+        # Ensure datetime index
+        if not isinstance(df.index, pd.DatetimeIndex):
+            date_col = next((c for c in df.columns if c.lower() == 'date'), None)
+            if date_col:
+                df[date_col] = pd.to_datetime(df[date_col])
+                df.set_index(date_col, inplace=True)
+            else:
+                df.index = pd.to_datetime(df.index)
+        
+        first_date = df.index.min()
+        last_date = df.index.max()
+        lag_date = get_data_lag_date()
+        effective_date = min(last_date, lag_date)
+        
+        # Calculate if manual lag is needed
+        needs_lag = lag_date > last_date
+        days_behind = (lag_date - last_date).days if needs_lag else 0
+        
+        return {
+            'available': True,
+            'first_date': first_date.strftime('%Y-%m-%d'),
+            'last_date': last_date.strftime('%Y-%m-%d'),
+            'lag_date': lag_date.strftime('%Y-%m-%d'),
+            'effective_last_date': effective_date.strftime('%Y-%m-%d'),
+            'needs_manual_lag': needs_lag,
+            'days_behind_lag': days_behind,
+            'total_days': (last_date - first_date).days,
+            'data_freshness_days': (datetime.now() - last_date).days,
+            'lag_days': DATA_LAG_DAYS,
+            'message': f"Data available from {first_date.strftime('%Y-%m-%d')} to {last_date.strftime('%Y-%m-%d')} "
+                      f"with {DATA_LAG_DAYS}-day SEBI compliance lag"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking data availability: {e}")
+        return {
+            'available': False,
+            'message': f'Error: {str(e)}',
+            'data_range': None,
+            'lag_days': DATA_LAG_DAYS
+        }
+
+
+def apply_sebi_lag(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Apply 30-day SEBI compliance lag to DataFrame.
+    Removes any data newer than 30 days.
+    """
+    if df.empty:
+        return df
+    
+    # Ensure datetime index
+    if not isinstance(df.index, pd.DatetimeIndex):
+        date_col = next((c for c in df.columns if c.lower() == 'date'), None)
+        if date_col:
+            df[date_col] = pd.to_datetime(df[date_col])
+            df = df.set_index(date_col)
+        else:
+            df.index = pd.to_datetime(df.index)
+    
+    lag_date = get_data_lag_date()
+    original_count = len(df)
+    filtered_df = df[df.index <= lag_date].copy()
+    
+    if len(filtered_df) < original_count:
+        logger.info(f"Applied {DATA_LAG_DAYS}-day SEBI lag: excluded {original_count - len(filtered_df)} rows")
+    
+    return filtered_df
 
 class BacktestEngine:
     def __init__(self, df):
@@ -382,18 +491,25 @@ def get_parquet_path(symbol: str) -> Optional[str]:
     file_path = os.path.join(base_dir, 'data', first_char, f"{symbol}.parquet")
     return file_path
 
-def load_stock_data(symbol: str) -> Optional[pd.DataFrame]:
+def load_stock_data(symbol: str, apply_lag: bool = True) -> Tuple[Optional[pd.DataFrame], Dict]:
     """
-    Load parquet data for a given stock symbol.
+    Load parquet data for a given stock symbol with optional SEBI compliance lag.
+    
+    Args:
+        symbol: Stock symbol to load
+        apply_lag: Whether to apply 30-day SEBI compliance lag (default: True)
+    
+    Returns:
+        Tuple of (DataFrame or None, compliance_info dict)
     """
     try:
         file_path = get_parquet_path(symbol)
         if not file_path:
-            return None
+            return None, {'error': f'No data found for symbol {symbol}'}
         
         if not os.path.exists(file_path):
             logger.error(f"Parquet file not found: {file_path}")
-            return None
+            return None, {'error': f'Data file not found for {symbol}'}
         
         logger.info(f"Loading data from {file_path}")
         df = pd.read_parquet(file_path, engine='pyarrow')
@@ -410,8 +526,26 @@ def load_stock_data(symbol: str) -> Optional[pd.DataFrame]:
                 # Attempt to convert the existing index to datetime
                 df.index = pd.to_datetime(df.index)
         
-        return df
+        compliance_info = {
+            'symbol': symbol,
+            'original_rows': len(df),
+            'date_range': {
+                'start': df.index.min().strftime('%Y-%m-%d'),
+                'end': df.index.max().strftime('%Y-%m-%d')
+            },
+            'lag_applied': apply_lag,
+            'lag_days': DATA_LAG_DAYS if apply_lag else 0
+        }
+        
+        # Apply SEBI compliance lag if requested
+        if apply_lag:
+            df = apply_sebi_lag(df)
+            compliance_info['filtered_rows'] = len(df)
+            compliance_info['rows_excluded'] = compliance_info['original_rows'] - len(df)
+            compliance_info['effective_end_date'] = df.index.max().strftime('%Y-%m-%d') if not df.empty else None
+        
+        return df, compliance_info
     
     except Exception as e:
         logger.error(f"Error loading stock data for {symbol}: {e}")
-        return None
+        return None, {'error': str(e)}

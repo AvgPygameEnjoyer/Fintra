@@ -9,6 +9,7 @@ import { initializePortfolio } from './portfolio.js';
 import { initializeBacktesting } from './backtesting.js';
 import { hideAutocomplete, selectStock } from './autocomplete.js';
 import { initializeMonteCarlo } from './monte_carlo.js';
+import { initializeDataInformatics } from './data_informatics.js';
 
 async function init() {
     log.info('Initializing application...');
@@ -38,6 +39,7 @@ async function init() {
     initializePortfolio();
     initializeBacktesting();
     initializeMonteCarlo();
+    initializeDataInformatics();
 
     // Step 6: If authenticated and no symbol is selected, show the welcome message.
     if (isAuthenticated && !deps.STATE.currentSymbol) {
