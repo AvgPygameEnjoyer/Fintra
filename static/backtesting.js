@@ -24,12 +24,30 @@ export function initializeBacktesting() {
     
     DOM.backtestingSymbol.addEventListener('input', handleBacktestingInput);
     DOM.backtestingSymbol.addEventListener('keydown', (e) => handleAutocompleteKeydown(e, DOM.backtestingAutocomplete));
+    DOM.backtestingSymbol.addEventListener('blur', () => {
+        // Fetch date range when user leaves the symbol field
+        setTimeout(() => {
+            const symbol = DOM.backtestingSymbol.value.trim().toUpperCase();
+            if (symbol) fetchDateRange(symbol);
+        }, 200);
+    });
     
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.input-wrapper')) {
             hideAutocomplete(DOM.backtestingAutocomplete);
         }
     });
+    
+    // Override the selectStock function to also fetch date range
+    const originalSelectStock = window.selectStock;
+    window.selectStock = function(symbol) {
+        if (originalSelectStock) originalSelectStock(symbol);
+        // Also update backtest symbol if visible
+        if (DOM.backtestingSymbol && document.getElementById('backtesting-view')?.style.display !== 'none') {
+            DOM.backtestingSymbol.value = symbol;
+            fetchDateRange(symbol);
+        }
+    };
     
     setDefaultDateRange();
 }
@@ -54,15 +72,76 @@ function setMode(mode) {
     }
 }
 
+// Global variable to store available date range
+let availableDateRange = null;
+
+async function fetchDateRange(symbol) {
+    if (!symbol) return;
+    
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/stock/${symbol}/date_range`, {
+            headers: getAuthHeaders()
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            availableDateRange = data;
+            updateDateInputs(data);
+            showDateRangeInfo(data);
+        }
+    } catch (error) {
+        console.error('Error fetching date range:', error);
+    }
+}
+
+function updateDateInputs(dateRange) {
+    if (!dateRange) return;
+    
+    // Set start date to first available date
+    if (DOM.startDate) {
+        DOM.startDate.min = dateRange.first_date;
+        DOM.startDate.max = dateRange.last_date;
+        DOM.startDate.value = dateRange.first_date;
+    }
+    
+    // Set end date to last available date (already has 31-day lag applied in backend)
+    if (DOM.endDate) {
+        DOM.endDate.min = dateRange.first_date;
+        DOM.endDate.max = dateRange.last_date;
+        DOM.endDate.value = dateRange.last_date;
+    }
+}
+
+function showDateRangeInfo(dateRange) {
+    // Remove existing info
+    let existingInfo = document.getElementById('date-range-info');
+    if (existingInfo) existingInfo.remove();
+    
+    // Add date range info banner
+    const form = DOM.backtestingForm;
+    if (!form) return;
+    
+    const infoDiv = document.createElement('div');
+    infoDiv.id = 'date-range-info';
+    infoDiv.className = 'date-range-info-banner';
+    infoDiv.innerHTML = `
+        <div class="date-range-content">
+            <span class="info-icon">📅</span>
+            <div class="info-text">
+                <strong>Available Data Range</strong>
+                <span>${dateRange.first_date} to ${dateRange.last_date}</span>
+                <span class="lag-notice">31-day SEBI compliance lag enforced</span>
+            </div>
+        </div>
+    `;
+    
+    form.insertBefore(infoDiv, form.firstChild);
+}
+
 function setDefaultDateRange() {
-    const today = new Date();
-    const oneYearAgo = new Date(today);
-    oneYearAgo.setFullYear(today.getFullYear() - 1);
-    
-    const formatDate = (date) => date.toISOString().split('T')[0];
-    
-    if (DOM.startDate) DOM.startDate.value = formatDate(oneYearAgo);
-    if (DOM.endDate) DOM.endDate.value = formatDate(today);
+    // Don't set defaults - wait for symbol selection to fetch actual range
+    if (DOM.startDate) DOM.startDate.value = '';
+    if (DOM.endDate) DOM.endDate.value = '';
 }
 
 async function handleBacktestSubmit(e) {
@@ -77,12 +156,23 @@ async function handleBacktestSubmit(e) {
     const formData = new FormData(DOM.backtestingForm);
     const params = Object.fromEntries(formData.entries());
     
+    // Use available date range if no dates selected or invalid dates
+    let startDate = params.start_date;
+    let endDate = params.end_date;
+    
+    if (!startDate && availableDateRange) {
+        startDate = availableDateRange.first_date;
+    }
+    if (!endDate && availableDateRange) {
+        endDate = availableDateRange.last_date;
+    }
+    
     const backtestData = {
         symbol: symbol,
         strategy: params.strategy,
         initial_balance: parseFloat(params.initial_balance),
-        start_date: params.start_date,
-        end_date: params.end_date,
+        start_date: startDate,
+        end_date: endDate,
         mode: currentMode,
         atr_multiplier: currentMode === 'advanced' ? parseFloat(params.atr_multiplier) : 3.0,
         risk_per_trade: currentMode === 'advanced' ? parseFloat(params.risk_per_trade) / 100 : 0.02

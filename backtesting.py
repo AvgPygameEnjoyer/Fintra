@@ -8,11 +8,11 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # SEBI Compliance Constants
-DATA_LAG_DAYS = 30
+DATA_LAG_DAYS = 31
 
 
 def get_data_lag_date() -> datetime:
-    """Get the effective date with 30-day SEBI compliance lag."""
+    """Get the effective date with 31-day SEBI compliance lag."""
     return datetime.now() - pd.Timedelta(days=DATA_LAG_DAYS)
 
 
@@ -91,8 +91,8 @@ def check_data_availability(symbol: str = None) -> Dict:
 
 def apply_sebi_lag(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Apply 30-day SEBI compliance lag to DataFrame.
-    Removes any data newer than 30 days.
+    Apply 31-day SEBI compliance lag to DataFrame.
+    Removes any data newer than 31 days.
     """
     if df.empty:
         return df
@@ -497,7 +497,7 @@ def load_stock_data(symbol: str, apply_lag: bool = True) -> Tuple[Optional[pd.Da
     
     Args:
         symbol: Stock symbol to load
-        apply_lag: Whether to apply 30-day SEBI compliance lag (default: True)
+        apply_lag: Whether to apply 31-day SEBI compliance lag (default: True)
     
     Returns:
         Tuple of (DataFrame or None, compliance_info dict)

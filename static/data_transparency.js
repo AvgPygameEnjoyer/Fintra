@@ -57,7 +57,7 @@ export function updateAnalysisHeader(symbol, effectiveDate) {
             <div class="badge-content">
                 <span class="badge-label">Historical Analysis</span>
                 <span class="badge-date">Data as of: <strong>${effectiveDate || 'N/A'}</strong></span>
-                <span class="badge-lag">30-day SEBI compliance lag enforced</span>
+                <span class="badge-lag">31-day SEBI compliance lag enforced</span>
             </div>
         </div>
     `;
@@ -136,10 +136,10 @@ export function addAIAnalysisTransparency(analysisContainerId, effectiveDate) {
             <div class="transparency-icon">🔍</div>
             <div class="transparency-content">
                 <h4>AI Analysis Transparency</h4>
-                <p>This analysis is based on <strong>historical data only</strong> (as of ${effectiveDate || 'N/A'}) and includes a mandatory 30-day lag per SEBI regulations.</p>
+                <p>This analysis is based on <strong>historical data only</strong> (as of ${effectiveDate || 'N/A'}) and includes a mandatory 31-day lag per SEBI regulations.</p>
                 <ul class="transparency-points">
                     <li>📅 <strong>Data Date:</strong> ${effectiveDate || 'N/A'} (not current)</li>
-                    <li>⏱️ <strong>Time Lag:</strong> Minimum 30 days behind real-time</li>
+                    <li>⏱️ <strong>Time Lag:</strong> Minimum 31 days behind real-time</li>
                     <li>📊 <strong>Analysis Type:</strong> Historical retrospective only</li>
                     <li>🚫 <strong>Not Current:</strong> This is NOT a current market assessment</li>
                 </ul>

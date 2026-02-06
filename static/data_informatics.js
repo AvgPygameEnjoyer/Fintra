@@ -107,7 +107,7 @@ export function addComplianceNotice(containerId) {
     notice.innerHTML = `
         <div class="notice-content">
             <span class="notice-icon">🔒</span>
-            <p><strong>SEBI Compliance Notice:</strong> This analysis uses historical data with a mandatory 30-day lag. 
+            <p><strong>SEBI Compliance Notice:</strong> This analysis uses historical data with a mandatory 31-day lag. 
             No current market data or investment advice is provided. For educational purposes only. 
             Past performance does not guarantee future results.</p>
         </div>

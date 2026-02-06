@@ -32,7 +32,7 @@ from mc_engine import MonteCarloEngine, SimulationConfig
 
 # Helper function to apply SEBI compliance lag to yfinance data
 def apply_sebi_lag_to_data(hist_df):
-    """Apply 30-day SEBI compliance lag to yfinance DataFrame."""
+    """Apply 31-day SEBI compliance lag to yfinance DataFrame."""
     if hist_df.empty:
         return hist_df
     
@@ -374,6 +374,36 @@ def get_data_availability():
         }), 500
 
 
+@api.route('/stock/<symbol>/date_range', methods=['GET'])
+def get_stock_date_range(symbol):
+    """
+    Get available date range for a specific stock symbol.
+    Returns first and last available dates from parquet data.
+    """
+    try:
+        if not symbol:
+            return jsonify(error="Symbol is required"), 400
+        
+        symbol = symbol.upper().strip()
+        df, compliance_info = load_stock_data(symbol, apply_lag=True)
+        
+        if df is None:
+            return jsonify(error=f"Data not found for symbol {symbol}"), 404
+        
+        return jsonify({
+            'symbol': symbol,
+            'first_date': df.index.min().strftime('%Y-%m-%d'),
+            'last_date': df.index.max().strftime('%Y-%m-%d'),
+            'total_days': len(df),
+            'lag_days': DATA_LAG_DAYS,
+            'lag_date': (datetime.now() - timedelta(days=DATA_LAG_DAYS)).strftime('%Y-%m-%d')
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting date range for {symbol}: {e}")
+        return jsonify(error=str(e)), 500
+
+
 # ==================== DATA & ANALYSIS ROUTES ====================
 @api.route('/get_data', methods=['POST'])
 def get_data():
@@ -396,7 +426,7 @@ def get_data():
         if hist.empty:
             return jsonify(error=f"Could not retrieve data for {symbol}"), 404
         
-        # Apply 30-day SEBI compliance lag
+        # Apply 31-day SEBI compliance lag
         hist = apply_sebi_lag_to_data(hist)
         
         if hist.empty:
@@ -584,6 +614,7 @@ def get_portfolio():
         
         portfolio_data = []
         for p in positions:
+            latest_date = None  # Initialize for transparency
             try:
                 hist = pd.DataFrame()
                 # 1. Try extracting from batch
@@ -632,6 +663,9 @@ def get_portfolio():
                 pnl_percent = (pnl / entry_value) * 100 if entry_value != 0 else 0
 
                 chart_data = clean_df(hist.tail(30), ['Date', 'Close'])
+                
+                # Get the latest date for transparency
+                latest_date = latest.name.strftime('%Y-%m-%d') if hasattr(latest.name, 'strftime') else str(latest.name)
 
                 position_payload = {
                     "id": p.id,
@@ -640,19 +674,17 @@ def get_portfolio():
                     "entry_price": p.entry_price,
                     "entry_date": p.entry_date.strftime('%Y-%m-%d'),
                     "notes": p.notes,
-                    "current_price": current_price, # Used for AI summary
+                    "current_price": current_price,
                     "current_value": current_value,
-                    "pnl": pnl, # Used for AI summary
-                    "pnl_percent": pnl_percent, # Used for AI summary
+                    "pnl": pnl,
+                    "pnl_percent": pnl_percent,
                     "rsi": latest.get('RSI'),
                     "ma5": latest.get('MA5'),
                     "ma10": latest.get('MA10'),
                     "macd_status": macd_status,
-                    "chart_data": chart_data
+                    "chart_data": chart_data,
+                    "data_date": latest_date  # Include the date of the data for transparency
                 }
-
-                # Get the new AI Position Summary
-                position_payload['ai_position_summary'] = get_gemini_position_summary(position_payload)
 
                 portfolio_data.append(position_payload)
 
@@ -666,7 +698,7 @@ def get_portfolio():
                     "notes": p.notes, "current_price": p.entry_price, "current_value": p.quantity * p.entry_price,
                     "pnl": 0, "pnl_percent": 0,
                     "rsi": None, "ma5": None, "ma10": None, "macd_status": "N/A", "chart_data": [],
-                    "ai_position_summary": "⚠️ AI summary could not be generated due to a data error."
+                    "data_date": None
                 })
 
         return jsonify(portfolio_data), 200
@@ -788,6 +820,18 @@ def run_backtest():
         df, compliance_info = load_stock_data(symbol, apply_lag=True)
         if df is None:
             return jsonify(error=f"Data not found for symbol {symbol}. Please check if it's a valid Indian stock."), 404
+        
+        # Get available date range from the data
+        available_first_date = df.index.min().strftime('%Y-%m-%d')
+        available_last_date = df.index.max().strftime('%Y-%m-%d')
+        
+        # Validate dates
+        if start_date and start_date < available_first_date:
+            return jsonify(error=f"Start date {start_date} is before available data start ({available_first_date})"), 400
+        if end_date and end_date > available_last_date:
+            return jsonify(error=f"End date {end_date} is after available data end ({available_last_date})"), 400
+        if start_date and end_date and start_date > end_date:
+            return jsonify(error="Start date cannot be after end date"), 400
 
         engine = BacktestEngine(df)
         result_df = engine.run_strategy(strategy)
@@ -831,7 +875,7 @@ quantitative decomposition of HISTORICAL backtest data. This is pure historical 
 
 **⚠️ CRITICAL CONTEXT: HISTORICAL BACKTEST ONLY ⚠️**
 - This is a backtest of historical data from {start_date} to {end_date}
-- Data includes a mandatory 30-day SEBI compliance lag
+- Data includes a mandatory 31-day SEBI compliance lag
 - This analysis examines what happened in the past, not what to do now
 - All performance metrics are hypothetical historical simulations
 

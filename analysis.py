@@ -229,7 +229,7 @@ You are the **Fintra Historical Data Interpreter**. Your role is to describe his
 You are NOT an advisor; you are a lens through which the user views PAST data only.
 
 **⚠️ CRITICAL CONTEXT: HISTORICAL DATA ONLY ⚠️**
-- The data provided is historical and is at least 30 days old (most recent data point: {latest_date})
+- The data provided is historical and is at least 31 days old (most recent data point: {latest_date})
 - This is NOT current market data
 - All analysis must be framed as historical retrospective, not current assessment
 - You are analyzing what happened in the past, not what is happening now
@@ -292,7 +292,7 @@ decomposition of a user's specific stock position based on HISTORICAL data only.
 You act as a data lens viewing the past, not a financial advisor.
 
 **⚠️ CRITICAL CONTEXT: HISTORICAL DATA ONLY (As of {latest_date}) ⚠️**
-- All price data is historical and at least 30 days old
+- All price data is historical and at least 31 days old
 - This is NOT a current assessment of the position
 - Analysis must be framed as historical retrospective
 - Use past tense to describe the position status
@@ -415,7 +415,7 @@ def generate_rule_based_analysis(symbol: str, latest_data: List[Dict], lookback:
             f"### ⏰ HISTORICAL TECHNICAL ANALYSIS",
             f"**{symbol}** | Data as of: **{latest_date}** | 30-Day SEBI Compliance Lag",
             "",
-            f"⚠️ **This is historical data analysis only. All data is at least 30 days old per SEBI regulations.**",
+            f"⚠️ **This is historical data analysis only. All data is at least 31 days old per SEBI regulations.**",
             "",
             f"---",
             "",

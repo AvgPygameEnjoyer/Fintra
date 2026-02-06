@@ -371,9 +371,6 @@ function createPositionCard(pos) {
     const pnlSign = pos.pnl >= 0 ? '+' : '';
     const company = STATE.stockDatabase.find(s => s.symbol === pos.symbol);
 
-    // Use marked.parse for the AI summary. It will be available globally from index.html.
-    const aiSummaryHtml = pos.ai_position_summary ? marked.parse(pos.ai_position_summary) : '<p>AI summary is being generated...</p>';
-
     return `
         <div class="position-card" data-id="${pos.id}" data-symbol="${pos.symbol}">
             <div class="position-card-header">
@@ -390,43 +387,120 @@ function createPositionCard(pos) {
                 </div>
             </div>
             <div class="position-card-body">
-                <div class="position-pnl ${pnlClass}">
-                    <div class="pnl-amount">${pnlSign}$${pos.pnl.toFixed(2)}</div>
-                    <div class="pnl-percent">(${pnlSign}${pos.pnl_percent.toFixed(2)}%)</div>
+                <div class="position-data-matrix">
+                    <!-- Section 1: Position Overview -->
+                    <div class="matrix-section">
+                        <div class="matrix-header">
+                            <span class="matrix-icon">📊</span>
+                            <span class="matrix-title">Position Overview</span>
+                        </div>
+                        <div class="matrix-content">
+                            <div class="matrix-row">
+                                <span class="matrix-label">Stock:</span>
+                                <span class="matrix-value">${pos.symbol}</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span class="matrix-label">Shares:</span>
+                                <span class="matrix-value">${pos.quantity}</span>
+                            </div>
+                            <div class="matrix-row ${pnlClass}">
+                                <span class="matrix-label">Total P&L:</span>
+                                <span class="matrix-value">${pnlSign}$${pos.pnl.toFixed(2)} (${pnlSign}${pos.pnl_percent.toFixed(2)}%)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Cost Basis -->
+                    <div class="matrix-section">
+                        <div class="matrix-header">
+                            <span class="matrix-icon">💰</span>
+                            <span class="matrix-title">Cost Basis</span>
+                        </div>
+                        <div class="matrix-content">
+                            <div class="matrix-row">
+                                <span class="matrix-label">Quantity:</span>
+                                <span class="matrix-value">${pos.quantity} shares</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span class="matrix-label">Avg Cost:</span>
+                                <span class="matrix-value">$${pos.entry_price.toFixed(2)}</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span class="matrix-label">Total Cost:</span>
+                                <span class="matrix-value">$${(pos.quantity * pos.entry_price).toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Market Data -->
+                    <div class="matrix-section">
+                        <div class="matrix-header">
+                            <span class="matrix-icon">📈</span>
+                            <span class="matrix-title">Market Metrics</span>
+                        </div>
+                        <div class="matrix-content">
+                            <div class="matrix-row">
+                                <span class="matrix-label">MA5:</span>
+                                <span class="matrix-value">${pos.ma5 != null ? '$'+pos.ma5.toFixed(2) : 'N/A'}</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span class="matrix-label">MA10:</span>
+                                <span class="matrix-value">${pos.ma10 != null ? '$'+pos.ma10.toFixed(2) : 'N/A'}</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span class="matrix-label">Market Value:</span>
+                                <span class="matrix-value">$${pos.current_value.toFixed(2)}</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span class="matrix-label">RSI (14):</span>
+                                <span class="matrix-value" style="color: ${getRsiColor(pos.rsi)}">${pos.rsi != null ? pos.rsi.toFixed(2) : 'N/A'}</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span class="matrix-label">MACD:</span>
+                                <span class="matrix-value">${pos.macd_status || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Profit/Loss Analysis -->
+                    <div class="matrix-section">
+                        <div class="matrix-header">
+                            <span class="matrix-icon">💵</span>
+                            <span class="matrix-title">P&L Analysis</span>
+                        </div>
+                        <div class="matrix-content">
+                            <div class="matrix-row">
+                                <span class="matrix-label">Entry Value:</span>
+                                <span class="matrix-value">$${(pos.quantity * pos.entry_price).toFixed(2)}</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span class="matrix-label">Current Value:</span>
+                                <span class="matrix-value">$${pos.current_value.toFixed(2)}</span>
+                            </div>
+                            <div class="matrix-row">
+                                <span class="matrix-label">Price Change:</span>
+                                <span class="matrix-value">$${(pos.current_price - pos.entry_price).toFixed(2)} per share</span>
+                            </div>
+                            <div class="matrix-row ${pnlClass}">
+                                <span class="matrix-label">Net P&L:</span>
+                                <span class="matrix-value highlight">${pnlSign}$${pos.pnl.toFixed(2)} (${pnlSign}${pos.pnl_percent.toFixed(2)}%)</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="position-details">
-                    <div>
-                        <span>Quantity</span>
-                        <strong>${pos.quantity}</strong>
-                    </div>
-                    <div>
-                        <span>Avg. Cost</span>
-                        <strong>$${pos.entry_price.toFixed(2)}</strong>
-                    </div>
-                    <div>
-                        <span>Mkt. Value</span>
-                        <strong>$${pos.current_value.toFixed(2)}</strong>
-                    </div>
-                </div>
-                <div class="position-indicators">
-                    <div class="indicator-item">
-                        <span>RSI (14)</span>
-                        <strong style="color: ${getRsiColor(pos.rsi)}">${pos.rsi != null ? pos.rsi.toFixed(2) : 'N/A'}</strong>
-                    </div>
-                    <div class="indicator-item">
-                        <span>MA5 / MA10</span>
-                        <strong>${pos.ma5 != null ? '$'+pos.ma5.toFixed(2) : 'N/A'} / ${pos.ma10 != null ? '$'+pos.ma10.toFixed(2) : 'N/A'}</strong>
-                    </div>
-                    <div class="indicator-item">
-                        <span>MACD Status</span>
-                        <strong>${pos.macd_status || 'N/A'}</strong>
-                    </div>
-                </div>
+
                 <div class="position-chart-container">
                     <canvas id="chart-${pos.id}"></canvas>
                 </div>
-                <div class="position-ai-summary">
-                    ${aiSummaryHtml}
+
+                <div class="position-health-notice">
+                    <div class="health-banner">
+                        <span class="health-icon">📅</span>
+                        <div class="health-content">
+                            <strong>Historical Position Data</strong>
+                            <span>All metrics shown are based on historical data with 31-day SEBI compliance lag. This is not a real-time position health assessment.</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

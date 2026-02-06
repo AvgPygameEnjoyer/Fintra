@@ -1,6 +1,6 @@
 """
 Data Compliance Module
-Handles SEBI compliance requirements including 30-day data lag
+Handles SEBI compliance requirements including 31-day data lag
 and data availability tracking.
 """
 import os
@@ -12,14 +12,14 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 # Constants for SEBI compliance
-DATA_LAG_DAYS = 30
+DATA_LAG_DAYS = 31
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), 'data')
 
 
 class DataComplianceManager:
     """
     Manages SEBI compliance requirements for data handling.
-    Ensures 30-day lag and tracks data availability.
+    Ensures 31-day lag and tracks data availability.
     """
     
     def __init__(self):
@@ -30,8 +30,8 @@ class DataComplianceManager:
         
     def get_current_date_with_lag(self) -> datetime:
         """
-        Get the current effective date with 30-day lag applied.
-        This ensures no data newer than 30 days is displayed.
+        Get the current effective date with 31-day lag applied.
+        This ensures no data newer than 31 days is displayed.
         """
         today = datetime.now()
         lag_date = today - timedelta(days=self.data_lag_days)
@@ -129,14 +129,14 @@ class DataComplianceManager:
             return (
                 f"📊 Data Range: {first_date.strftime('%Y-%m-%d')} to {last_date.strftime('%Y-%m-%d')} "
                 f"({data_range} days)\n"
-                f"⏱️ SEBI Compliance: 30-day lag enforced (effective date: {lag_date.strftime('%Y-%m-%d')})\n"
+                f"⏱️ SEBI Compliance: 31-day lag enforced (effective date: {lag_date.strftime('%Y-%m-%d')})\n"
                 f"⚠️  Data is {days_behind} days behind the lag requirement"
             )
         else:
             return (
                 f"📊 Data Range: {first_date.strftime('%Y-%m-%d')} to {last_date.strftime('%Y-%m-%d')} "
                 f"({data_range} days)\n"
-                f"✅ SEBI Compliance: 30-day lag active (effective date: {lag_date.strftime('%Y-%m-%d')})"
+                f"✅ SEBI Compliance: 31-day lag active (effective date: {lag_date.strftime('%Y-%m-%d')})"
             )
     
     def filter_data_with_lag(self, df: pd.DataFrame) -> pd.DataFrame:
