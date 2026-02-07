@@ -1,8 +1,7 @@
 # ==================================================
-# Direct Application Dependencies
+# Core Application Dependencies (Lightweight)
 # ==================================================
-# List only the packages your application directly imports.
-# Pip will handle resolving and installing all sub-dependencies.
+# Install these first for faster builds
 
 Flask>=3.0.0
 Flask-SQLAlchemy>=3.1.1
@@ -17,9 +16,10 @@ psycopg2-binary>=2.9.9
 pandas>=2.2.0
 numpy>=1.26.0
 pyarrow>=22.0.0
-
-# Redis and Vector Search
 redis>=5.0.0
-redisvl>=0.3.0
-sentence-transformers>=2.5.0
 flask-limiter>=3.5.0
+
+# Heavy ML dependencies - uncomment after first successful deploy
+# These take 15-20 minutes to install and should be cached
+# redisvl>=0.3.0
+# sentence-transformers>=2.5.0
