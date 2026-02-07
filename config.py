@@ -71,17 +71,24 @@ class Config:
     # Production Frontend URL
     CLIENT_REDIRECT_URL = f"{CLIENT_ORIGIN}/dashboard.html"
 
-    # JWT Configuration
-    # These MUST be loaded from the environment for stability across restarts.
-    ACCESS_TOKEN_JWT_SECRET = os.getenv('ACCESS_TOKEN_JWT_SECRET')
-    REFRESH_TOKEN_JWT_SECRET = os.getenv('REFRESH_TOKEN_JWT_SECRET')
-    ACCESS_TOKEN_EXPIRETIME = '15m'
-    REFRESH_TOKEN_EXPIRETIME = '7d'
+# JWT Configuration
+# Auto-generate if not set (for Render deployment), but warn that they should be set explicitly
+ACCESS_TOKEN_JWT_SECRET = os.getenv('ACCESS_TOKEN_JWT_SECRET')
+REFRESH_TOKEN_JWT_SECRET = os.getenv('REFRESH_TOKEN_JWT_SECRET')
+ACCESS_TOKEN_EXPIRETIME = '15m'
+REFRESH_TOKEN_EXPIRETIME = '7d'
 
-    if not ACCESS_TOKEN_JWT_SECRET or not REFRESH_TOKEN_JWT_SECRET:
-        raise EnvironmentError(
-            "FATAL: ACCESS_TOKEN_JWT_SECRET and REFRESH_TOKEN_JWT_SECRET must be set in the .env file."
-        )
+# Auto-generate secrets if not provided (Render free tier friendly)
+_is_production = os.getenv('RENDER') is not None or os.getenv('FLASK_ENV') == 'production'
+if not ACCESS_TOKEN_JWT_SECRET:
+    ACCESS_TOKEN_JWT_SECRET = secrets.token_hex(32)
+    if _is_production:
+        print("WARNING: ACCESS_TOKEN_JWT_SECRET not set, auto-generated. Set this in Render env vars for persistence.")
+
+if not REFRESH_TOKEN_JWT_SECRET:
+    REFRESH_TOKEN_JWT_SECRET = secrets.token_hex(32)
+    if _is_production:
+        print("WARNING: REFRESH_TOKEN_JWT_SECRET not set, auto-generated. Set this in Render env vars for persistence.")
 
     # OAuth Scopes
     SCOPES = [

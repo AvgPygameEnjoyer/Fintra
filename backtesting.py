@@ -314,7 +314,7 @@ class BacktestEngine:
         
         return result
 
-    def get_performance_summary(self, initial_capital=100000, is_long_only=True, start_date=None, end_date=None, 
+    def get_performance_summary(self, initial_capital=100000.0, is_long_only=True, start_date=None, end_date=None, 
                                 atr_multiplier=3.0, tax_rate=0.002):
         """
         Event-Driven Backtest Simulator.

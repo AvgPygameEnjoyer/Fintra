@@ -22,6 +22,15 @@ from auth import (
 )
 from database import db
 from models import User, Position
+from validation import (
+    validate_symbol, sanitize_string, validate_float, validate_int,
+    validate_date, validate_date_range, validate_required_fields, validate_strategy,
+    create_validation_error,
+    POSITION_QUANTITY_MIN, POSITION_QUANTITY_MAX, POSITION_PRICE_MIN, POSITION_PRICE_MAX,
+    POSITION_NOTES_MAX_LENGTH,
+    BACKTEST_BALANCE_MIN, BACKTEST_BALANCE_MAX, BACKTEST_ATR_MULTIPLIER_MIN,
+    BACKTEST_ATR_MULTIPLIER_MAX, BACKTEST_RISK_PER_TRADE_MIN, BACKTEST_RISK_PER_TRADE_MAX
+)
 from analysis import (
     latest_symbol_data, conversation_context, clean_df,
     compute_rsi, compute_macd, generate_rule_based_analysis, call_gemini_api,
@@ -423,11 +432,18 @@ def get_data():
         return auth_response
     logger.info("Received request for /api/get_data") # This log is now reachable
     data = request.get_json()
-    symbol = data.get('symbol', '').upper().strip()
+    if not data:
+        return jsonify(error="Request body is required"), 400
+    
+    # Validate symbol against whitelist
+    symbol = data.get('symbol', '').strip()
+    is_valid, error_msg = validate_symbol(symbol)
+    if not is_valid:
+        return jsonify(error=error_msg), 400
+    
     user_id, _ = get_user_from_token()
-
-    if not symbol:
-        return jsonify(error="No symbol provided"), 400
+    
+    symbol = symbol.upper()
 
     try:
         ticker = yf.Ticker(symbol)
@@ -521,7 +537,12 @@ def chat():
     if not data:
         return jsonify(error="No data provided"), 400
 
-    query = data.get('query', '').strip()
+    # Validate and sanitize query (XSS protection)
+    raw_query = data.get('query', '')
+    query, error_msg = sanitize_string(raw_query, max_length=500, allow_html=False)
+    if error_msg:
+        return jsonify(error=f"Invalid query: {error_msg}"), 400
+    
     if not query:
         return jsonify(error="No query provided"), 400
 
@@ -821,42 +842,92 @@ def get_portfolio_positions_list():
 
 @api.route('/positions', methods=['POST'])
 def add_position():
-    """Add a new position to the user's portfolio."""
+    """Add a new position to the user's portfolio with comprehensive validation."""
     auth_response = require_auth()
     if auth_response: return auth_response
-    
+
     _, db_user = get_user_from_token()
     if not db_user: return jsonify(error="Database user not found."), 401
 
     data = request.get_json()
-    # Basic validation
-    required_fields = ['symbol', 'quantity', 'entry_price']
-    if not all(field in data for field in required_fields):
-        return jsonify(error=f"Missing required fields: {', '.join(required_fields)}"), 400
+    if not data:
+        return jsonify(error="Request body is required"), 400
+    
+    # Validate required fields
+    is_valid, error_msg = validate_required_fields(data, ['symbol', 'quantity', 'entry_price'])
+    if not is_valid:
+        return jsonify(create_validation_error([error_msg])), 400
+
+    validation_errors = []
+    
+    # Validate symbol against whitelist
+    symbol = data.get('symbol', '').strip()
+    is_valid, error_msg = validate_symbol(symbol)
+    if not is_valid:
+        validation_errors.append(error_msg)
+    
+    # Validate quantity (0 to 100,000)
+    quantity, error_msg = validate_float(
+        data.get('quantity'), 'Quantity',
+        min_val=POSITION_QUANTITY_MIN, max_val=POSITION_QUANTITY_MAX
+    )
+    if error_msg:
+        validation_errors.append(error_msg)
+    
+    # Validate entry_price (0 to 1,000,000)
+    entry_price, error_msg = validate_float(
+        data.get('entry_price'), 'Entry price',
+        min_val=POSITION_PRICE_MIN, max_val=POSITION_PRICE_MAX
+    )
+    if error_msg:
+        validation_errors.append(error_msg)
+    
+    # Validate and sanitize notes (max 500 chars, strip HTML, XSS protection)
+    notes = data.get('notes', '')
+    sanitized_notes, error_msg = sanitize_string(notes, max_length=POSITION_NOTES_MAX_LENGTH, allow_html=False)
+    if error_msg:
+        validation_errors.append(f"Notes: {error_msg}")
+    
+    # Validate entry_date (YYYY-MM-DD, cannot be in future)
+    entry_date_str = data.get('entry_date')
+    entry_date = None
+    if entry_date_str:
+        entry_date_val, error_msg = validate_date(entry_date_str, 'Entry date', allow_future=False)
+        if error_msg:
+            validation_errors.append(error_msg)
+        else:
+            entry_date = entry_date_val.date()
+    else:
+        entry_date = datetime.now(timezone.utc).date()
+    
+    # Return all validation errors if any
+    if validation_errors:
+        logger.warning(f"Position validation failed: {validation_errors}")
+        return jsonify(create_validation_error(validation_errors)), 400
 
     try:
-        # Handle date parsing safely (empty string from form becomes today)
-        entry_date_str = data.get('entry_date')
-        if entry_date_str:
-            entry_date = datetime.strptime(entry_date_str, '%Y-%m-%d').date()
-        else:
-            entry_date = datetime.now(timezone.utc).date()
-
         new_position = Position(
-            symbol=data['symbol'].upper(),
-            quantity=float(data['quantity']),
-            entry_price=float(data['entry_price']),
+            symbol=symbol.upper(),
+            quantity=quantity,
+            entry_price=entry_price,
             entry_date=entry_date,
-            notes=data.get('notes'),
+            notes=sanitized_notes,
             user_id=db_user.id
         )
         db.session.add(new_position)
         db.session.commit()
-        return jsonify(id=new_position.id, message="Position added successfully"), 201
+        logger.info(f"✅ Position added: {symbol} x {quantity} for user {db_user.id}")
+        return jsonify(
+            id=new_position.id,
+            message="Position added successfully",
+            symbol=symbol.upper(),
+            quantity=quantity,
+            entry_price=entry_price
+        ), 201
     except Exception as e:
         logger.error(f"❌ Error adding position: {e}")
         db.session.rollback()
-        return jsonify(error="Failed to add position."), 500
+        return jsonify(error="Failed to add position due to database error"), 500
 
 
 @api.route('/positions/<int:position_id>', methods=['DELETE'])
@@ -879,24 +950,77 @@ def delete_position(position_id):
 @api.route('/backtest', methods=['POST'])
 def run_backtest():
     """
-    Run backtest strategy on historical data.
+    Run backtest strategy on historical data with comprehensive input validation.
     """
     auth_response = require_auth()
     if auth_response:
         return auth_response
 
     data = request.get_json()
-    symbol = data.get('symbol', '').upper().strip()
+    if not data:
+        return jsonify(error="Request body is required"), 400
+
+    validation_errors = []
+    
+    # Validate symbol against whitelist
+    symbol = data.get('symbol', '').strip()
+    is_valid, error_msg = validate_symbol(symbol)
+    if not is_valid:
+        validation_errors.append(error_msg)
+    
+    # Validate strategy
     strategy = data.get('strategy', 'composite')
-    initial_balance = float(data.get('initial_balance', 100000))
+    is_valid, error_msg = validate_strategy(strategy)
+    if not is_valid:
+        validation_errors.append(error_msg)
+    
+    # Validate initial_balance (1,000 to 10,000,000)
+    initial_balance, error_msg = validate_float(
+        data.get('initial_balance', 100000), 'Initial balance',
+        min_val=BACKTEST_BALANCE_MIN, max_val=BACKTEST_BALANCE_MAX
+    )
+    if error_msg:
+        validation_errors.append(error_msg)
+    
+    # Validate atr_multiplier (0.5 to 20)
+    atr_multiplier, error_msg = validate_float(
+        data.get('atr_multiplier', 3.0), 'ATR multiplier',
+        min_val=BACKTEST_ATR_MULTIPLIER_MIN, max_val=BACKTEST_ATR_MULTIPLIER_MAX
+    )
+    if error_msg:
+        validation_errors.append(error_msg)
+    
+    # Validate risk_per_trade (0.001 to 0.5)
+    risk_per_trade, error_msg = validate_float(
+        data.get('risk_per_trade', 0.02), 'Risk per trade',
+        min_val=BACKTEST_RISK_PER_TRADE_MIN, max_val=BACKTEST_RISK_PER_TRADE_MAX
+    )
+    if error_msg:
+        validation_errors.append(error_msg)
+    
+    # Get date strings for validation
     start_date = data.get('start_date')
     end_date = data.get('end_date')
-    mode = data.get('mode', 'beginner')
-    atr_multiplier = float(data.get('atr_multiplier', 3.0))
-    risk_per_trade = float(data.get('risk_per_trade', 0.02))
-
-    if not symbol:
-        return jsonify(error="No symbol provided"), 400
+    
+    # Validate date range (not in the future, start <= end)
+    if start_date or end_date:
+        if start_date and end_date:
+            is_valid, error_msg = validate_date_range(start_date, end_date)
+            if not is_valid:
+                validation_errors.append(error_msg)
+        elif start_date:
+            _, error_msg = validate_date(start_date, 'Start date', allow_future=False)
+            if error_msg:
+                validation_errors.append(error_msg)
+        elif end_date:
+            _, error_msg = validate_date(end_date, 'End date', allow_future=False)
+            if error_msg:
+                validation_errors.append(error_msg)
+    
+    # Return all validation errors if any
+    if validation_errors:
+        logger.warning(f"Backtest validation failed: {validation_errors}")
+        return jsonify(create_validation_error(validation_errors)), 400
 
     try:
         df, compliance_info = load_stock_data(symbol, apply_lag=True)
@@ -1021,33 +1145,94 @@ quantitative decomposition of HISTORICAL backtest data. This is pure historical 
 @api.route('/backtest/monte_carlo', methods=['POST'])
 def run_monte_carlo():
     """
-    Run Monte Carlo simulation analysis on backtest results.
-    
+    Run Monte Carlo simulation analysis on backtest results with input validation.
+
     This endpoint analyzes whether backtest results are due to luck or skill
     by running thousands of randomized simulations.
     """
     auth_response = require_auth()
     if auth_response:
         return auth_response
-    
+
     data = request.get_json()
+    if not data:
+        return jsonify(error="Request body is required"), 400
+
+    validation_errors = []
     
     # Required parameters
     trades = data.get('trades', [])
-    prices = data.get('prices', [])  # List of historical prices
+    prices = data.get('prices', [])
     
-    # Optional parameters
-    num_simulations = int(data.get('num_simulations', 10000))
-    seed = int(data.get('seed', 0))
-    initial_capital = float(data.get('initial_capital', 100000))
+    # Validate trades is a list with at least 2 items
+    if not isinstance(trades, list):
+        validation_errors.append("Trades must be an array")
+    elif len(trades) < 2:
+        validation_errors.append("At least 2 trades required for Monte Carlo analysis")
+    elif len(trades) > 10000:
+        validation_errors.append("Maximum 10,000 trades allowed")
     
-    # Original strategy metrics for comparison
-    original_return = float(data.get('original_return', 0))
-    original_sharpe = float(data.get('original_sharpe', 0))
-    original_max_dd = float(data.get('original_max_dd', 0))
+    # Validate prices is a list if provided
+    if prices and not isinstance(prices, list):
+        validation_errors.append("Prices must be an array")
+    elif prices and len(prices) > 100000:
+        validation_errors.append("Maximum 100,000 price points allowed")
     
-    if not trades or len(trades) < 2:
-        return jsonify(error="At least 2 trades required for Monte Carlo analysis"), 400
+    # Validate num_simulations (100 to 100000)
+    num_simulations, error_msg = validate_int(
+        data.get('num_simulations', 10000), 'Number of simulations',
+        min_val=100, max_val=100000
+    )
+    if error_msg:
+        validation_errors.append(error_msg)
+    
+    # Validate seed
+    seed_val = data.get('seed', 0)
+    try:
+        seed = int(seed_val)
+        if seed < 0:
+            validation_errors.append("Seed must be a non-negative integer")
+    except (ValueError, TypeError):
+        validation_errors.append("Seed must be a valid integer")
+        seed = 0
+    
+    # Validate initial_capital
+    initial_capital, error_msg = validate_float(
+        data.get('initial_capital', 100000), 'Initial capital',
+        min_val=1000, max_val=100000000
+    )
+    if error_msg:
+        validation_errors.append(error_msg)
+    
+    # Validate numeric metrics
+    try:
+        original_return = float(data.get('original_return', 0))
+        if not (-1000 <= original_return <= 1000):
+            validation_errors.append("Original return must be between -1000% and 1000%")
+    except (ValueError, TypeError):
+        validation_errors.append("Original return must be a valid number")
+        original_return = 0
+    
+    try:
+        original_sharpe = float(data.get('original_sharpe', 0))
+        if not (-100 <= original_sharpe <= 100):
+            validation_errors.append("Original Sharpe ratio must be between -100 and 100")
+    except (ValueError, TypeError):
+        validation_errors.append("Original Sharpe ratio must be a valid number")
+        original_sharpe = 0
+    
+    try:
+        original_max_dd = float(data.get('original_max_dd', 0))
+        if not (-100 <= original_max_dd <= 0):
+            validation_errors.append("Original max drawdown must be between -100% and 0%")
+    except (ValueError, TypeError):
+        validation_errors.append("Original max drawdown must be a valid number")
+        original_max_dd = 0
+    
+    # Return validation errors if any
+    if validation_errors:
+        logger.warning(f"Monte Carlo validation failed: {validation_errors}")
+        return jsonify(create_validation_error(validation_errors)), 400
     
     try:
         logger.info(f"🎲 Starting Monte Carlo analysis: {num_simulations} simulations")
