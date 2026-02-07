@@ -11,14 +11,14 @@ class Config:
 
     # Flask Settings
     SECRET_KEY = os.getenv('FLASK_SECRET_KEY')
-    
+
     # Detect environment: Assume production if RENDER env var is set or FLASK_ENV is production
     # We default to True if not explicitly development to ensure security headers on cloud deployments
     IS_PRODUCTION = os.getenv('RENDER') is not None or os.getenv('FLASK_ENV') == 'production' or os.getenv('FLASK_ENV') != 'development'
-    
+
     # Force secure cookies in production for cross-site usage (Vercel -> Render)
     SESSION_COOKIE_SECURE = IS_PRODUCTION
-    SESSION_COOKIE_SAMESITE = 'None' if IS_PRODUCTION else 'Lax' 
+    SESSION_COOKIE_SAMESITE = 'None' if IS_PRODUCTION else 'Lax'
 
     # Define a data directory, configurable via environment variable. Defaults to the project root.
     DATA_DIR = os.getenv('DATA_DIR', os.path.dirname(os.path.abspath(__file__)))
@@ -27,7 +27,7 @@ class Config:
     # Check for DATABASE_URL. If provided by Render/Neon, it might start with 'postgres://'
     # SQLAlchemy requires 'postgresql://', so we fix it if necessary.
     _db_url = os.getenv('DATABASE_URL')
-    
+
     # Robust cleaning: strip whitespace and quotes that might have been pasted in
     if _db_url:
         _db_url = _db_url.strip().strip('"').strip("'")
@@ -61,7 +61,7 @@ class Config:
     # Default to production URLs if running on Render (IS_PRODUCTION is True)
     _default_client = 'https://fintraio.vercel.app' if IS_PRODUCTION else 'http://localhost:5000'
     CLIENT_ORIGIN = os.getenv('CLIENT_ORIGIN', _default_client).rstrip('/')
-    
+
     _default_backend = 'https://stock-dashboard-fqtn.onrender.com' if IS_PRODUCTION else 'http://localhost:5000'
     BACKEND_ORIGIN = os.getenv('BACKEND_ORIGIN', _default_backend).rstrip('/')
 
@@ -71,24 +71,27 @@ class Config:
     # Production Frontend URL
     CLIENT_REDIRECT_URL = f"{CLIENT_ORIGIN}/dashboard.html"
 
-# JWT Configuration
-# Auto-generate if not set (for Render deployment), but warn that they should be set explicitly
-ACCESS_TOKEN_JWT_SECRET = os.getenv('ACCESS_TOKEN_JWT_SECRET')
-REFRESH_TOKEN_JWT_SECRET = os.getenv('REFRESH_TOKEN_JWT_SECRET')
-ACCESS_TOKEN_EXPIRETIME = '15m'
-REFRESH_TOKEN_EXPIRETIME = '7d'
+    # JWT Configuration
+    # Auto-generate if not set (for Render deployment), but warn that they should be set explicitly
+    _access_token_secret = os.getenv('ACCESS_TOKEN_JWT_SECRET')
+    _refresh_token_secret = os.getenv('REFRESH_TOKEN_JWT_SECRET')
+    ACCESS_TOKEN_EXPIRETIME = '15m'
+    REFRESH_TOKEN_EXPIRETIME = '7d'
 
-# Auto-generate secrets if not provided (Render free tier friendly)
-_is_production = os.getenv('RENDER') is not None or os.getenv('FLASK_ENV') == 'production'
-if not ACCESS_TOKEN_JWT_SECRET:
-    ACCESS_TOKEN_JWT_SECRET = secrets.token_hex(32)
-    if _is_production:
-        print("WARNING: ACCESS_TOKEN_JWT_SECRET not set, auto-generated. Set this in Render env vars for persistence.")
+    # Auto-generate secrets if not provided (Render free tier friendly)
+    _is_production_check = os.getenv('RENDER') is not None or os.getenv('FLASK_ENV') == 'production'
+    if not _access_token_secret:
+        _access_token_secret = secrets.token_hex(32)
+        if _is_production_check:
+            print("WARNING: ACCESS_TOKEN_JWT_SECRET not set, auto-generated. Set this in Render env vars for persistence.")
 
-if not REFRESH_TOKEN_JWT_SECRET:
-    REFRESH_TOKEN_JWT_SECRET = secrets.token_hex(32)
-    if _is_production:
-        print("WARNING: REFRESH_TOKEN_JWT_SECRET not set, auto-generated. Set this in Render env vars for persistence.")
+    if not _refresh_token_secret:
+        _refresh_token_secret = secrets.token_hex(32)
+        if _is_production_check:
+            print("WARNING: REFRESH_TOKEN_JWT_SECRET not set, auto-generated. Set this in Render env vars for persistence.")
+
+    ACCESS_TOKEN_JWT_SECRET = _access_token_secret
+    REFRESH_TOKEN_JWT_SECRET = _refresh_token_secret
 
     # OAuth Scopes
     SCOPES = [
