@@ -19,7 +19,14 @@ pyarrow>=22.0.0
 redis>=5.0.0
 flask-limiter>=3.5.0
 
-# Heavy ML dependencies - uncomment after first successful deploy
-# These take 15-20 minutes to install and should be cached
+# Redis Vector Library (lightweight, works on Render free tier)
 redisvl>=0.3.0
-sentence-transformers>=2.5.0
+
+# Lightweight embedding model - only ~10MB, no PyTorch needed
+# Falls back to sentence-transformers or disabled if not available
+fastembed>=0.3.0
+
+# Heavy ML dependency - commented out due to Render build timeout
+# sentence-transformers requires PyTorch (~2GB) and causes 20+ minute builds
+# FastEmbed is preferred, but this is fallback option
+# sentence-transformers>=2.5.0

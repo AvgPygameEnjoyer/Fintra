@@ -5,14 +5,43 @@ Implements vector search using Redis for knowledge retrieval
 import json
 import os
 from typing import List, Dict, Optional, Any
-from sentence_transformers import SentenceTransformer
 import logging
 from pathlib import Path
-import numpy as np
 
 from redis_client import redis_client, RedisConfig
 
 logger = logging.getLogger(__name__)
+
+# Try lightweight embedding libraries in order of preference
+EMBEDDING_BACKEND = None
+
+# Option 1: FastEmbed (lightweight, ~10MB, no PyTorch)
+try:
+    from fastembed import TextEmbedding
+    EMBEDDING_BACKEND = 'fastembed'
+    logger.info("✅ FastEmbed available - using lightweight embeddings")
+except ImportError:
+    pass
+
+# Option 2: sentence-transformers (heavy, fallback)
+if EMBEDDING_BACKEND is None:
+    try:
+        from sentence_transformers import SentenceTransformer
+        EMBEDDING_BACKEND = 'sentence_transformers'
+        logger.info("✅ sentence-transformers available")
+    except ImportError:
+        pass
+
+if EMBEDDING_BACKEND is None:
+    logger.warning("⚠️ No embedding library available. RAG features disabled. Install fastembed for lightweight option.")
+
+# numpy is required for all backends
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    logger.error("❌ NumPy not available - RAG features disabled")
 
 class RAGEngine:
     """
@@ -28,24 +57,52 @@ class RAGEngine:
         self.similarity_threshold = RedisConfig.SIMILARITY_THRESHOLD
         
     def _load_model(self):
-        """Load the sentence transformer model"""
+        """Load the embedding model (FastEmbed or sentence-transformers)"""
+        if not NUMPY_AVAILABLE:
+            logger.warning("NumPy not available. RAG features disabled.")
+            self.model = None
+            return
+            
+        if EMBEDDING_BACKEND is None:
+            logger.warning("No embedding library available. Install fastembed or sentence-transformers.")
+            self.model = None
+            return
+            
         try:
-            logger.info("Loading embedding model...")
-            self.model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("✅ Embedding model loaded successfully")
+            logger.info(f"Loading embedding model (backend: {EMBEDDING_BACKEND})...")
+            
+            if EMBEDDING_BACKEND == 'fastembed':
+                # FastEmbed - lightweight, no PyTorch
+                self.model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+                logger.info("✅ FastEmbed model loaded successfully")
+            elif EMBEDDING_BACKEND == 'sentence_transformers':
+                # sentence-transformers - heavy fallback
+                self.model = SentenceTransformer('all-MiniLM-L6-v2')
+                logger.info("✅ SentenceTransformer model loaded successfully")
+            else:
+                self.model = None
+                
         except Exception as e:
             logger.error(f"❌ Failed to load embedding model: {e}")
             self.model = None
     
     def embed_text(self, text: str) -> Optional[List[float]]:
         """Generate embedding vector for text"""
-        if not self.model:
+        if not self.model or not NUMPY_AVAILABLE:
             logger.error("Embedding model not available")
             return None
         
         try:
-            embedding = self.model.encode(text, convert_to_tensor=False)
-            return embedding.tolist()
+            if EMBEDDING_BACKEND == 'fastembed':
+                # FastEmbed returns generator, convert to list
+                embedding = list(self.model.embed([text]))[0]
+                return embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
+            elif EMBEDDING_BACKEND == 'sentence_transformers':
+                # sentence-transformers
+                embedding = self.model.encode(text, convert_to_tensor=False)
+                return embedding.tolist()
+            else:
+                return None
         except Exception as e:
             logger.error(f"Error generating embedding: {e}")
             return None
@@ -99,6 +156,10 @@ class RAGEngine:
                      category: str = "general", tags: List[str] = None,
                      metadata: Dict = None):
         """Add a document to the vector index"""
+        if not NUMPY_AVAILABLE or not self.model:
+            logger.warning("Cannot add document: numpy or sentence-transformers not available")
+            return False
+            
         try:
             client = redis_client.get_client()
             if not client:
@@ -139,10 +200,14 @@ class RAGEngine:
         Search for similar documents
         Returns list of documents with similarity scores
         """
+        if not NUMPY_AVAILABLE or not self.model:
+            logger.warning("Cannot search: numpy or sentence-transformers not available")
+            return []
+            
         try:
             client = redis_client.get_client()
-            if not client or not self.model:
-                logger.warning("Redis or model not available, returning empty results")
+            if not client:
+                logger.warning("Redis not available, returning empty results")
                 return []
             
             # Generate query embedding
