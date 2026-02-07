@@ -21,5 +21,5 @@ flask-limiter>=3.5.0
 
 # Heavy ML dependencies - uncomment after first successful deploy
 # These take 15-20 minutes to install and should be cached
-#redisvl>=0.3.0
+redisvl>=0.3.0
 #sentence-transformers>=2.5.0
