@@ -335,12 +335,31 @@ function handleChatSubmit() {
             body: JSON.stringify(contextData),
             credentials: 'include'
         })
-        .then(response => {
-            if (!response.ok) {
-                if (response.status === 401) {
+        .then(async response => {
+            // Handle token refresh
+            if (response.status === 401) {
+                const data = await response.json();
+                if (data.access_token && data.refresh_token) {
+                    console.log('Token refreshed by backend. Updating stored tokens.');
+                    localStorage.setItem('accessToken', data.access_token);
+                    localStorage.setItem('refreshToken', data.refresh_token);
+                    // Retry the request with new tokens
+                    return fetch(`${CONFIG.API_BASE_URL}/chat`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'Authorization': `Bearer ${data.access_token}:${data.refresh_token}`
+                        },
+                        body: JSON.stringify(contextData),
+                        credentials: 'include'
+                    });
+                } else {
                     showAuthOverlay();
                     throw new Error('Unauthorized. Please sign in again.');
                 }
+            }
+            if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             return response.json();

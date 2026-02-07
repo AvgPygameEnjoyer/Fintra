@@ -36,6 +36,12 @@ export const STATE = {
 // Export helper for auth headers
 export function getAuthHeaders() {
     if (STATE.authToken) {
+        // Include both access and refresh tokens in Authorization header
+        // Format: "Bearer access_token:refresh_token"
+        const refreshToken = localStorage.getItem('refreshToken') || '';
+        if (refreshToken) {
+            return { 'Authorization': `Bearer ${STATE.authToken}:${refreshToken}` };
+        }
         return { 'Authorization': `Bearer ${STATE.authToken}` };
     }
     return {};

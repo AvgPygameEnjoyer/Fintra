@@ -127,6 +127,35 @@ def create_app():
     
     # Trigger background initialization
     init_services_background()
+    
+    # Log Redis configuration status on startup
+    @app.before_first_request
+    def check_redis_status():
+        """Check Redis status on first request and log warnings if not configured."""
+        try:
+            from redis_client import redis_client
+            is_connected = redis_client.is_connected()
+            if not is_connected:
+                logger.warning("=" * 60)
+                logger.warning("⚠️  REDIS NOT CONNECTED")
+                logger.warning("=" * 60)
+                logger.warning("Redis is not available. The following features are disabled:")
+                logger.warning("  - Chat response caching")
+                logger.warning("  - Rate limiting on chat")
+                logger.warning("  - RAG knowledge base search")
+                logger.warning("  - OAuth state validation (CSRF protection reduced)")
+                logger.warning("")
+                logger.warning("To enable these features, set these environment variables:")
+                logger.warning("  REDIS_HOST=your-redis-host")
+                logger.warning("  REDIS_PORT=6379")
+                logger.warning("  REDIS_PASSWORD=your-password (if required)")
+                logger.warning("")
+                logger.warning("Get a free Redis instance from:")
+                logger.warning("  - Render Dashboard: https://dashboard.render.com")
+                logger.warning("  - Upstash (free tier): https://upstash.com")
+                logger.warning("=" * 60)
+        except Exception as e:
+            logger.warning(f"Could not check Redis status: {e}")
 
     # Request hooks
     @app.before_request

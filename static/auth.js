@@ -37,7 +37,8 @@ function setAuthToken(token) {
     } else {
         STATE.authToken = null;
         localStorage.removeItem('accessToken');
-        log.info('Auth token has been cleared.');
+        localStorage.removeItem('refreshToken');
+        log.info('Auth tokens have been cleared.');
     }
 }
 
@@ -73,10 +74,16 @@ export async function checkAuthStatus() {
     // This is the core fix: read the token from the URL after the backend redirect.
     const queryParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = queryParams.get('access_token');
+    const refreshTokenFromUrl = queryParams.get('refresh_token');
 
     if (tokenFromUrl) {
         log.info('Access token found in URL. Setting auth token.');
         setAuthToken(tokenFromUrl);
+        // Also store refresh token if provided
+        if (refreshTokenFromUrl) {
+            localStorage.setItem('refreshToken', refreshTokenFromUrl);
+            log.info('Refresh token also stored.');
+        }
         // Clean the URL so the token isn't visible in the address bar.
         window.history.replaceState({}, document.title, window.location.pathname);
     } else {
@@ -95,6 +102,19 @@ export async function checkAuthStatus() {
             credentials: 'include',
             headers: getAuthHeaders() // Add the token header
         });
+        
+        // Handle token refresh response
+        if (response.status === 401) {
+            const data = await response.json();
+            if (data.access_token && data.refresh_token) {
+                log.info('Token refreshed by backend. Updating stored tokens.');
+                setAuthToken(data.access_token);
+                localStorage.setItem('refreshToken', data.refresh_token);
+                // Retry the request once with new tokens
+                return checkAuthStatus();
+            }
+        }
+        
         const data = await response.json();
 
         // If backend says we are not authenticated, but we have a token, it's invalid.

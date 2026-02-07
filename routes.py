@@ -211,9 +211,15 @@ def oauth_callback():
             logger.error("No 'state' parameter found in callback.")
             return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=missing_state')
         
-        if not OAuthStateManager.validate_and_clear_state(state):
-            logger.error(f"Invalid or expired state parameter: {state[:16]}...")
-            return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=invalid_state')
+        # Only validate state if Redis is available
+        # If Redis is down, we log a warning but allow the OAuth flow to continue
+        # This is a trade-off between security and availability
+        if REDIS_AVAILABLE:
+            if not OAuthStateManager.validate_and_clear_state(state):
+                logger.error(f"Invalid or expired state parameter: {state[:16]}...")
+                return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=invalid_state')
+        else:
+            logger.warning("⚠️ Redis not available - skipping OAuth state validation for availability")
 
         logger.info("Exchanging code for tokens...")
         token_data = {

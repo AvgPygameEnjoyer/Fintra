@@ -45,6 +45,13 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         logger.warning("⚠️ Configuration Mismatch: Forcing Secure=True because SameSite='None'.")
         is_production = True
 
+    # Calculate max_age in seconds
+    access_max_age = Config.parse_time_to_seconds(Config.ACCESS_TOKEN_EXPIRETIME)
+    refresh_max_age = Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME)
+
+    logger.info(f"🍪 Setting cookies: Secure={is_production}, SameSite={samesite_mode}")
+    logger.info(f"   Access token expires in {access_max_age}s, Refresh token expires in {refresh_max_age}s")
+
     # Explicitly set path='/' to ensure cookies are sent for all API routes
     response.set_cookie(
         'access_token',
@@ -52,7 +59,7 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         httponly=True,
         secure=is_production,
         samesite=samesite_mode,
-        max_age=Config.parse_time_to_seconds(Config.ACCESS_TOKEN_EXPIRETIME),
+        max_age=access_max_age,
         domain=None,
         path='/' 
     )
@@ -63,12 +70,10 @@ def set_token_cookies(response, access_token: str, refresh_token: str):
         httponly=True,
         secure=is_production,
         samesite=samesite_mode,
-        max_age=Config.parse_time_to_seconds(Config.REFRESH_TOKEN_EXPIRETIME),
+        max_age=refresh_max_age,
         domain=None,
         path='/'
     )
-
-    logger.info(f"🍪 Cookies set. Secure={is_production}, SameSite={samesite_mode}, Domain=None (HostOnly)")
 
     # --- FIX: Add 'Partitioned' attribute for Cross-Site Tracking (CHIPS) ---
     # Modern browsers (Chrome 110+) require cookies in cross-site contexts (Vercel -> Render)
@@ -116,10 +121,21 @@ def require_auth():
     else:
         logger.info("No access_token cookie found in request.")
 
-    # 2. Try refresh token
-    refresh_token_cookie = request.cookies.get('refresh_token')
-    if refresh_token_cookie:
-        payload = verify_jwt_token(refresh_token_cookie, Config.REFRESH_TOKEN_JWT_SECRET)
+    # 2. Try refresh token from cookie or Authorization header
+    refresh_token = request.cookies.get('refresh_token')
+    
+    # Fallback: Check Authorization Header for refresh token
+    if not refresh_token:
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith("Bearer "):
+            # Try to parse two tokens: access_token:refresh_token
+            token_parts = auth_header.split(" ")[1].split(':')
+            if len(token_parts) >= 2:
+                refresh_token = token_parts[1]
+                logger.debug("Using refresh token from Authorization header")
+    
+    if refresh_token:
+        payload = verify_jwt_token(refresh_token, Config.REFRESH_TOKEN_JWT_SECRET)
         if payload:
             user_id = payload.get('user_id')
             if user_id:
@@ -130,15 +146,23 @@ def require_auth():
                     logger.info(f"Refresh token valid for user {user_id}. Issuing new access token.")
                     user_data = {'user_id': db_user.google_user_id, 'email': db_user.email, 'name': db_user.name}
                     new_access_token = generate_jwt_token(user_data, Config.ACCESS_TOKEN_JWT_SECRET, Config.ACCESS_TOKEN_EXPIRETIME)
-                    response = jsonify({"error": "Access token refreshed. Please retry the request."})
-                    set_token_cookies(response, new_access_token, refresh_token_cookie)
+                    new_refresh_token = generate_jwt_token(user_data, Config.REFRESH_TOKEN_JWT_SECRET, Config.REFRESH_TOKEN_EXPIRETIME)
+                    
+                    # Return both tokens in response for frontend to store
+                    response = jsonify({
+                        "error": "Access token refreshed",
+                        "access_token": new_access_token,
+                        "refresh_token": new_refresh_token
+                    })
+                    # Also try to set cookies as backup
+                    set_token_cookies(response, new_access_token, new_refresh_token)
                     return response, 401  # Signal client to retry
                 else:
                     logger.error(f"Refresh token is for a user ({user_id}) that does not exist in DB.")
         else:
             logger.warning("Refresh token found but verification failed.")
     else:
-        logger.info("No refresh_token cookie found in request.")
+        logger.info("No refresh_token found in request (cookie or header).")
 
     logger.warning("--- Auth check failed: No valid tokens found. Denying access. ---")
     # Clear potentially bad cookies on the client
