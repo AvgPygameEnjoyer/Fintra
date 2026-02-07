@@ -111,9 +111,9 @@ class ChatCache:
     
     @staticmethod
     def _generate_key(query: str, context: Dict) -> str:
-        """Generate cache key from query and context"""
+        """Generate cache key from query and context using SHA-256"""
         key_data = f"{query}:{json.dumps(context, sort_keys=True)}"
-        return f"chat:cache:{hashlib.md5(key_data.encode()).hexdigest()}"
+        return f"chat:cache:{hashlib.sha256(key_data.encode()).hexdigest()[:64]}"
     
     @staticmethod
     def get(query: str, context: Dict) -> Optional[str]:

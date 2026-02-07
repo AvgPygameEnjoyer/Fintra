@@ -3,7 +3,6 @@ Configuration Management Module
 Handles environment variables, secrets, and application settings.
 """
 import os
-import secrets
 from datetime import timedelta
 
 class Config:
@@ -72,26 +71,11 @@ class Config:
     CLIENT_REDIRECT_URL = f"{CLIENT_ORIGIN}/dashboard.html"
 
     # JWT Configuration
-    # Auto-generate if not set (for Render deployment), but warn that they should be set explicitly
-    _access_token_secret = os.getenv('ACCESS_TOKEN_JWT_SECRET')
-    _refresh_token_secret = os.getenv('REFRESH_TOKEN_JWT_SECRET')
+    # Secrets MUST be set via environment variables for security
+    ACCESS_TOKEN_JWT_SECRET = os.getenv('ACCESS_TOKEN_JWT_SECRET')
+    REFRESH_TOKEN_JWT_SECRET = os.getenv('REFRESH_TOKEN_JWT_SECRET')
     ACCESS_TOKEN_EXPIRETIME = '15m'
     REFRESH_TOKEN_EXPIRETIME = '7d'
-
-    # Auto-generate secrets if not provided (Render free tier friendly)
-    _is_production_check = os.getenv('RENDER') is not None or os.getenv('FLASK_ENV') == 'production'
-    if not _access_token_secret:
-        _access_token_secret = secrets.token_hex(32)
-        if _is_production_check:
-            print("WARNING: ACCESS_TOKEN_JWT_SECRET not set, auto-generated. Set this in Render env vars for persistence.")
-
-    if not _refresh_token_secret:
-        _refresh_token_secret = secrets.token_hex(32)
-        if _is_production_check:
-            print("WARNING: REFRESH_TOKEN_JWT_SECRET not set, auto-generated. Set this in Render env vars for persistence.")
-
-    ACCESS_TOKEN_JWT_SECRET = _access_token_secret
-    REFRESH_TOKEN_JWT_SECRET = _refresh_token_secret
 
     # OAuth Scopes
     SCOPES = [

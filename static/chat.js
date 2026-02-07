@@ -38,16 +38,23 @@ export function initializeChat() {
     // Fetch portfolio positions for potential context
     fetchPortfolioPositions();
 
-    // Welcome message
-    DOM.chatMessages.innerHTML = `
-        <div style="padding: 15px; text-align: center; color: #6b7280; font-size: 0.9rem; line-height: 1.5;">
-            <strong style="color: #3b82f6; font-size: 1.1rem;">👋 Welcome to Fintra!</strong>
-            <p style="margin-top: 10px;">I'm here to help you learn about technical analysis and market patterns using historical data.</p>
-            <p style="margin-top: 8px; font-size: 0.85rem; color: #9ca3af;">
+    // Welcome message - properly styled without dark box
+    const welcomeDiv = document.createElement('div');
+    welcomeDiv.className = 'chat-welcome-message';
+    welcomeDiv.innerHTML = `
+        <div class="chat-welcome-content">
+            <div class="chat-welcome-icon">👋</div>
+            <div class="chat-welcome-title">Welcome to Fintra!</div>
+            <div class="chat-welcome-text">
+                I'm here to help you learn about technical analysis and market patterns using historical data.
+            </div>
+            <div class="chat-welcome-hint">
                 Select a context above (📈 Market or 📁 Portfolio) or just chat with me!
-            </p>
+            </div>
         </div>
     `;
+    DOM.chatMessages.innerHTML = '';
+    DOM.chatMessages.appendChild(welcomeDiv);
     
     updateChatContextIndicator();
     STATE.chatHistory = [];
@@ -265,12 +272,19 @@ function refreshChatContext() {
     
     updateChatContextIndicator();
 
-    DOM.chatMessages.innerHTML = `
-        <div style="padding: 15px; text-align: center; color: #6b7280; font-size: 0.9rem; line-height: 1.5;">
-            <strong style="color: #3b82f6; font-size: 1.1rem;">🔄 Chat Refreshed</strong>
-            <p style="margin-top: 10px;">Context has been cleared. You can start a new conversation!</p>
+    const refreshedDiv = document.createElement('div');
+    refreshedDiv.className = 'chat-welcome-message';
+    refreshedDiv.innerHTML = `
+        <div class="chat-welcome-content">
+            <div class="chat-welcome-icon" style="animation: none;">🔄</div>
+            <div class="chat-welcome-title">Chat Refreshed</div>
+            <div class="chat-welcome-text">
+                Context has been cleared. You can start a new conversation!
+            </div>
         </div>
     `;
+    DOM.chatMessages.innerHTML = '';
+    DOM.chatMessages.appendChild(refreshedDiv);
     showNotification('Chat context refreshed.', 'info');
 }
 
@@ -290,7 +304,11 @@ function handleChatSubmit() {
     appendMessage({ role: 'user', content: text });
     DOM.chatInput.value = '';
 
-    const typingIndicator = appendMessage({ role: 'bot', content: '...' });
+    const typingIndicator = document.createElement('div');
+    typingIndicator.className = 'msg msg-bot typing-indicator';
+    typingIndicator.innerHTML = '<span></span><span></span><span></span>';
+    DOM.chatMessages.appendChild(typingIndicator);
+    DOM.chatMessages.scrollTop = DOM.chatMessages.scrollHeight;
 
     // Build context data
     const contextData = {
@@ -328,7 +346,9 @@ function handleChatSubmit() {
             return response.json();
         })
         .then(data => {
-            typingIndicator.remove();
+            if (typingIndicator && typingIndicator.parentNode) {
+                typingIndicator.remove();
+            }
             if (data.response) {
                 appendMessage({ role: 'bot', content: data.response });
             } else {
@@ -336,12 +356,16 @@ function handleChatSubmit() {
             }
         })
         .catch(err => {
-            typingIndicator.remove();
+            if (typingIndicator && typingIndicator.parentNode) {
+                typingIndicator.remove();
+            }
             appendMessage({ role: 'system', content: `An error occurred: ${err.message}.` });
             console.error('Chat error:', err);
         });
     } catch (err) {
-        typingIndicator.remove();
+        if (typingIndicator && typingIndicator.parentNode) {
+            typingIndicator.remove();
+        }
         appendMessage({ role: 'system', content: 'A connection error occurred. Please check your network.' });
         console.error('Chat error:', err);
     }

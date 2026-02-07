@@ -15,6 +15,10 @@ from urllib.parse import urlencode
 from flask import Blueprint, request, jsonify, session, redirect, make_response
 import pandas as pd
 
+# Google Auth imports for secure ID token verification
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
+
 from config import Config
 from auth import (
     generate_jwt_token, verify_jwt_token,
@@ -30,6 +34,10 @@ from validation import (
     POSITION_NOTES_MAX_LENGTH,
     BACKTEST_BALANCE_MIN, BACKTEST_BALANCE_MAX, BACKTEST_ATR_MULTIPLIER_MIN,
     BACKTEST_ATR_MULTIPLIER_MAX, BACKTEST_RISK_PER_TRADE_MIN, BACKTEST_RISK_PER_TRADE_MAX
+)
+from chatbot_validation import (
+    validate_chat_input, ChatbotSafetyEnforcer, get_conversation_state,
+    FrameworkValidator, ConversationStateTracker
 )
 from analysis import (
     latest_symbol_data, conversation_context, clean_df,
@@ -77,6 +85,50 @@ logger = logging.getLogger(__name__)
 api = Blueprint('api', __name__)
 
 
+# ==================== OAUTH STATE MANAGEMENT ====================
+class OAuthStateManager:
+    """Manages OAuth state tokens for CSRF protection using Redis"""
+    
+    @staticmethod
+    def store_state(state: str, ttl: int = 300):
+        """Store state token in Redis with 5-minute TTL"""
+        try:
+            if REDIS_AVAILABLE:
+                client = redis_client.get_client()
+                if client:
+                    key = f"oauth:state:{state}"
+                    client.setex(key, ttl, "pending")
+                    logger.debug(f"OAuth state stored: {state[:16]}...")
+                    return True
+        except Exception as e:
+            logger.error(f"Failed to store OAuth state: {e}")
+        return False
+    
+    @staticmethod
+    def validate_and_clear_state(state: str) -> bool:
+        """Validate state token and clear it from Redis"""
+        try:
+            if REDIS_AVAILABLE:
+                client = redis_client.get_client()
+                if client:
+                    key = f"oauth:state:{state}"
+                    # Get and delete in one operation
+                    value = client.get(key)
+                    if value:
+                        client.delete(key)
+                        logger.debug(f"OAuth state validated and cleared: {state[:16]}...")
+                        return True
+                    else:
+                        logger.warning(f"OAuth state not found or expired: {state[:16]}...")
+                        return False
+            # If Redis is not available, we can't validate state
+            logger.warning("Redis not available for OAuth state validation")
+            return False
+        except Exception as e:
+            logger.error(f"Failed to validate OAuth state: {e}")
+            return False
+
+
 # ==================== PORTFOLIO HELPERS ====================
 def get_user_from_token():
     """Helper to get user_id and db_user from access token."""
@@ -111,6 +163,10 @@ def auth_login():
     """Initiate Google OAuth flow."""
     try:
         state = secrets.token_urlsafe(32)
+        
+        # Store state in Redis for CSRF protection
+        if not OAuthStateManager.store_state(state):
+            logger.warning("⚠️ Failed to store OAuth state in Redis - continuing without state validation")
         
         logger.info(f"Generating auth URL with redirect_uri: {Config.REDIRECT_URI}")
 
@@ -150,7 +206,14 @@ def oauth_callback():
             logger.error("No 'code' parameter found in callback.")
             return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=no_code')
 
-        logger.info(f"State parameter received: {state}. In a full stateless flow, this would be validated against a client-provided token.")
+        # Validate state parameter to prevent CSRF attacks
+        if not state:
+            logger.error("No 'state' parameter found in callback.")
+            return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=missing_state')
+        
+        if not OAuthStateManager.validate_and_clear_state(state):
+            logger.error(f"Invalid or expired state parameter: {state[:16]}...")
+            return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=invalid_state')
 
         logger.info("Exchanging code for tokens...")
         token_data = {
@@ -174,12 +237,23 @@ def oauth_callback():
             logger.error(f"Token exchange response did not include an id_token: {tokens}")
             return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=missing_id_token')
 
-        logger.info("Tokens received. Decoding ID token...")
+        logger.info("Tokens received. Verifying ID token signature...")
 
         try:
-            user_info = jwt.decode(id_token, options={"verify_signature": False})
+            # Verify ID token signature using Google's public keys
+            # This ensures the token was actually issued by Google and hasn't been tampered with
+            user_info = google_id_token.verify_oauth2_token(
+                id_token,
+                google_requests.Request(),
+                Config.GOOGLE_CLIENT_ID,
+                clock_skew_in_seconds=10
+            )
+            logger.info("ID token signature verified successfully")
+        except google_id_token.InvalidTokenError as e:
+            logger.error(f"Invalid ID token: {e}")
+            return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=invalid_id_token')
         except Exception as e:
-            logger.error(f"Failed to decode ID token: {e}")
+            logger.error(f"Failed to verify ID token: {e}")
             return redirect(f'{Config.CLIENT_REDIRECT_URL}?error=invalid_id_token')
 
         user_id = user_info.get('sub')
@@ -511,8 +585,8 @@ def get_data():
 @api.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
     """
-    Chatbot endpoint with Redis caching, rate limiting, and RAG.
-    Provides educational responses about technical analysis.
+    Enhanced chatbot endpoint with framework validation, safety enforcement,
+    conversation memory management, and educational value protection.
     """
     if request.method == 'OPTIONS':
         return jsonify(success=True), 200
@@ -521,8 +595,13 @@ def chat():
     if auth_response:
         return auth_response
 
-    # Get user ID for rate limiting
-    user_id = request.cookies.get('access_token', 'anonymous')
+    # Get user ID from token for conversation tracking
+    _, db_user = get_user_from_token()
+    if db_user:
+        user_id = str(db_user.id)
+    else:
+        # Fallback to access token for anonymous users
+        user_id = request.cookies.get('access_token', 'anonymous')
     
     # Rate limiting check (30 requests per minute)
     if REDIS_AVAILABLE and RateLimiter.is_allowed(user_id, 'chat', max_requests=30):
@@ -559,42 +638,81 @@ def chat():
     }
 
     try:
-        # Check cache first
+        # ============================================
+        # STEP 1: FRAMEWORK VALIDATION & SAFETY CHECKS
+        # ============================================
+        
+        # Validate chat input for framework correctness and safety
+        is_valid, processed_query, validation_metadata = validate_chat_input(query, mode, user_id)
+        
+        if not is_valid:
+            # Input was blocked by pre-validation
+            logger.warning(f"Chat input blocked for user {user_id}: {validation_metadata}")
+            return jsonify(
+                response=processed_query,  # This contains the error message
+                context={"mode": mode, "blocked": True},
+                validation={"blocked": True, "reason": validation_metadata.get("reason", "validation_failed")},
+                rate_limit_remaining=remaining
+            ), 200
+        
+        # Check for suspicious mode transition
+        conv_state = get_conversation_state(user_id)
+        is_transition_suspicious, transition_msg = conv_state.is_transition_suspicious(mode)
+        mode_warning = ""
+        if is_transition_suspicious:
+            mode_warning = f"\n\n⚠️ **Mode Transition Warning:** {transition_msg}"
+            logger.warning(f"Suspicious mode transition for user {user_id}: {transition_msg}")
+        
+        # ============================================
+        # STEP 2: CHECK CACHE
+        # ============================================
+        
         if REDIS_AVAILABLE:
             cached_response = ChatCache.get(query, cache_context)
             if cached_response:
                 logger.debug("Chat cache hit - returning cached response")
                 return jsonify(
-                    response=cached_response,
+                    response=cached_response + mode_warning if mode_warning else cached_response,
                     context=cache_context,
                     cached=True,
-                    rate_limit_remaining=remaining
+                    rate_limit_remaining=remaining,
+                    validation={"framework_validated": True}
                 ), 200
 
-        # Load system prompt
+        # ============================================
+        # STEP 3: LOAD & ENHANCE SYSTEM PROMPT
+        # ============================================
+        
         import os
         BASE_DIR = os.path.dirname(os.path.dirname(__file__))
         system_prompt_path = os.path.join(BASE_DIR, 'system_prompt.txt')
         
         try:
             with open(system_prompt_path, 'r') as f:
-                system_prompt = f.read().strip()
+                base_system_prompt = f.read().strip()
         except Exception as e:
             logger.warning(f"Could not load system prompt: {e}")
-            system_prompt = "You are Fintra, a friendly AI assistant helping users learn about stock market technical analysis. Be conversational and educational."
+            base_system_prompt = "You are Fintra, a friendly AI assistant helping users learn about stock market technical analysis. Be conversational and educational."
+        
+        # Enhance system prompt with safety rules
+        system_prompt = ChatbotSafetyEnforcer.build_enhanced_system_prompt(base_system_prompt, conv_state)
 
-        # Build context based on mode
+        # ============================================
+        # STEP 4: BUILD CONTEXT BASED ON MODE
+        # ============================================
+        
         context_str = ""
-        current_context = {"mode": mode}
+        current_context = {
+            "mode": mode,
+            "framework_validated": True,
+            "suspicious_score": validation_metadata.get("suspicious_score", 0)
+        }
 
         if mode == 'market' and symbol:
-            # Market mode - user selected a stock
             context_str = f"\n[MARKET CONTEXT]: The user is asking about {symbol}. This is historical data (31-day lag per SEBI). Current stock: {symbol}"
             current_context["symbol"] = symbol
             
         elif mode == 'portfolio' and selected_position_id:
-            # Portfolio mode - user selected a position
-            _, db_user = get_user_from_token()
             if db_user:
                 position = Position.query.filter_by(id=selected_position_id, user_id=db_user.id).first()
                 if position:
@@ -605,16 +723,18 @@ def chat():
                         "entry_price": float(position.entry_price)
                     }
         else:
-            # General chat mode - no specific context
-            context_str = "\n[GENERAL CHAT]: No specific stock or position context. Answer general educational questions."
-            current_context["mode"] = "none"
+            context_str = "\n[GENERAL CHAT MODE]: Educational discussion only. No specific stock context."
+            current_context["mode"] = "educational"
 
-        # RAG: Retrieve relevant knowledge
+        # ============================================
+        # STEP 5: RAG KNOWLEDGE RETRIEVAL
+        # ============================================
+        
         rag_context = ""
         sources = []
         if REDIS_AVAILABLE and rag_engine.model:
             try:
-                retrieved_docs = rag_engine.search(query, top_k=2)
+                retrieved_docs = rag_engine.search(query, top_k=3)
                 if retrieved_docs:
                     rag_context = rag_engine.assemble_context(query, retrieved_docs)
                     sources = [doc['title'] for doc in retrieved_docs]
@@ -622,39 +742,73 @@ def chat():
             except Exception as e:
                 logger.warning(f"RAG retrieval failed: {e}")
 
-        # Build prompt
-        safe_query = query[:500]  # Limit query length
+        # ============================================
+        # STEP 6: BUILD ENHANCED PROMPT
+        # ============================================
         
-        # Construct full prompt with RAG context if available
-        if rag_context:
-            full_prompt = f"{system_prompt}\n\n{rag_context}\n{context_str}\n\nUser: {safe_query}\n\nUse the knowledge base information above to provide an accurate, educational response."
-        elif mode == 'none':
-            # General chat - no forced context
-            full_prompt = f"{system_prompt}\n\nUser: {safe_query}"
+        safe_query = processed_query[:500]  # Use validated query
+        
+        # Check if this is a correction scenario
+        if validation_metadata.get("correction_needed"):
+            # Use the correction prompt built by the validator
+            full_prompt = safe_query  # The validator already built the full correction prompt
+            current_context["framework_correction"] = True
+            current_context["corrected_framework"] = validation_metadata.get("framework", {}).get("framework", "")
         else:
-            # Context-aware chat
-            full_prompt = f"{system_prompt}{context_str}\n\nUser: {safe_query}"
+            # Standard prompt construction
+            if rag_context:
+                full_prompt = f"{system_prompt}\n\n{rag_context}\n{context_str}\n\nUser: {safe_query}\n\nUse the knowledge base information above to provide an accurate, educational response that corrects any misconceptions."
+            elif mode == 'none':
+                full_prompt = f"{system_prompt}\n\nUser: {safe_query}\n\nProvide an educational response. If the user has any misconceptions about technical analysis, politely correct them with the proper definitions."
+            else:
+                full_prompt = f"{system_prompt}{context_str}\n\nUser: {safe_query}\n\nAnalyze based on the context provided. Correct any wrong frameworks or definitions."
         
-        full_prompt = full_prompt.replace('\r', ' ')  # Remove carriage returns
+        full_prompt = full_prompt.replace('\r', ' ')
 
-        # Call API
+        # ============================================
+        # STEP 7: CALL API WITH VALIDATION
+        # ============================================
+        
         assistant_response = call_gemini_api(full_prompt)
         
         if not assistant_response:
             assistant_response = "I'm sorry, I couldn't generate a response. Please try asking in a different way."
         elif len(assistant_response) > 1000:
             assistant_response = assistant_response[:997] + "..."
+        
+        # Add mode transition warning if present
+        if mode_warning:
+            assistant_response = mode_warning + "\n\n" + assistant_response
 
-        # Cache the response
-        if REDIS_AVAILABLE:
+        # ============================================
+        # STEP 8: POST-PROCESS & CACHE
+        # ============================================
+        
+        # Only cache if no personal/sensitive data
+        if REDIS_AVAILABLE and not validation_metadata.get("correction_needed"):
             ChatCache.set(query, cache_context, assistant_response)
+
+        # Build validation info for response
+        validation_info = {
+            "framework_validated": True,
+            "suspicious_score": validation_metadata.get("suspicious_score", 0),
+            "corrections_made": validation_metadata.get("corrections_made", 0)
+        }
+        
+        if validation_metadata.get("correction_needed"):
+            validation_info["correction_applied"] = True
+            validation_info["corrected_framework"] = validation_metadata.get("framework", {}).get("framework", "")
+        
+        if validation_metadata.get("mode_transition_warning"):
+            validation_info["mode_transition_warning"] = True
 
         return jsonify(
             response=assistant_response,
             context=current_context,
             sources=sources if sources else None,
             rate_limit_remaining=remaining,
-            cached=False
+            cached=False,
+            validation=validation_info
         ), 200
 
     except Exception as e:
@@ -663,6 +817,76 @@ def chat():
         return jsonify(error="Unable to process request"), 500
 
 
+@api.route('/chat/reset', methods=['POST'])
+def reset_chat_context():
+    """
+    Reset conversation context and memory.
+    Useful after completing educational exercises or when switching topics.
+    """
+    auth_response = require_auth()
+    if auth_response:
+        return auth_response
+
+    try:
+        # Get user ID
+        _, db_user = get_user_from_token()
+        if db_user:
+            user_id = str(db_user.id)
+        else:
+            user_id = request.cookies.get('access_token', 'anonymous')
+        
+        # Clear conversation state
+        from chatbot_validation import clear_conversation_state
+        clear_conversation_state(user_id)
+        
+        logger.info(f"Chat context reset for user {user_id}")
+        
+        return jsonify(
+            success=True,
+            message="Conversation context has been reset. You can start fresh now.",
+            timestamp=datetime.now(timezone.utc).isoformat()
+        ), 200
+        
+    except Exception as e:
+        logger.error(f"Error resetting chat context: {e}")
+        return jsonify(error="Failed to reset context"), 500
+
+
+@api.route('/chat/validation-status', methods=['GET'])
+def get_chat_validation_status():
+    """
+    Get current conversation validation status and suspicious activity score.
+    Useful for debugging and monitoring.
+    """
+    auth_response = require_auth()
+    if auth_response:
+        return auth_response
+
+    try:
+        # Get user ID
+        _, db_user = get_user_from_token()
+        if db_user:
+            user_id = str(db_user.id)
+        else:
+            user_id = request.cookies.get('access_token', 'anonymous')
+        
+        # Get conversation state
+        from chatbot_validation import get_conversation_state
+        conv_state = get_conversation_state(user_id)
+        
+        return jsonify(
+            user_id=user_id[:8] + "..." if len(user_id) > 8 else user_id,
+            suspicious_score=conv_state.suspicious_score,
+            corrections_made=conv_state.correction_count,
+            last_correction=conv_state.last_correction,
+            mode_history_count=len(conv_state.mode_history),
+            strict_mode_active=conv_state.should_enforce_strict_mode(),
+            user_frameworks_introduced=conv_state.user_frameworks_introduced
+        ), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting validation status: {e}")
+        return jsonify(error="Failed to get status"), 500
 
 
 @api.route('/price/<symbol>', methods=['GET'])
