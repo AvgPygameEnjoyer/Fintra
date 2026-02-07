@@ -91,13 +91,20 @@ function addContextToggles() {
         </div>
     `;
 
-    // Insert before the close button
-    const closeBtn = chatHeader.querySelector('#chat-close');
-    if (closeBtn) {
-        chatHeader.insertBefore(togglesContainer, closeBtn);
+  // Find the flex container that holds the buttons (where close button is)
+  const buttonContainer = chatHeader.querySelector('div[style*="display: flex"]');
+  if (buttonContainer) {
+    // Insert before the first child of the button container (usually the portfolio button)
+    const firstButton = buttonContainer.firstElementChild;
+    if (firstButton) {
+      buttonContainer.insertBefore(togglesContainer, firstButton);
     } else {
-        chatHeader.appendChild(togglesContainer);
+      buttonContainer.appendChild(togglesContainer);
     }
+  } else {
+    // Fallback: append to chat header
+    chatHeader.appendChild(togglesContainer);
+  }
 
     // Add event listeners
     document.getElementById('market-toggle').addEventListener('click', () => toggleContext(CONTEXT_MODES.MARKET));

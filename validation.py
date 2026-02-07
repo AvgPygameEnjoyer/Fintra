@@ -71,8 +71,12 @@ def get_symbol_whitelist() -> List[str]:
     """Get cached symbol whitelist."""
     global _SYMBOL_WHITELIST
     if _SYMBOL_WHITELIST is None:
-        _SYMBOL_WHITELIST = get_available_symbols()
-        logger.info(f"Loaded {len(_SYMBOL_WHITELIST)} symbols into whitelist")
+        try:
+            _SYMBOL_WHITELIST = get_available_symbols()
+            logger.info(f"Loaded {len(_SYMBOL_WHITELIST)} symbols into whitelist")
+        except Exception as e:
+            logger.warning(f"Could not load symbol whitelist: {e}. Using permissive validation.")
+            _SYMBOL_WHITELIST = []
     return _SYMBOL_WHITELIST
 
 
@@ -97,10 +101,15 @@ def validate_symbol(symbol: str) -> Tuple[bool, str]:
     if not SYMBOL_PATTERN.match(symbol):
         return False, "Symbol contains invalid characters. Only alphanumeric, dots, and dashes allowed"
     
-    # Check against whitelist
-    whitelist = get_symbol_whitelist()
-    if symbol not in whitelist:
-        return False, f"Symbol '{symbol}' is not available in our database. Please check the symbol and try again."
+    # Check against whitelist (if available)
+    try:
+        whitelist = get_symbol_whitelist()
+        if whitelist and symbol not in whitelist:
+            return False, f"Symbol '{symbol}' is not available in our database. Please check the symbol and try again."
+    except Exception as e:
+        logger.warning(f"Could not validate symbol against whitelist: {e}")
+        # If whitelist can't be loaded, allow the symbol (basic validation passed)
+        pass
     
     return True, ""
 
