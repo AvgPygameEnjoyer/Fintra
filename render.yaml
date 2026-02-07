@@ -5,7 +5,7 @@ services:
     plan: free
     runtime: python
     buildCommand: "./build.sh"
-    startCommand: "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"
+    startCommand: "chmod +x start.sh && ./start.sh"
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.4"

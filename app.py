@@ -130,8 +130,9 @@ def create_app():
         thread.start()
         logger.info("🚀 Background service initialization started (non-blocking)")
     
-    # Trigger background initialization
-    init_services_background()
+    # Trigger background initialization (DISABLED to save memory on free tier)
+    # init_services_background()
+    logger.info("⚠️  Background services (Redis/RAG) initialization disabled to save memory on free tier")
 
     # Request hooks
     @app.before_request
