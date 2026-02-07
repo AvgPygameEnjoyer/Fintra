@@ -84,6 +84,11 @@ logger = logging.getLogger(__name__)
 # Create Blueprint for all routes
 api = Blueprint('api', __name__)
 
+@api.route('/health', methods=['GET'])
+def health_check():
+    """Simple health check endpoint"""
+    return jsonify(status='ok', timestamp=datetime.now(timezone.utc).isoformat()), 200
+
 
 # ==================== OAUTH STATE MANAGEMENT ====================
 class OAuthStateManager:
@@ -161,11 +166,15 @@ def get_user_from_token():
 @api.route('/auth/login', methods=['GET', 'OPTIONS'])
 def auth_login():
     """Initiate Google OAuth flow."""
+    logger.info("📥 /auth/login endpoint called")
     try:
         state = secrets.token_urlsafe(32)
+        logger.info(f"   Generated state: {state[:16]}...")
         
         # Store state in Redis for CSRF protection
-        if not OAuthStateManager.store_state(state):
+        store_result = OAuthStateManager.store_state(state)
+        logger.info(f"   OAuth state stored: {store_result}")
+        if not store_result:
             logger.warning("⚠️ Failed to store OAuth state in Redis - continuing without state validation")
         
         logger.info(f"Generating auth URL with redirect_uri: {Config.REDIRECT_URI}")
@@ -186,6 +195,7 @@ def auth_login():
         return resp, 200
     except Exception as e:
         logger.error(f"❌ OAuth initiation error: {e}")
+        logger.error(traceback.format_exc())
         return jsonify(error=f"Failed to initiate OAuth: {str(e)}"), 500
 
 

@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 def generate_jwt_token(user_data: dict, secret: str, expires_in: str) -> str:
     """Generate JWT token"""
+    if not secret:
+        logger.error("Cannot generate JWT token: secret is None or empty")
+        raise ValueError("JWT secret is not configured")
+    
     expiry_seconds = Config.parse_time_to_seconds(expires_in)
     payload = {
         'user_id': user_data['user_id'],
@@ -28,6 +32,10 @@ def generate_jwt_token(user_data: dict, secret: str, expires_in: str) -> str:
 
 def verify_jwt_token(token: str, secret: str) -> Optional[dict]:
     """Verify JWT token"""
+    if not secret:
+        logger.error("Cannot verify JWT token: secret is None or empty")
+        return None
+    
     try:
         # Add a 10-second leeway to account for minor clock skew.
         return jwt.decode(token, secret, algorithms=['HS256'], leeway=timedelta(seconds=10))

@@ -76,6 +76,35 @@ class Config:
     REFRESH_TOKEN_JWT_SECRET = os.getenv('REFRESH_TOKEN_JWT_SECRET')
     ACCESS_TOKEN_EXPIRETIME = '15m'
     REFRESH_TOKEN_EXPIRETIME = '7d'
+    
+    # Validate that secrets are set
+    @classmethod
+    def validate_secrets(cls):
+        """Validate that required secrets are configured"""
+        missing = []
+        if not cls.ACCESS_TOKEN_JWT_SECRET:
+            missing.append('ACCESS_TOKEN_JWT_SECRET')
+        if not cls.REFRESH_TOKEN_JWT_SECRET:
+            missing.append('REFRESH_TOKEN_JWT_SECRET')
+        if not cls.GOOGLE_CLIENT_ID:
+            missing.append('GOOGLE_CLIENT_ID')
+        if not cls.GOOGLE_CLIENT_SECRET:
+            missing.append('GOOGLE_CLIENT_SECRET')
+        
+        if missing:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error("=" * 60)
+            logger.error("❌ MISSING REQUIRED ENVIRONMENT VARIABLES:")
+            for var in missing:
+                logger.error(f"   - {var}")
+            logger.error("=" * 60)
+            logger.error("Please set these variables in your Render Dashboard:")
+            logger.error("https://dashboard.render.com")
+            # Don't raise - let the app start so we can see the logs
+            return False
+        
+        return True
 
     # OAuth Scopes
     SCOPES = [
