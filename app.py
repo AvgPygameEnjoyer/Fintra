@@ -128,10 +128,8 @@ def create_app():
     # Trigger background initialization
     init_services_background()
     
-    # Log Redis configuration status on startup
-    @app.before_first_request
-    def check_redis_status():
-        """Check Redis status on first request and log warnings if not configured."""
+    # Check Redis status immediately (not using deprecated before_first_request)
+    with app.app_context():
         try:
             from redis_client import redis_client
             is_connected = redis_client.is_connected()
