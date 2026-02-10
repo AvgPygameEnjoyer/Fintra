@@ -1000,6 +1000,8 @@ def get_portfolio():
                 
                 # Standardize column names (ensure PascalCase for compatibility)
                 hist.columns = [col.title().replace('_', '') for col in hist.columns]
+                # Also standardize index name for clean_df
+                hist.index.name = 'Date'
                 
                 # Validate and Clean
                 if 'Close' not in hist.columns:
