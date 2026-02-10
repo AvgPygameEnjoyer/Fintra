@@ -1157,7 +1157,7 @@ footer {
 
 .msg-user {
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
+  color: #ffffff !important;
   align-self: flex-end;
   border-radius: 16px 16px 4px 16px;
   padding: 12px 16px;
@@ -1166,11 +1166,17 @@ footer {
   max-width: 85%;
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
   font-size: 0.9rem;
+  display: block;
+  word-wrap: break-word;
+}
+
+.msg-user * {
+  color: #ffffff !important;
 }
 
 .msg-bot {
   background: #ffffff;
-  color: #1f2937;
+  color: #1f2937 !important;
   align-self: flex-start;
   border-radius: 16px 16px 16px 4px;
   padding: 12px 16px;
@@ -1180,6 +1186,22 @@ footer {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(229, 231, 235, 0.8);
   font-size: 0.9rem;
+  display: block;
+  word-wrap: break-word;
+}
+
+.msg-bot * {
+  color: #1f2937 !important;
+}
+
+.msg-bot strong, .msg-bot b {
+  color: #111827 !important;
+  font-weight: 600;
+}
+
+.msg-bot a {
+  color: #3b82f6 !important;
+  text-decoration: underline;
 }
 
 
@@ -2371,6 +2393,50 @@ footer {
     font-size: 1.5rem;
     color: var(--fintra-dark-blue);
     margin-bottom: 20px;
+}
+
+.trades-toggle {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #0a2540 0%, #1c3d5e 100%);
+    color: white !important;
+    border-radius: 8px;
+    margin: -24px -24px 20px -24px;
+    transition: all 0.3s ease;
+}
+
+.trades-toggle:hover {
+    background: linear-gradient(135deg, #1c3d5e 0%, #0a2540 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(10, 37, 64, 0.3);
+}
+
+.trades-toggle .toggle-icon {
+    transition: transform 0.3s ease;
+    font-size: 0.8rem;
+}
+
+.trades-toggle.expanded .toggle-icon {
+    transform: rotate(180deg);
+}
+
+.trades-content {
+    overflow: hidden;
+    transition: max-height 0.5s ease-out, opacity 0.3s ease;
+}
+
+.trades-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+.trades-content.expanded {
+    max-height: 2000px;
+    opacity: 1;
 }
 
 .trades-summary {

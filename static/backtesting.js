@@ -209,10 +209,12 @@ const results = await response.json();
     window.currentBacktestData = {
         ...backtestData,
         trades: results.trades || [],
+        prices: results.prices || [],
         strategy_return_pct: results.strategy_return_pct || 0,
         sharpe_ratio: results.sharpe_ratio || 0,
         max_drawdown_pct: results.max_drawdown_pct || 0,
-        final_portfolio_value: results.final_portfolio_value || 0
+        final_portfolio_value: results.final_portfolio_value || 0,
+        initial_balance: backtestData.initial_balance
     };
     
     displayBacktestResults(results, backtestData);
@@ -271,7 +273,10 @@ function displayBacktestResults(results, params) {
     if (trades.length > 0) {
         tradesSection = `
             <div class="trades-section">
-                <h3>📋 Trade History</h3>
+                <h3 class="trades-toggle" onclick="this.nextElementSibling.classList.toggle('expanded'); this.classList.toggle('expanded')">
+                    📋 Trade History <span class="toggle-icon">▼</span>
+                </h3>
+                <div class="trades-content collapsed">
                 <div class="trades-summary">
                     <div class="trade-stat">
                         <span>Total Trades</span>
@@ -319,6 +324,7 @@ function displayBacktestResults(results, params) {
                             `).join('')}
                         </tbody>
                     </table>
+                </div>
                 </div>
             </div>
         `;
@@ -370,15 +376,47 @@ ${aiSummary}
     `;
 }
 
+let loadingInterval = null;
+
 function showLoading() {
     if (DOM.backtestingLoading) {
         DOM.backtestingLoading.style.display = 'flex';
+        
+        // Dynamic loading messages
+        const messages = [
+            "🔄 Initializing backtest engine...",
+            "📊 Loading historical market data...",
+            "🧮 Calculating technical indicators...",
+            "💡 Analyzing entry and exit signals...",
+            "📈 Computing risk metrics...",
+            "🤖 Generating AI strategy analysis...",
+            "✨ Almost there, finalizing results..."
+        ];
+        
+        let messageIndex = 0;
+        const loadingText = DOM.backtestingLoading.querySelector('.loading-text');
+        
+        if (loadingText) {
+            loadingText.textContent = messages[0];
+            
+            // Cycle through messages every 3 seconds
+            loadingInterval = setInterval(() => {
+                messageIndex = (messageIndex + 1) % messages.length;
+                loadingText.textContent = messages[messageIndex];
+            }, 3000);
+        }
     }
 }
 
 function hideLoading() {
     if (DOM.backtestingLoading) {
         DOM.backtestingLoading.style.display = 'none';
+    }
+    
+    // Clear the interval
+    if (loadingInterval) {
+        clearInterval(loadingInterval);
+        loadingInterval = null;
     }
 }
 

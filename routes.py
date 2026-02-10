@@ -13,7 +13,6 @@ from urllib.parse import urlencode
 import jwt
 import pandas as pd
 import requests
-import yfinance as yf
 from flask import Blueprint, jsonify, make_response, redirect, request, session
 
 # Google Auth imports for secure ID token verification
@@ -36,7 +35,10 @@ from auth import generate_jwt_token, require_auth, set_token_cookies, verify_jwt
 from backtesting import (
     DATA_LAG_DAYS,
     BacktestEngine,
+    batch_fetch_prices,
     check_data_availability,
+    get_current_price,
+    get_stock_data_with_fallback,
     load_stock_data,
 )
 from chatbot_validation import (
@@ -81,28 +83,6 @@ try:
 except ImportError as e:
     logging.warning(f"Redis/RAG modules not available: {e}")
     REDIS_AVAILABLE = False
-
-# Helper function to apply SEBI compliance lag to yfinance data
-def apply_sebi_lag_to_data(hist_df):
-    """Apply 31-day SEBI compliance lag to yfinance DataFrame."""
-    if hist_df.empty:
-        return hist_df
-    
-    # Create lag date with UTC timezone to match yfinance data
-    lag_date = datetime.now(timezone.utc) - timedelta(days=DATA_LAG_DAYS)
-    original_count = len(hist_df)
-    
-    # Convert index to UTC if timezone-aware, or keep as-is if naive
-    if hist_df.index.tz is not None:
-        lag_date = lag_date.astimezone(hist_df.index.tz)
-    
-    # Filter to only include data up to lag date
-    filtered_df = hist_df[hist_df.index <= lag_date].copy()
-    
-    if len(filtered_df) < original_count:
-        logger.info(f"Applied {DATA_LAG_DAYS}-day SEBI lag to yfinance data: {original_count - len(filtered_df)} rows excluded")
-    
-    return filtered_df
 
 logger = logging.getLogger(__name__)
 
@@ -473,15 +453,27 @@ def auth_status():
 @api.route('/health', methods=['GET'])
 def health():
     """Health check endpoint"""
+    # Check local data availability
+    try:
+        data_status = check_data_availability()
+        local_data_available = data_status.get('available', False)
+        data_freshness = data_status.get('data_freshness_days', 'unknown')
+    except Exception as e:
+        local_data_available = False
+        data_freshness = f"error: {str(e)}"
+    
     return jsonify(
         status="healthy",
         services={
-            "yfinance": "operational",
+            "local_data": "available" if local_data_available else "unavailable",
+            "data_freshness_days": data_freshness,
+            "yfinance": "fallback_available",
             "rule_based_analysis": "operational",
             "oauth_authentication": "enabled"
         },
-        version="5.0-Stateless",
-        env="production" # Hardcoded for production
+        data_source_priority="local_first",
+        version="5.1-LocalPriority",
+        env="production"
     ), 200
 
 
@@ -561,26 +553,35 @@ def get_data():
     symbol = symbol.upper()
 
     try:
-        ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="90d", interval="1d")
+        # Use unified data fetching with local data priority
+        hist, metadata = get_stock_data_with_fallback(
+            symbol,
+            period="90d",
+            interval="1d",
+            apply_lag=True,
+            min_rows=30
+        )
 
-        if hist.empty:
-            return jsonify(error=f"Could not retrieve data for {symbol}"), 404
+        if hist is None or hist.empty:
+            source_info = f" (source: {metadata.get('source', 'unknown')})" if metadata else ""
+            return jsonify(error=f"Could not retrieve data for {symbol}{source_info}"), 404
         
-        # Apply 31-day SEBI compliance lag
-        hist = apply_sebi_lag_to_data(hist)
+        # Log data source for debugging
+        logger.info(f"Data loaded for {symbol}: source={metadata.get('source')}, "
+                   f"yfinance_fallback={metadata.get('yfinance_fallback', False)}, "
+                   f"rows={len(hist)}")
+
+        # Standardize column names (ensure PascalCase for compatibility)
+        hist.columns = [col.title().replace('_', '') for col in hist.columns]
         
-        if hist.empty:
-            return jsonify(error=f"No data available for {symbol} within SEBI compliance lag period ({DATA_LAG_DAYS} days)"), 404
+        hist['Ma5'] = hist['Close'].rolling(window=5).mean()
+        hist['Ma10'] = hist['Close'].rolling(window=10).mean()
+        hist['Rsi'] = compute_rsi(hist['Close'])
+        hist['Macd'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
 
-        hist['MA5'] = hist['Close'].rolling(window=5).mean()
-        hist['MA10'] = hist['Close'].rolling(window=10).mean()
-        hist['RSI'] = compute_rsi(hist['Close'])
-        hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
-
-        hist_display = hist.dropna(subset=['MA5', 'MA10', 'RSI', 'MACD', 'Signal', 'Histogram'])
+        hist_display = hist.dropna(subset=['Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal', 'Histogram'])
         latest_data_list = clean_df(hist_display,
-                                    ['Open', 'High', 'Low', 'Close', 'Volume', 'MA5', 'MA10', 'RSI', 'MACD', 'Signal',
+                                    ['Open', 'High', 'Low', 'Close', 'Volume', 'Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal',
                                      'Histogram'])
 
         latest_symbol_data[symbol] = latest_data_list
@@ -606,11 +607,17 @@ def get_data():
         return jsonify(
             ticker=symbol,
             OHLCV=clean_df(hist_display, ['Open', 'High', 'Low', 'Close', 'Volume']),
-            MA=clean_df(hist_display, ['MA5', 'MA10']),
-            RSI=clean_df(hist_display, ['RSI']),
-            MACD=clean_df(hist_display, ['MACD', 'Signal', 'Histogram']),
+            MA=clean_df(hist_display, ['Ma5', 'Ma10']),
+            RSI=clean_df(hist_display, ['Rsi']),
+            MACD=clean_df(hist_display, ['Macd', 'Signal', 'Histogram']),
             AI_Review=gemini_analysis,
             Rule_Based_Analysis=rule_based_text,
+            data_source={
+                'primary': metadata.get('source', 'unknown'),
+                'yfinance_fallback': metadata.get('yfinance_fallback', False),
+                'local_available': metadata.get('local_available', False),
+                'yfinance_available': metadata.get('yfinance_available', False)
+            },
             sebi_compliance={
                 'data_lag_days': DATA_LAG_DAYS,
                 'effective_last_date': effective_date,
@@ -931,18 +938,18 @@ def get_chat_validation_status():
 
 
 @api.route('/price/<symbol>', methods=['GET'])
-def get_current_price(symbol):
-    """Get current price for a symbol (proxy for frontend to avoid CORS)."""
+def get_current_price_endpoint(symbol):
+    """Get current price for a symbol using local data with yfinance fallback."""
     if not symbol:
         return jsonify(error="Symbol required"), 400
     
     try:
-        ticker = yf.Ticker(symbol)
-        # Fast fetch of 1 day history
-        hist = ticker.history(period="1d")
-        if not hist.empty:
-            price = hist['Close'].iloc[-1]
-            return jsonify(price=price), 200
+        # Use unified data fetching with local priority
+        price = get_current_price(symbol)
+        
+        if price is not None:
+            return jsonify(price=price, source="local"), 200
+        
         return jsonify(error="Price not found"), 404
     except Exception as e:
         logger.error(f"Price fetch error: {e}")
@@ -969,41 +976,33 @@ def get_portfolio():
         if not positions:
             return jsonify([]), 200
 
-        # Batch fetch current prices from yfinance
+        # Batch fetch current prices using local data with yfinance fallback
         symbols = [p.symbol for p in positions]
         
-        # Use yf.download for batch fetching history
-        tickers_hist = None
-        if symbols:
-            try:
-                tickers_hist = yf.download(symbols, period="60d", interval="1d", group_by='ticker', progress=False)
-            except Exception as e:
-                logger.error(f"Batch download failed: {e}")
+        # Use batch_fetch_prices for unified data fetching
+        symbols_data = batch_fetch_prices(symbols, period="60d")
         
         portfolio_data = []
         for p in positions:
             latest_date = None  # Initialize for transparency
+            data_source = "unknown"
             try:
-                hist = pd.DataFrame()
-                # 1. Try extracting from batch
-                if tickers_hist is not None and not tickers_hist.empty:
-                    try:
-                        if len(symbols) > 1:
-                            hist = tickers_hist[p.symbol]
-                        else:
-                            hist = tickers_hist
-                    except Exception:
-                        pass # Symbol might be missing from batch, fall through to individual fetch
-
-                # 2. Fallback to individual fetch if batch failed or data is missing
-                if hist.empty or 'Close' not in hist.columns:
-                    hist = yf.Ticker(p.symbol).history(period="60d", interval="1d")
-
-                # 3. Validate and Clean
-                if hist.empty or 'Close' not in hist.columns:
+                # Get data from batch fetch
+                hist = symbols_data.get(p.symbol)
+                
+                if hist is None or hist.empty:
                     raise ValueError(f"No valid history for {p.symbol}")
-
-                # Create a copy to avoid SettingWithCopyWarning on slices
+                
+                # Track data source
+                data_source = "local" if hist is not None else "unavailable"
+                
+                # Standardize column names (ensure PascalCase for compatibility)
+                hist.columns = [col.title().replace('_', '') for col in hist.columns]
+                
+                # Validate and Clean
+                if 'Close' not in hist.columns:
+                    raise ValueError(f"No 'Close' column in data for {p.symbol}")
+                
                 hist = hist.copy()
                 hist = hist.dropna(subset=['Close'])
                 
@@ -1011,15 +1010,15 @@ def get_portfolio():
                     raise ValueError(f"History is empty after dropping NaNs for {p.symbol}")
 
                 # Calculate indicators
-                hist['RSI'] = compute_rsi(hist['Close'])
-                hist['MA5'] = hist['Close'].rolling(window=5).mean()
-                hist['MA10'] = hist['Close'].rolling(window=10).mean()
-                hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
+                hist['Rsi'] = compute_rsi(hist['Close'])
+                hist['Ma5'] = hist['Close'].rolling(window=5).mean()
+                hist['Ma10'] = hist['Close'].rolling(window=10).mean()
+                hist['Macd'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
                 
                 latest = hist.iloc[-1]
                 current_price = latest['Close']
                 
-                hist_list_for_macd = clean_df(hist.dropna(subset=['MACD', 'Signal']), ['MACD', 'Signal'])
+                hist_list_for_macd = clean_df(hist.dropna(subset=['Macd', 'Signal']), ['Macd', 'Signal'])
                 crossover_type, crossover_days_ago = find_recent_macd_crossover(hist_list_for_macd, lookback=7)
                 macd_status = "None"
                 if crossover_type != 'none':
@@ -1046,12 +1045,13 @@ def get_portfolio():
                     "current_value": current_value,
                     "pnl": pnl,
                     "pnl_percent": pnl_percent,
-                    "rsi": latest.get('RSI'),
-                    "ma5": latest.get('MA5'),
-                    "ma10": latest.get('MA10'),
+                    "rsi": latest.get('Rsi'),
+                    "ma5": latest.get('Ma5'),
+                    "ma10": latest.get('Ma10'),
                     "macd_status": macd_status,
                     "chart_data": chart_data,
-                    "data_date": latest_date  # Include the date of the data for transparency
+                    "data_date": latest_date,  # Include the date of the data for transparency
+                    "data_source": data_source  # Track where data came from
                 }
 
                 portfolio_data.append(position_payload)
@@ -1066,7 +1066,8 @@ def get_portfolio():
                     "notes": p.notes, "current_price": p.entry_price, "current_value": p.quantity * p.entry_price,
                     "pnl": 0, "pnl_percent": 0,
                     "rsi": None, "ma5": None, "ma10": None, "macd_status": "N/A", "chart_data": [],
-                    "data_date": None
+                    "data_date": None,
+                    "data_source": data_source
                 })
 
         return jsonify(portfolio_data), 200

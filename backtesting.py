@@ -1,12 +1,20 @@
 import logging
 import os
-from datetime import datetime
-from typing import Dict, Optional, Tuple
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+# Try to import yfinance for fallback
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFINANCE_AVAILABLE = False
+    logger.warning("yfinance not available, local data only")
 
 # SEBI Compliance Constants
 DATA_LAG_DAYS = 31
@@ -550,3 +558,212 @@ def load_stock_data(symbol: str, apply_lag: bool = True) -> Tuple[Optional[pd.Da
     except Exception as e:
         logger.error(f"Error loading stock data for {symbol}: {e}")
         return None, {'error': str(e)}
+
+
+def fetch_from_yfinance(symbol: str, period: str = "90d", interval: str = "1d") -> Optional[pd.DataFrame]:
+    """
+    Fetch stock data from yfinance as fallback.
+    
+    Args:
+        symbol: Stock symbol to fetch
+        period: Time period to fetch (e.g., '90d', '1y')
+        interval: Data interval (e.g., '1d', '1h')
+    
+    Returns:
+        DataFrame with OHLCV data or None if fetch fails
+    """
+    if not YFINANCE_AVAILABLE:
+        logger.warning("yfinance not available, cannot fetch from API")
+        return None
+    
+    try:
+        logger.info(f"Fetching {symbol} from yfinance (period={period}, interval={interval})")
+        ticker = yf.Ticker(symbol)
+        df = ticker.history(period=period, interval=interval)
+        
+        if df.empty:
+            logger.warning(f"No data returned from yfinance for {symbol}")
+            return None
+        
+        # Standardize column names to lowercase
+        df.columns = [col.lower().replace(' ', '_') for col in df.columns]
+        
+        logger.info(f"Successfully fetched {len(df)} rows from yfinance for {symbol}")
+        return df
+        
+    except Exception as e:
+        logger.error(f"Error fetching {symbol} from yfinance: {e}")
+        return None
+
+
+def save_to_local_data(symbol: str, df: pd.DataFrame) -> bool:
+    """
+    Save fetched data to local parquet file for future use.
+    
+    Args:
+        symbol: Stock symbol
+        df: DataFrame with OHLCV data
+    
+    Returns:
+        True if saved successfully, False otherwise
+    """
+    try:
+        file_path = get_parquet_path(symbol)
+        if not file_path:
+            return False
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        # Standardize column names before saving
+        df_to_save = df.copy()
+        df_to_save.columns = [col.lower().replace(' ', '_') for col in df_to_save.columns]
+        
+        # Save to parquet
+        df_to_save.to_parquet(file_path, compression='snappy')
+        logger.info(f"Saved {len(df_to_save)} rows to local data: {file_path}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error saving data for {symbol}: {e}")
+        return False
+
+
+def get_stock_data_with_fallback(
+    symbol: str,
+    period: str = "90d",
+    interval: str = "1d",
+    apply_lag: bool = True,
+    min_rows: int = 30
+) -> Tuple[Optional[pd.DataFrame], Dict]:
+    """
+    Get stock data with local data as primary source and yfinance as fallback.
+    
+    This function implements a priority-based data fetching strategy:
+    1. First, try to load from local parquet files
+    2. If local data is insufficient or missing, fetch from yfinance
+    3. Save yfinance data to local storage for future use
+    
+    Args:
+        symbol: Stock symbol to load
+        period: Time period for yfinance fallback (e.g., '90d', '1y')
+        interval: Data interval for yfinance fallback (e.g., '1d', '1h')
+        apply_lag: Whether to apply 31-day SEBI compliance lag
+        min_rows: Minimum number of rows required for local data to be considered sufficient
+    
+    Returns:
+        Tuple of (DataFrame or None, metadata dict with source info)
+    """
+    symbol_upper = symbol.upper().strip()
+    metadata = {
+        'symbol': symbol_upper,
+        'source': None,
+        'local_available': False,
+        'yfinance_available': False,
+        'data_completeness': {},
+        'lag_applied': apply_lag
+    }
+    
+    # Step 1: Try to load from local data
+    logger.info(f"Attempting to load {symbol_upper} from local data (primary source)")
+    local_df, local_info = load_stock_data(symbol_upper, apply_lag=apply_lag)
+    
+    if local_df is not None and not local_df.empty:
+        metadata['local_available'] = True
+        metadata['data_completeness']['local_rows'] = len(local_df)
+        metadata['data_completeness']['local_date_range'] = local_info.get('date_range', {})
+        
+        # Check if local data is sufficient
+        if len(local_df) >= min_rows:
+            logger.info(f"Using local data for {symbol_upper}: {len(local_df)} rows")
+            metadata['source'] = 'local'
+            metadata['yfinance_fallback'] = False
+            return local_df, metadata
+        else:
+            logger.warning(f"Local data insufficient for {symbol_upper}: {len(local_df)} rows (min: {min_rows})")
+            metadata['data_completeness']['local_insufficient'] = True
+    else:
+        logger.warning(f"No local data available for {symbol_upper}")
+        metadata['data_completeness']['local_missing'] = True
+    
+    # Step 2: Fallback to yfinance
+    logger.info(f"Falling back to yfinance for {symbol_upper}")
+    yf_df = fetch_from_yfinance(symbol_upper, period=period, interval=interval)
+    
+    if yf_df is not None and not yf_df.empty:
+        metadata['yfinance_available'] = True
+        metadata['data_completeness']['yfinance_rows'] = len(yf_df)
+        metadata['data_completeness']['yfinance_date_range'] = {
+            'start': yf_df.index.min().strftime('%Y-%m-%d'),
+            'end': yf_df.index.max().strftime('%Y-%m-%d')
+        }
+        
+        # Apply SEBI lag if requested
+        if apply_lag:
+            yf_df = apply_sebi_lag(yf_df)
+            metadata['data_completeness']['yfinance_rows_after_lag'] = len(yf_df)
+        
+        # Save to local storage for future use
+        save_success = save_to_local_data(symbol_upper, yf_df)
+        metadata['data_completeness']['saved_to_local'] = save_success
+        
+        logger.info(f"Using yfinance data for {symbol_upper}: {len(yf_df)} rows")
+        metadata['source'] = 'yfinance'
+        metadata['yfinance_fallback'] = True
+        return yf_df, metadata
+    
+    # Step 3: Neither source available
+    logger.error(f"No data available for {symbol_upper} from any source")
+    metadata['source'] = None
+    metadata['error'] = 'No data available from local storage or yfinance'
+    return None, metadata
+
+
+def batch_fetch_prices(symbols: List[str], period: str = "60d") -> Dict[str, Optional[pd.DataFrame]]:
+    """
+    Batch fetch prices for multiple symbols with local data priority.
+    
+    Args:
+        symbols: List of stock symbols
+        period: Time period to fetch
+    
+    Returns:
+        Dictionary mapping symbol to DataFrame or None
+    """
+    results = {}
+    
+    for symbol in symbols:
+        df, metadata = get_stock_data_with_fallback(
+            symbol,
+            period=period,
+            apply_lag=True,
+            min_rows=1  # For price fetching, even 1 row is sufficient
+        )
+        results[symbol] = df
+    
+    return results
+
+
+def get_current_price(symbol: str) -> Optional[float]:
+    """
+    Get current/latest price for a symbol with local data priority.
+    
+    Args:
+        symbol: Stock symbol
+    
+    Returns:
+        Latest price or None if unavailable
+    """
+    df, metadata = get_stock_data_with_fallback(
+        symbol,
+        period="5d",  # Short period for price check
+        apply_lag=True,
+        min_rows=1
+    )
+    
+    if df is not None and not df.empty:
+        # Get the latest close price
+        if 'close' in df.columns:
+            return float(df['close'].iloc[-1])
+    
+    return None

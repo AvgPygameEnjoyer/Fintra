@@ -53,4 +53,26 @@ async function init() {
 // Make selectStock function global for event handlers
 window.selectStock = selectStock;
 
-document.addEventListener('DOMContentLoaded', init);
+// Update footer effective date on load
+function updateFooterDate() {
+    const footerDateEl = document.getElementById('footer-effective-date');
+    if (footerDateEl) {
+        // Calculate effective date (31 days ago for SEBI compliance)
+        const today = new Date();
+        const effectiveDate = new Date(today);
+        effectiveDate.setDate(today.getDate() - 31);
+        
+        const dateStr = effectiveDate.toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+        
+        footerDateEl.textContent = `Effective Date: ${dateStr}`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    init();
+    updateFooterDate();
+});
