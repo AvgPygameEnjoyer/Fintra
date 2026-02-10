@@ -26,11 +26,25 @@ export function initialize() {
 }
 
 export function showLoading() {
-    DOM.loading.style.display = 'block';
+    DOM.loading.style.display = 'flex';
+    updateLoadingProgress(0, 'Initializing...');
 }
 
 export function hideLoading() {
     DOM.loading.style.display = 'none';
+    updateLoadingProgress(0, '');
+}
+
+export function updateLoadingProgress(percent, phase) {
+    const progressBar = document.getElementById('loading-progress-bar');
+    const phaseText = document.getElementById('loading-phase');
+    
+    if (progressBar) {
+        progressBar.style.width = percent + '%';
+    }
+    if (phaseText && phase) {
+        phaseText.textContent = phase;
+    }
 }
 
 export function hideError() {

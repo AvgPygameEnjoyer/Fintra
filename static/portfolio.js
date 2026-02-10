@@ -143,13 +143,32 @@ function showBacktestingView() {
 
 async function fetchAndDisplayPortfolio() {
     const portfolioContent = DOM.portfolioContent;
-    portfolioContent.innerHTML = '<div class="loading"><div class="spinner"></div>Fetching portfolio...</div>';
+    portfolioContent.innerHTML = `
+        <div class="loading">
+            <div class="spinner"></div>
+            <div class="loading-text">Loading portfolio...</div>
+            <div class="loading-progress-container">
+                <div class="loading-progress-bar" id="portfolio-loading-progress"></div>
+            </div>
+            <div class="loading-phase" id="portfolio-loading-phase">Initializing...</div>
+        </div>
+    `;
+
+    const updateProgress = (percent, phase) => {
+        const progressBar = document.getElementById('portfolio-loading-progress');
+        const phaseText = document.getElementById('portfolio-loading-phase');
+        if (progressBar) progressBar.style.width = percent + '%';
+        if (phaseText) phaseText.textContent = phase;
+    };
 
     try {
+        updateProgress(15, 'Connecting to server...');
+        
         const response = await fetch(`${CONFIG.API_BASE_URL}/portfolio`, {
             credentials: 'include',
             headers: getAuthHeaders()
         });
+        
         if (!response.ok) {
             if (response.status === 401) {
                 showNotification('Session expired or invalid. Please sign in again.', 'error');
@@ -158,7 +177,11 @@ async function fetchAndDisplayPortfolio() {
             }
             throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        updateProgress(40, 'Fetching position data...');
         const positions = await response.json();
+        
+        updateProgress(70, 'Calculating indicators & P&L...');
         
         // Store in global state for chat context
         STATE.portfolio = positions;
@@ -173,7 +196,10 @@ async function fetchAndDisplayPortfolio() {
             return;
         }
 
+        updateProgress(90, 'Rendering portfolio view...');
         portfolioContent.innerHTML = `<div class="portfolio-grid">${positions.map(createPositionCard).join('')}</div>`;
+        
+        updateProgress(100, 'Complete!');
 
     } catch (error) {
         console.error('❌ Error fetching portfolio:', error);

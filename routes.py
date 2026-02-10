@@ -569,12 +569,10 @@ def get_data():
         # Log data source for debugging
         logger.info(f"Data loaded for {symbol}: source={metadata.get('source')}, "
                    f"yfinance_fallback={metadata.get('yfinance_fallback', False)}, "
-                   f"rows={len(hist)}")
+                   f"rows={len(hist)}, cached={metadata.get('data_completeness', {}).get('cached', False)}")
 
-        # Standardize column names (ensure PascalCase for compatibility)
-        hist.columns = [col.title().replace('_', '') for col in hist.columns]
-        # Also standardize index name for clean_df
-        hist.index.name = 'Date'
+        # Note: Column names are already standardized to PascalCase in load_stock_data
+        # hist.columns = [col.title().replace('_', '') for col in hist.columns]
         
         hist['Ma5'] = hist['Close'].rolling(window=5).mean()
         hist['Ma10'] = hist['Close'].rolling(window=10).mean()
@@ -1007,10 +1005,8 @@ def get_portfolio():
                 # Track data source
                 data_source = "local" if hist is not None else "unavailable"
                 
-                # Standardize column names (ensure PascalCase for compatibility)
-                hist.columns = [col.title().replace('_', '') for col in hist.columns]
-                # Also standardize index name for clean_df
-                hist.index.name = 'Date'
+                # Note: Column names are already standardized to PascalCase in load_stock_data
+                # hist.columns = [col.title().replace('_', '') for col in hist.columns]
                 
                 # Validate and Clean
                 if 'Close' not in hist.columns:

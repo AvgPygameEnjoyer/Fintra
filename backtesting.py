@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime, timedelta
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -490,19 +491,53 @@ class BacktestEngine:
 def get_parquet_path(symbol: str) -> Optional[str]:
     """
     Get the absolute file path for a stock symbol's parquet data file.
+    Automatically adds .NS suffix for NSE stocks if not present.
     """
     # Use absolute path relative to this file's directory
     base_dir = os.path.dirname(__file__)
     if not symbol or len(symbol) == 0:
         logger.error(f"Invalid symbol: {symbol}")
         return None
-    first_char = symbol[0].upper()
-    file_path = os.path.join(base_dir, 'data', first_char, f"{symbol}.parquet")
+    
+    # Ensure symbol has .NS suffix for NSE stocks
+    symbol_upper = symbol.upper().strip()
+    if not symbol_upper.endswith('.NS'):
+        symbol_with_suffix = f"{symbol_upper}.NS"
+    else:
+        symbol_with_suffix = symbol_upper
+    
+    first_char = symbol_with_suffix[0].upper()
+    file_path = os.path.join(base_dir, 'data', first_char, f"{symbol_with_suffix}.parquet")
     return file_path
+
+
+# Cache for loaded stock data to reduce latency
+_stock_data_cache: Dict[str, Tuple[pd.DataFrame, datetime]] = {}
+CACHE_TTL_SECONDS = 300  # Cache data for 5 minutes
+
+
+def _get_cached_stock_data(symbol: str) -> Optional[pd.DataFrame]:
+    """Get stock data from cache if available and not expired."""
+    if symbol in _stock_data_cache:
+        df, timestamp = _stock_data_cache[symbol]
+        if datetime.now() - timestamp < timedelta(seconds=CACHE_TTL_SECONDS):
+            logger.info(f"Cache hit for {symbol}")
+            return df.copy()
+        else:
+            logger.info(f"Cache expired for {symbol}")
+            del _stock_data_cache[symbol]
+    return None
+
+
+def _set_cached_stock_data(symbol: str, df: pd.DataFrame):
+    """Store stock data in cache."""
+    _stock_data_cache[symbol] = (df.copy(), datetime.now())
+    logger.info(f"Cached data for {symbol}")
 
 def load_stock_data(symbol: str, apply_lag: bool = True) -> Tuple[Optional[pd.DataFrame], Dict]:
     """
     Load parquet data for a given stock symbol with optional SEBI compliance lag.
+    Uses caching to reduce latency for repeated requests.
     
     Args:
         symbol: Stock symbol to load
@@ -512,13 +547,40 @@ def load_stock_data(symbol: str, apply_lag: bool = True) -> Tuple[Optional[pd.Da
         Tuple of (DataFrame or None, compliance_info dict)
     """
     try:
-        file_path = get_parquet_path(symbol)
+        symbol_upper = symbol.upper().strip()
+        
+        # Try to get from cache first
+        cached_df = _get_cached_stock_data(symbol_upper)
+        if cached_df is not None:
+            compliance_info = {
+                'symbol': symbol_upper,
+                'original_rows': len(cached_df),
+                'date_range': {
+                    'start': cached_df.index.min().strftime('%Y-%m-%d'),
+                    'end': cached_df.index.max().strftime('%Y-%m-%d')
+                },
+                'lag_applied': apply_lag,
+                'lag_days': DATA_LAG_DAYS if apply_lag else 0,
+                'cached': True
+            }
+            
+            # Apply SEBI compliance lag if requested
+            if apply_lag:
+                df = apply_sebi_lag(cached_df.copy())
+                compliance_info['filtered_rows'] = len(df)
+                compliance_info['rows_excluded'] = compliance_info['original_rows'] - len(df)
+                compliance_info['effective_end_date'] = df.index.max().strftime('%Y-%m-%d') if not df.empty else None
+                return df, compliance_info
+            else:
+                return cached_df.copy(), compliance_info
+        
+        file_path = get_parquet_path(symbol_upper)
         if not file_path:
-            return None, {'error': f'No data found for symbol {symbol}'}
+            return None, {'error': f'No data found for symbol {symbol_upper}'}
         
         if not os.path.exists(file_path):
             logger.error(f"Parquet file not found: {file_path}")
-            return None, {'error': f'Data file not found for {symbol}'}
+            return None, {'error': f'Data file not found for {symbol_upper}'}
         
         logger.info(f"Loading data from {file_path}")
         df = pd.read_parquet(file_path, engine='pyarrow')
@@ -535,15 +597,24 @@ def load_stock_data(symbol: str, apply_lag: bool = True) -> Tuple[Optional[pd.Da
                 # Attempt to convert the existing index to datetime
                 df.index = pd.to_datetime(df.index)
         
+        # Standardize column names to PascalCase for consistency across the application
+        # This avoids repeated column name conversions in routes
+        df.columns = [col.title().replace('_', '') for col in df.columns]
+        df.index.name = 'Date'
+        
+        # Cache the standardized data before applying lag
+        _set_cached_stock_data(symbol_upper, df)
+        
         compliance_info = {
-            'symbol': symbol,
+            'symbol': symbol_upper,
             'original_rows': len(df),
             'date_range': {
                 'start': df.index.min().strftime('%Y-%m-%d'),
                 'end': df.index.max().strftime('%Y-%m-%d')
             },
             'lag_applied': apply_lag,
-            'lag_days': DATA_LAG_DAYS if apply_lag else 0
+            'lag_days': DATA_LAG_DAYS if apply_lag else 0,
+            'cached': False
         }
         
         # Apply SEBI compliance lag if requested

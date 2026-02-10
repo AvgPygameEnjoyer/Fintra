@@ -1,6 +1,6 @@
 // ==================== DATA FETCHING ====================
 import { deps } from './config.js';
-import { showLoading, hideLoading, hideError, showError } from './dom.js';
+import { showLoading, hideLoading, hideError, showError, updateLoadingProgress } from './dom.js';
 import { displayData } from './display.js';
 import { updateAuthUI, getAuthHeaders } from './auth.js';
 import { updateAnalysisDataInfo } from './data_transparency.js';
@@ -27,6 +27,9 @@ export async function fetchData() {
     document.getElementById('output').innerHTML = '';
 
     try {
+        // Phase 1: Sending request (0-20%)
+        updateLoadingProgress(10, 'Connecting to server...');
+        
         const response = await fetch(`${CONFIG.API_BASE_URL}/get_data`, {
             method: "POST",
             credentials: "include",
@@ -48,13 +51,26 @@ export async function fetchData() {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
+        // Phase 2: Receiving data (20-50%)
+        updateLoadingProgress(30, 'Fetching market data...');
+        
         const data = await response.json();
 
         if (data.error) {
             showError(data.error);
             deps.log.warn(`API returned an error for ${STATE.currentSymbol}:`, data.error);
         } else {
+            // Phase 3: Processing indicators (50-80%)
+            updateLoadingProgress(60, 'Calculating technical indicators (MA, RSI, MACD)...');
+            
+            // Phase 4: AI Analysis (80-95%)
+            updateLoadingProgress(85, 'Generating AI analysis...');
+            
             displayData(data);
+            
+            // Phase 5: Finalizing (95-100%)
+            updateLoadingProgress(100, 'Complete!');
+            
             // Add transparency indicators for data lag
             if (data.sebi_compliance) {
                 updateAnalysisDataInfo(data);
@@ -66,6 +82,9 @@ export async function fetchData() {
         deps.log.error('Fetch error:', error);
         showError(`Failed to fetch data for ${STATE.currentSymbol}. Please try another symbol.`);
     } finally {
-        hideLoading();
+        // Small delay to show 100% before hiding
+        setTimeout(() => {
+            hideLoading();
+        }, 300);
     }
 }

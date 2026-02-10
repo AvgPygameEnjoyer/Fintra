@@ -61,7 +61,14 @@
                 </form>
             </div>
 
-            <div id="loading" class="loading">Loading data...</div>
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <div class="loading-text">Loading data...</div>
+                <div class="loading-progress-container">
+                    <div class="loading-progress-bar" id="loading-progress-bar"></div>
+                </div>
+                <div class="loading-phase" id="loading-phase">Initializing...</div>
+            </div>
             <div id="error" class="error"></div>
             <div id="output"></div>
         </div>
