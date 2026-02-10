@@ -573,6 +573,8 @@ def get_data():
 
         # Standardize column names (ensure PascalCase for compatibility)
         hist.columns = [col.title().replace('_', '') for col in hist.columns]
+        # Also standardize index name for clean_df
+        hist.index.name = 'Date'
         
         hist['Ma5'] = hist['Close'].rolling(window=5).mean()
         hist['Ma10'] = hist['Close'].rolling(window=10).mean()
@@ -1029,7 +1031,10 @@ def get_portfolio():
                 pnl = current_value - entry_value
                 pnl_percent = (pnl / entry_value) * 100 if entry_value != 0 else 0
 
-                chart_data = clean_df(hist.tail(30), ['Date', 'Close'])
+                # Reset index to make Date a column (clean_df expects 'Date' column)
+                chart_df = hist.tail(30).reset_index()
+                chart_df.columns = [col.title() if col.lower() == 'date' else col for col in chart_df.columns]
+                chart_data = clean_df(chart_df, ['Close'])
                 
                 # Get the latest date for transparency
                 latest_date = latest.name.strftime('%Y-%m-%d') if hasattr(latest.name, 'strftime') else str(latest.name)
