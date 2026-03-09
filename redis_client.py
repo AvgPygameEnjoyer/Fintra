@@ -44,12 +44,31 @@ class RedisClient:
             cls._instance._vector_index = None
         return cls._instance
     
-    def connect(self) -> redis.Redis:
+    def connect(self) -> Any:
         """Initialize Redis connection with Upstash & Render support"""
         if self._client is None:
             try:
+                # 0. Fast-track Upstash REST API if provided (fixes DNS/IP blocking issues)
+                raw_host = os.getenv('REDIS_HOST')
+                rest_token = os.getenv('REDIS_PASSWORD')
+                
+                if raw_host and rest_token and 'upstash.io' in raw_host:
+                    # Ensure the host has the required https protocol for the REST client
+                    rest_url = raw_host if raw_host.startswith('http') else f"https://{raw_host}"
+                    
+                    try:
+                        from upstash_redis import Redis as UpstashRedis
+                        logger.info(f"🔒 Using native upstash-redis REST client at {rest_url}")
+                        self._client = UpstashRedis(url=rest_url, token=rest_token)
+                        # Test connection
+                        self._client.ping()
+                        logger.info("✅ Redis connection established (REST HTTP)")
+                        return self._client
+                    except ImportError:
+                        logger.warning("upstash-redis package not found, falling back to standard redis-py")
+
                 # 1. Prefer REDIS_URL if available (It handles username, pass, and rediss:// SSL natively)
-                redis_url = os.getenv('REDIS_URL') or os.getenv('UPSTASH_REDIS_REST_URL')
+                redis_url = os.getenv('REDIS_URL')
                 
                 kwargs = {
                     'decode_responses': True,
