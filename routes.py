@@ -650,12 +650,14 @@ def get_data():
                       f"Please try again later or contact support if the issue persists."
             ), 422
         
-    hist['MA5'] = hist['Close'].rolling(window=5).mean()
-    hist['MA10'] = hist['Close'].rolling(window=10).mean()
-    hist['RSI'] = compute_rsi(hist['Close'])
-    hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
+        hist['Ma5'] = hist['Close'].rolling(window=5).mean()
+        hist['Ma10'] = hist['Close'].rolling(window=10).mean()
+        hist['Rsi'] = compute_rsi(hist['Close'])
+        hist['Macd'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
 
-    hist_with_indicators = hist.dropna(subset=['MA5', 'MA10', 'RSI', 'MACD', 'Signal', 'Histogram'])
+        # For AI analysis, use last 30 days of data that has all indicators calculated
+        # (RSI needs 14 days, so we need at least 14 days of history)
+        hist_with_indicators = hist.dropna(subset=['Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal', 'Histogram'])
         
         # Check if we have any data with indicators after dropping NaN
         if hist_with_indicators.empty:
@@ -666,9 +668,9 @@ def get_data():
                       f"Please try a different symbol or contact support."
             ), 422
         
-    latest_data_list = clean_df(hist_with_indicators.tail(30),
-        ['Open', 'High', 'Low', 'Close', 'Volume', 'MA5', 'MA10', 'RSI', 'MACD', 'Signal',
-        'Histogram'])
+        latest_data_list = clean_df(hist_with_indicators.tail(30),
+                                    ['Open', 'High', 'Low', 'Close', 'Volume', 'Ma5', 'Ma10', 'Rsi', 'Macd', 'Signal',
+                                     'Histogram'])
 
         latest_symbol_data[symbol] = latest_data_list
 
@@ -693,16 +695,16 @@ def get_data():
         # For display tables, use data that has the specific indicators available
         # Don't require ALL indicators to be present - just the ones needed for each table
         hist_ohlcv = hist.dropna(subset=['Open', 'High', 'Low', 'Close', 'Volume'])
-    hist_ma = hist.dropna(subset=['MA5', 'MA10'])
-    hist_rsi = hist.dropna(subset=['RSI'])
-    hist_macd = hist.dropna(subset=['MACD', 'Signal', 'Histogram'])
-
-    return jsonify(
-        ticker=symbol,
-        OHLCV=clean_df(hist_ohlcv, ['Open', 'High', 'Low', 'Close', 'Volume']),
-        MA=clean_df(hist_ma, ['MA5', 'MA10']),
-        RSI=clean_df(hist_rsi, ['RSI']),
-        MACD=clean_df(hist_macd, ['MACD', 'Signal', 'Histogram']),
+        hist_ma = hist.dropna(subset=['Ma5', 'Ma10'])
+        hist_rsi = hist.dropna(subset=['Rsi'])
+        hist_macd = hist.dropna(subset=['Macd', 'Signal', 'Histogram'])
+        
+        return jsonify(
+            ticker=symbol,
+            OHLCV=clean_df(hist_ohlcv, ['Open', 'High', 'Low', 'Close', 'Volume']),
+            MA=clean_df(hist_ma, ['Ma5', 'Ma10']),
+            RSI=clean_df(hist_rsi, ['Rsi']),
+            MACD=clean_df(hist_macd, ['Macd', 'Signal', 'Histogram']),
             AI_Review=gemini_analysis,
             Rule_Based_Analysis=rule_based_text,
             data_source={
@@ -1102,68 +1104,69 @@ def get_portfolio():
                 if hist.empty:
                     raise ValueError(f"History is empty after dropping NaNs for {p.symbol}")
 
-            # Calculate indicators
-            hist['RSI'] = compute_rsi(hist['Close'])
-            hist['MA5'] = hist['Close'].rolling(window=5).mean()
-            hist['MA10'] = hist['Close'].rolling(window=10).mean()
-            hist['MACD'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
+                # Calculate indicators
+                hist['Rsi'] = compute_rsi(hist['Close'])
+                hist['Ma5'] = hist['Close'].rolling(window=5).mean()
+                hist['Ma10'] = hist['Close'].rolling(window=10).mean()
+                hist['Macd'], hist['Signal'], hist['Histogram'] = compute_macd(hist['Close'])
+                
+                latest = hist.iloc[-1]
+                current_price = latest['Close']
+                
+                hist_list_for_macd = clean_df(hist.dropna(subset=['Macd', 'Signal']), ['Macd', 'Signal'])
+                crossover_type, crossover_days_ago = find_recent_macd_crossover(hist_list_for_macd, lookback=7)
+                macd_status = "None"
+                if crossover_type != 'none':
+                    macd_status = f"{crossover_type.capitalize()} {crossover_days_ago}d ago"
+                
+                current_value = p.quantity * current_price
+                entry_value = p.quantity * p.entry_price
+                pnl = current_value - entry_value
+                pnl_percent = (pnl / entry_value) * 100 if entry_value != 0 else 0
 
-            latest = hist.iloc[-1]
-            current_price = latest['Close']
+                # Reset index to make Date a column (clean_df expects 'Date' column)
+                chart_df = hist.tail(30).reset_index()
+                chart_df.columns = [col.title() if col.lower() == 'date' else col for col in chart_df.columns]
+                chart_data = clean_df(chart_df, ['Close'])
+                
+                # Get the latest date for transparency
+                latest_date = latest.name.strftime('%Y-%m-%d') if hasattr(latest.name, 'strftime') else str(latest.name)
 
-            hist_list_for_macd = clean_df(hist.dropna(subset=['MACD', 'Signal']), ['MACD', 'Signal'])
-            crossover_type, crossover_days_ago = find_recent_macd_crossover(hist_list_for_macd, lookback=7)
-            macd_status = "None"
-            if crossover_type != 'none':
-                macd_status = f"{crossover_type.capitalize()} {crossover_days_ago}d ago"
+                position_payload = {
+                    "id": p.id,
+                    "symbol": p.symbol,
+                    "quantity": p.quantity,
+                    "entry_price": p.entry_price,
+                    "entry_date": p.entry_date.strftime('%Y-%m-%d'),
+                    "notes": p.notes,
+                    "current_price": current_price,
+                    "current_value": current_value,
+                    "pnl": pnl,
+                    "pnl_percent": pnl_percent,
+                    "rsi": latest.get('Rsi'),
+                    "ma5": latest.get('Ma5'),
+                    "ma10": latest.get('Ma10'),
+                    "macd_status": macd_status,
+                    "chart_data": chart_data,
+                    "data_date": latest_date,  # Include the date of the data for transparency
+                    "data_source": data_source  # Track where data came from
+                }
 
-            current_value = p.quantity * current_price
-            entry_value = p.quantity * p.entry_price
-            pnl = current_value - entry_value
-            pnl_percent = (pnl / entry_value) * 100 if entry_value != 0 else 0
+                portfolio_data.append(position_payload)
 
-            # Reset index to make Date a column (clean_df expects 'Date' column)
-            chart_df = hist.tail(30).reset_index()
-            chart_df.columns = [col.title() if col.lower() == 'date' else col for col in chart_df.columns]
-            chart_data = clean_df(chart_df, ['Close'])
-
-            # Get the latest date for transparency
-            latest_date = latest.name.strftime('%Y-%m-%d') if hasattr(latest.name, 'strftime') else str(latest.name)
-
-            position_payload = {
-                "id": p.id,
-                "symbol": p.symbol,
-                "quantity": p.quantity,
-                "entry_price": p.entry_price,
-                "entry_date": p.entry_date.strftime('%Y-%m-%d'),
-                "notes": p.notes,
-                "current_price": current_price,
-                "current_value": current_value,
-                "pnl": pnl,
-                "pnl_percent": pnl_percent,
-                "rsi": latest.get('RSI'),
-                "ma5": latest.get('MA5'),
-                "ma10": latest.get('MA10'),
-                "macd_status": macd_status,
-                "chart_data": chart_data,
-                "data_date": latest_date, # Include the date of the data for transparency
-                "data_source": data_source # Track where data came from
-            }
-
-            portfolio_data.append(position_payload)
-
-        except Exception as e:
-            logger.error(f"❌ CRITICAL ERROR processing {p.symbol}: {str(e)}")
-            logger.error(traceback.format_exc())
-            # Append with data we have, even if live price fails
-            portfolio_data.append({
-                "id": p.id, "symbol": p.symbol, "quantity": p.quantity,
-                "entry_price": p.entry_price, "entry_date": p.entry_date.strftime('%Y-%m-%d'),
-                "notes": p.notes, "current_price": p.entry_price, "current_value": p.quantity * p.entry_price,
-                "pnl": 0, "pnl_percent": 0, "rsi": None, "ma5": None, "ma10": None, "macd_status": "N/A", "chart_data": [],
-                "data_date": None,
-                "data_source": data_source
-            })
+            except Exception as e:
+                logger.error(f"❌ CRITICAL ERROR processing {p.symbol}: {str(e)}")
+                logger.error(traceback.format_exc())
+                # Append with data we have, even if live price fails
+                portfolio_data.append({
+                    "id": p.id, "symbol": p.symbol, "quantity": p.quantity,
+                    "entry_price": p.entry_price, "entry_date": p.entry_date.strftime('%Y-%m-%d'),
+                    "notes": p.notes, "current_price": p.entry_price, "current_value": p.quantity * p.entry_price,
+                    "pnl": 0, "pnl_percent": 0,
+                    "rsi": None, "ma5": None, "ma10": None, "macd_status": "N/A", "chart_data": [],
+                    "data_date": None,
+                    "data_source": data_source
+                })
 
         return jsonify(portfolio_data), 200
     except Exception as e:
