@@ -47,13 +47,9 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
 
-    # CORS setup
-    CORS(
-        app,
-        supports_credentials=True,
-        origins=Config.CORS_ORIGINS,
-        methods=["GET", "POST", "OPTIONS", "DELETE", "PUT"]
-    )
+    # CORS is handled manually via before_request/after_request hooks below.
+    # Do NOT use Flask-CORS here — it conflicts with our manual headers.
+    # CORS(app, supports_credentials=True, origins=Config.CORS_ORIGINS, ...)
 
     # Initialize SocketIO for real‑time replay
     socketio = SocketIO(app, cors_allowed_origins=Config.CORS_ORIGINS)
@@ -168,14 +164,25 @@ def create_app():
             logger.info(f"   🔑 Incoming Cookies: {list(request.cookies.keys())}")
 
     @app.after_request
-    def ensure_cors_headers(response):
-        """Stamp CORS headers on EVERY response — error, success, redirect, anything."""
+    def ensure_cors_and_tokens(response):
+        """Stamp CORS headers + inject refreshed auth cookies on EVERY response."""
+        # 1. CORS headers
         origin = request.headers.get('Origin', '')
         if origin in allowed_origins:
             response.headers['Access-Control-Allow-Origin'] = origin
             response.headers['Access-Control-Allow-Credentials'] = 'true'
             response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, DELETE, PUT'
             response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+        
+        # 2. If require_auth() silently refreshed tokens, set cookies on this response
+        from flask import g
+        pending_access = getattr(g, 'pending_access_token', None)
+        pending_refresh = getattr(g, 'pending_refresh_token', None)
+        if pending_access and pending_refresh:
+            from auth import set_token_cookies
+            set_token_cookies(response, pending_access, pending_refresh)
+            logger.info("🔄 Silently refreshed auth tokens on response")
+        
         return response
 
     # Error handlers

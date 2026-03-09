@@ -157,15 +157,13 @@ def require_auth():
                     new_access_token = generate_jwt_token(user_data, Config.ACCESS_TOKEN_JWT_SECRET, Config.ACCESS_TOKEN_EXPIRETIME)
                     new_refresh_token = generate_jwt_token(user_data, Config.REFRESH_TOKEN_JWT_SECRET, Config.REFRESH_TOKEN_EXPIRETIME)
                     
-                    # Return both tokens in response for frontend to store
-                    response = jsonify({
-                        "error": "Access token refreshed",
-                        "access_token": new_access_token,
-                        "refresh_token": new_refresh_token
-                    })
-                    # Also try to set cookies as backup
-                    set_token_cookies(response, new_access_token, new_refresh_token)
-                    return response, 401  # Signal client to retry
+                    # Store new tokens in Flask g so after_request can set cookies
+                    from flask import g
+                    g.pending_access_token = new_access_token
+                    g.pending_refresh_token = new_refresh_token
+                    
+                    # Let the request proceed — don't return 401
+                    return None  # Success
                 else:
                     logger.error(f"Refresh token is for a user ({user_id}) that does not exist in DB.")
         else:
