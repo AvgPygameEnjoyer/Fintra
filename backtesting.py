@@ -720,20 +720,21 @@ def get_stock_data_with_fallback(
     min_rows: int = 30
 ) -> Tuple[Optional[pd.DataFrame], Dict]:
     """
-    Get stock data with local data as primary source and yfinance as fallback.
-    
+    Get stock data with yfinance as the primary source and local parquet files as fallback.
+
     This function implements a priority-based data fetching strategy:
-    1. First, try to load from local parquet files
-    2. If local data is insufficient or missing, fetch from yfinance
-    3. Save yfinance data to local storage for future use
-    
+    1. First, try to fetch from yfinance (live/recent data)
+    2. If yfinance is unavailable or returns insufficient data, fall back to local parquet files
+
+    Note: The /backtest route calls load_stock_data() directly and is unaffected by this function.
+
     Args:
         symbol: Stock symbol to load
-        period: Time period for yfinance fallback (e.g., '90d', '1y')
-        interval: Data interval for yfinance fallback (e.g., '1d', '1h')
+        period: Time period for yfinance fetch (e.g., '90d', '1y')
+        interval: Data interval for yfinance fetch (e.g., '1d', '1h')
         apply_lag: Whether to apply 31-day SEBI compliance lag
-        min_rows: Minimum number of rows required for local data to be considered sufficient
-    
+        min_rows: Minimum number of rows required for yfinance data to be considered sufficient
+
     Returns:
         Tuple of (DataFrame or None, metadata dict with source info)
     """
@@ -746,33 +747,11 @@ def get_stock_data_with_fallback(
         'data_completeness': {},
         'lag_applied': apply_lag
     }
-    
-    # Step 1: Try to load from local data
-    logger.info(f"Attempting to load {symbol_upper} from local data (primary source)")
-    local_df, local_info = load_stock_data(symbol_upper, apply_lag=apply_lag)
-    
-    if local_df is not None and not local_df.empty:
-        metadata['local_available'] = True
-        metadata['data_completeness']['local_rows'] = len(local_df)
-        metadata['data_completeness']['local_date_range'] = local_info.get('date_range', {})
-        
-        # Check if local data is sufficient
-        if len(local_df) >= min_rows:
-            logger.info(f"Using local data for {symbol_upper}: {len(local_df)} rows")
-            metadata['source'] = 'local'
-            metadata['yfinance_fallback'] = False
-            return local_df, metadata
-        else:
-            logger.warning(f"Local data insufficient for {symbol_upper}: {len(local_df)} rows (min: {min_rows})")
-            metadata['data_completeness']['local_insufficient'] = True
-    else:
-        logger.warning(f"No local data available for {symbol_upper}")
-        metadata['data_completeness']['local_missing'] = True
-    
-    # Step 2: Fallback to yfinance
-    logger.info(f"Falling back to yfinance for {symbol_upper}")
+
+    # Step 1: Try yfinance first (primary source)
+    logger.info(f"Attempting to fetch {symbol_upper} from yfinance (primary source)")
     yf_df = fetch_from_yfinance(symbol_upper, period=period, interval=interval)
-    
+
     if yf_df is not None and not yf_df.empty:
         metadata['yfinance_available'] = True
         metadata['data_completeness']['yfinance_rows'] = len(yf_df)
@@ -780,25 +759,47 @@ def get_stock_data_with_fallback(
             'start': yf_df.index.min().strftime('%Y-%m-%d'),
             'end': yf_df.index.max().strftime('%Y-%m-%d')
         }
-        
+
         # Apply SEBI lag if requested
         if apply_lag:
             yf_df = apply_sebi_lag(yf_df)
             metadata['data_completeness']['yfinance_rows_after_lag'] = len(yf_df)
-        
-        # Save to local storage for future use
-        save_success = save_to_local_data(symbol_upper, yf_df)
-        metadata['data_completeness']['saved_to_local'] = save_success
-        
-        logger.info(f"Using yfinance data for {symbol_upper}: {len(yf_df)} rows")
-        metadata['source'] = 'yfinance'
+
+        # Check if yfinance data is sufficient
+        if len(yf_df) >= min_rows:
+            logger.info(f"Using yfinance data for {symbol_upper}: {len(yf_df)} rows")
+            metadata['source'] = 'yfinance'
+            metadata['yfinance_fallback'] = False
+            return yf_df, metadata
+        else:
+            logger.warning(f"yfinance data insufficient for {symbol_upper}: {len(yf_df)} rows (min: {min_rows})")
+            metadata['data_completeness']['yfinance_insufficient'] = True
+    else:
+        logger.warning(f"No data returned from yfinance for {symbol_upper}, falling back to local data")
+        metadata['data_completeness']['yfinance_missing'] = True
+
+    # Step 2: Fall back to local parquet data
+    logger.info(f"Falling back to local parquet data for {symbol_upper}")
+    local_df, local_info = load_stock_data(symbol_upper, apply_lag=apply_lag)
+
+    if local_df is not None and not local_df.empty:
+        metadata['local_available'] = True
+        metadata['data_completeness']['local_rows'] = len(local_df)
+        metadata['data_completeness']['local_date_range'] = local_info.get('date_range', {})
+        metadata['data_completeness']['cached'] = local_info.get('cached', False)
+
+        logger.info(f"Using local data for {symbol_upper}: {len(local_df)} rows")
+        metadata['source'] = 'local'
         metadata['yfinance_fallback'] = True
-        return yf_df, metadata
-    
+        return local_df, metadata
+    else:
+        logger.warning(f"No local data available for {symbol_upper}")
+        metadata['data_completeness']['local_missing'] = True
+
     # Step 3: Neither source available
     logger.error(f"No data available for {symbol_upper} from any source")
     metadata['source'] = None
-    metadata['error'] = 'No data available from local storage or yfinance'
+    metadata['error'] = 'No data available from yfinance or local storage'
     return None, metadata
 
 

@@ -37,8 +37,10 @@ from backtesting import (
     DATA_LAG_DAYS,
     YFINANCE_AVAILABLE,
     BacktestEngine,
+    apply_sebi_lag,
     batch_fetch_prices,
     check_data_availability,
+    fetch_from_yfinance,
     get_current_price,
     get_stock_data_with_fallback,
     load_stock_data,
@@ -602,14 +604,50 @@ def get_data():
     symbol = symbol.upper()
 
     try:
-        # Use unified data fetching with local data priority
-        hist, metadata = get_stock_data_with_fallback(
-            symbol,
-            period="90d",
-            interval="1d",
-            apply_lag=True,
-            min_rows=30
-        )
+        # Use yfinance as primary source, local parquet files as fallback
+        metadata = {
+            'symbol': symbol,
+            'source': None,
+            'local_available': False,
+            'yfinance_available': False,
+            'yfinance_fallback': False,
+            'data_completeness': {},
+            'lag_applied': True
+        }
+
+        # Step 1: Try yfinance first (primary source)
+        hist = fetch_from_yfinance(symbol, period="90d", interval="1d")
+        if hist is not None and not hist.empty:
+            metadata['yfinance_available'] = True
+            hist = apply_sebi_lag(hist)
+            metadata['data_completeness']['yfinance_rows'] = len(hist)
+            if len(hist) >= 30:
+                logger.info(f"Using yfinance data for {symbol}: {len(hist)} rows")
+                metadata['source'] = 'yfinance'
+            else:
+                logger.warning(f"yfinance data insufficient for {symbol} after lag ({len(hist)} rows), trying local")
+                metadata['data_completeness']['yfinance_insufficient'] = True
+                hist = None
+        else:
+            logger.warning(f"yfinance returned no data for {symbol}, falling back to local")
+            metadata['data_completeness']['yfinance_missing'] = True
+            hist = None
+
+        # Step 2: Fall back to local parquet data if yfinance failed/insufficient
+        if hist is None or hist.empty:
+            logger.info(f"Loading {symbol} from local parquet data (fallback)")
+            local_df, local_info = load_stock_data(symbol, apply_lag=True)
+            if local_df is not None and not local_df.empty:
+                metadata['local_available'] = True
+                metadata['data_completeness']['local_rows'] = len(local_df)
+                metadata['data_completeness']['local_date_range'] = local_info.get('date_range', {})
+                metadata['data_completeness']['cached'] = local_info.get('cached', False)
+                metadata['source'] = 'local'
+                metadata['yfinance_fallback'] = True
+                hist = local_df
+            else:
+                metadata['data_completeness']['local_missing'] = True
+                hist = None
 
         if hist is None or hist.empty:
             # Provide detailed error message about fallback attempts
