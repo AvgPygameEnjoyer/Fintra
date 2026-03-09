@@ -48,32 +48,48 @@ class RedisClient:
         """Initialize Redis connection with Upstash & Render support"""
         if self._client is None:
             try:
-                # 1. Force SSL for Upstash (it's mandatory)
-                # You can also detect it via host: is_upstash = "upstash.io" in RedisConfig.HOST
-                use_ssl = True 
-
-                connection_params = {
-                    'host': RedisConfig.HOST,
-                    'port': RedisConfig.PORT,
-                    'db': RedisConfig.DB,
-                    'password': RedisConfig.PASSWORD,
+                # 1. Prefer REDIS_URL if available (It handles username, pass, and rediss:// SSL natively)
+                redis_url = os.getenv('REDIS_URL') or os.getenv('UPSTASH_REDIS_REST_URL')
+                
+                kwargs = {
                     'decode_responses': True,
                     'socket_connect_timeout': 5,
                     'socket_timeout': 5,
-                    # Essential for keeping connections alive on Render/Serverless
                     'health_check_interval': 30,
                     'socket_keepalive': True,
                     'retry_on_timeout': True,
                 }
 
-                if use_ssl:
-                    connection_params.update({
-                        'ssl': True,
-                        'ssl_cert_reqs': "none", # String "none" is safer than NoneType
-                    })
-                    logger.info(f"🔒 SSL enabled for Redis at {RedisConfig.HOST}")
+                if redis_url:
+                    if redis_url.startswith('rediss://'):
+                        kwargs['ssl_cert_reqs'] = "none"
+                        logger.info("🔒 Using native SSL Rediss URL for connection")
+                    self._client = redis.from_url(redis_url, **kwargs)
+                else:    
+                    # 2. Fallback to manual pieces
+                    is_upstash = "upstash.io" in RedisConfig.HOST
+                    use_ssl = is_upstash or RedisConfig.PORT == 6379 
 
-                self._client = redis.Redis(**connection_params)
+                    connection_params = {
+                        'host': RedisConfig.HOST,
+                        'port': RedisConfig.PORT,
+                        'db': RedisConfig.DB,
+                        'password': RedisConfig.PASSWORD,
+                        **kwargs
+                    }
+
+                    if is_upstash:
+                        # Upstash requires the explicit 'default' username via ACLs if not using a URL
+                        connection_params['username'] = 'default'
+
+                    if use_ssl:
+                        connection_params.update({
+                            'ssl': True,
+                            'ssl_cert_reqs': "none",
+                        })
+                        logger.info(f"🔒 SSL enabled for Redis at {RedisConfig.HOST}")
+
+                    self._client = redis.Redis(**connection_params)
                 
                 # Test connection
                 self._client.ping()
