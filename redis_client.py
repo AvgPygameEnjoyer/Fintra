@@ -51,17 +51,18 @@ class RedisClient:
             try:
                 # 0. Fast-track Upstash REST API if provided (fixes DNS/IP blocking issues)
                 raw_host = os.getenv('REDIS_HOST')
-                # Upstash REST API expects a separate API token passed as the Bearer
-                rest_token = os.getenv('REDIS_API_KEY') or os.getenv('REDIS_PASSWORD')
+                # Explicitly grab the API Key for the Bearer token header as requested
+                api_key_bearer = os.getenv('REDIS_PASSWORD')
                 
-                if raw_host and rest_token and 'upstash.io' in raw_host:
+                if raw_host and api_key_bearer and 'upstash.io' in raw_host:
                     # Ensure the host has the required https protocol for the REST client
                     rest_url = raw_host if raw_host.startswith('http') else f"https://{raw_host}"
                     
                     try:
                         from upstash_redis import Redis as UpstashRedis
-                        logger.info(f"🔒 Using native upstash-redis REST client at {rest_url}")
-                        self._client = UpstashRedis(url=rest_url, token=rest_token)
+                        logger.info(f"🔒 Using native upstash-redis REST client with REDIS_API_KEY Bearer token at {rest_url}")
+                        # The 'token' param exactly translates to: Authorization: Bearer <api_key_bearer>
+                        self._client = UpstashRedis(url=rest_url, token=api_key_bearer)
                         # Test connection
                         self._client.ping()
                         logger.info("✅ Redis connection established (REST HTTP)")
