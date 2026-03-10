@@ -124,68 +124,161 @@ def fmt_price(x):
         return str(x)
 
 
-# ==================== GEMINI AI INTEGRATION ====================
-# Define a pool of models to rotate through for load balancing and fallback.
-# Includes the Gemma 3 variants requested and Gemini 2.0 Flash as a robust backup.
-GEMINI_MODELS = [
-    "gemma-3-1b-it", 
-    "gemma-3-4b-it",
-    "gemma-3-12b-it",
-    "gemma-3-27b-it",
-    "gemini-2.0-flash"
-]
-#helloworld
-def call_gemini_api(prompt: str) -> str:
-    """Call the Gemini API, rotating through models to handle rate limits."""
-    api_key = Config.GEMINI_API_KEY
+# ==================== GROQ AI INTEGRATION ====================
+import groq
+
+# Model Stack: each task type maps to a primary model + ordered fallbacks.
+# Routing is based on model strengths and rate limits:
+#   - chat:       fast, high-throughput for conversational queries (14.4K RPD)
+#   - analysis:   deep reasoning for technical data interpretation (12K TPM)
+#   - heavy_data: massive context window for backtest DataFrames (30K TPM)
+#   - safety:     lightweight guard model for prompt injection screening
+GROQ_MODEL_STACK = {
+    "chat": [
+        "llama-3.1-8b-instant",           # 30 RPM | 14.4K RPD | 6K TPM – fast & high daily limit
+        "qwen/qwen3-32b",                 # 60 RPM | 1K RPD | 6K TPM – strong fallback
+        "llama-3.3-70b-versatile",        # 30 RPM | 1K RPD | 12K TPM – deep fallback
+    ],
+    "analysis": [
+        "llama-3.3-70b-versatile",        # 30 RPM | 1K RPD | 12K TPM – deep reasoning
+        "openai/gpt-oss-120b",            # 30 RPM | 1K RPD | 8K TPM – large model fallback
+        "llama-3.1-8b-instant",           # fast fallback
+    ],
+    "heavy_data": [
+        "meta-llama/llama-4-scout-17b-16e-instruct",  # 30 RPM | 1K RPD | 30K TPM – huge context
+        "moonshotai/kimi-k2-instruct",    # 60 RPM | 1K RPD | 10K TPM – fallback
+        "llama-3.3-70b-versatile",        # deep fallback
+    ],
+    "safety": [
+        "meta-llama/llama-prompt-guard-2-86m",  # 30 RPM | 14.4K RPD | 15K TPM – guard model
+        "meta-llama/llama-prompt-guard-2-22m",  # lighter guard fallback
+        "meta-llama/llama-guard-4-12b",         # heavier guard fallback
+    ],
+}
+
+# Default temperature per task type
+GROQ_TASK_TEMPERATURE = {
+    "chat": 0.7,
+    "analysis": 0.4,
+    "heavy_data": 0.3,
+    "safety": 0.0,
+}
+
+# Default max_tokens per task type
+GROQ_TASK_MAX_TOKENS = {
+    "chat": 1024,
+    "analysis": 1536,
+    "heavy_data": 2048,
+    "safety": 256,
+}
+
+
+def call_groq_api(prompt: str, task_type: str = "chat") -> str:
+    """
+    Call the Groq API with intelligent model routing.
+
+    Args:
+        prompt: The text prompt to send.
+        task_type: One of 'chat', 'analysis', 'heavy_data', 'safety'.
+                   Determines which model stack to use.
+    """
+    api_key = Config.GROQ_API_KEY
     if not api_key:
-        logger.warning("GEMINI_API_KEY is not set in the environment.")
+        logger.warning("GROQ_API_KEY is not set in the environment.")
         return "⚠️ **AI Service Misconfigured** – The API key is not set on the server."
 
-    # Shuffle models to spread the load (smart delegation)
-    models_queue = GEMINI_MODELS.copy()
-    random.shuffle(models_queue)
+    models_queue = GROQ_MODEL_STACK.get(task_type, GROQ_MODEL_STACK["chat"])
+    temperature = GROQ_TASK_TEMPERATURE.get(task_type, 0.7)
+    max_tokens = GROQ_TASK_MAX_TOKENS.get(task_type, 1024)
+
+    client = groq.Groq(api_key=api_key)
 
     for model in models_queue:
-        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        
         try:
-            # logger.info(f"🤖 Attempting AI generation with model: {model}")
-            response = requests.post(
-                api_url,
-                headers={"Content-Type": "application/json"},
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {"temperature": 0.7, "topK": 40, "topP": 0.95, "maxOutputTokens": 1024}
-                },
-                timeout=30
+            logger.info(f"🤖 Groq [{task_type}] → trying model: {model}")
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=0.95,
             )
 
-            # Handle Rate Limits (429), Service Overload (503), or Model Not Found (404)
-            if response.status_code in [429, 503, 404]:
-                logger.warning(f"⚠️ Model {model} unavailable ({response.status_code}). Switching...")
-                continue
-
-            response.raise_for_status()
-            result = response.json()
-
-            if 'candidates' in result and result['candidates'] and 'content' in result['candidates'][0]:
-                return result['candidates'][0]['content']['parts'][0]['text']
-            
-            # Handle safety blocks
-            if 'promptFeedback' in result and result['promptFeedback'].get('blockReason'):
-                return f"⚠️ **AI Prompt Blocked** – Safety filter: {result['promptFeedback'].get('blockReason')}"
-            if 'candidates' in result and result['candidates'] and result['candidates'][0].get('finishReason') == 'SAFETY':
-                return "⚠️ **AI Response Blocked** – Safety filter triggered."
-
-            # If empty response, try next model
+            response_text = chat_completion.choices[0].message.content
+            if response_text:
+                logger.info(f"✅ Groq [{task_type}] → success with model: {model}")
+                return response_text
+            # Empty response, try next model
             continue
-
         except Exception as e:
-            logger.error(f"❌ Error with model {model}: {e}")
+            logger.warning(f"⚠️ Groq [{task_type}] model {model} failed: {e}")
             continue
 
     return "⚠️ **System Busy** – All AI models are currently experiencing high traffic. Please try again later."
+
+
+def screen_prompt_safety(user_message: str) -> tuple:
+    """
+    Pre-screen a user message through Meta's Llama Prompt Guard model.
+    
+    Returns:
+        (is_safe: bool, reason: str)
+        - is_safe=True means the message is fine to pass to the main LLM.
+        - is_safe=False means the message was flagged; `reason` explains why.
+    """
+    api_key = Config.GROQ_API_KEY
+    if not api_key:
+        # If no API key, skip safety check (don't block users)
+        return True, "safety_skipped_no_key"
+    
+    try:
+        client = groq.Groq(api_key=api_key)
+        
+        # Use the guard model to classify the input
+        safety_models = GROQ_MODEL_STACK.get("safety", [])
+        
+        for model in safety_models:
+            try:
+                response = client.chat.completions.create(
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": user_message,
+                        }
+                    ],
+                    model=model,
+                    temperature=0.0,
+                    max_tokens=32,
+                )
+                
+                result = response.choices[0].message.content.strip().lower()
+                
+                # Llama Prompt Guard returns labels like "benign" or "injection"/"jailbreak"
+                if "injection" in result or "jailbreak" in result or "unsafe" in result:
+                    logger.warning(f"🛡️ Safety screen BLOCKED message: guard={model}, label={result}")
+                    return False, f"prompt_guard_flagged:{result}"
+                
+                # Message passed the guard
+                logger.debug(f"🛡️ Safety screen PASSED: guard={model}, label={result}")
+                return True, "safe"
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Safety guard model {model} failed: {e}")
+                continue
+        
+        # All guard models failed — default to allowing the message through
+        logger.warning("🛡️ All safety guard models unavailable — defaulting to allow")
+        return True, "safety_guard_unavailable"
+        
+    except Exception as e:
+        logger.error(f"🛡️ Safety screening error: {e}")
+        # On error, default to allowing (fail-open to avoid blocking users)
+        return True, f"safety_error:{e}"
 
 
 def format_data_for_ai_skimmable(symbol: str, data: list) -> str:
@@ -218,8 +311,8 @@ def format_data_for_ai_skimmable(symbol: str, data: list) -> str:
     return "\n".join(summary)
 
 
-def get_gemini_ai_analysis(symbol: str, data: list) -> str:
-    """Get AI-powered analysis from Gemini as a Data-Analyst persona."""
+def get_ai_analysis(symbol: str, data: list) -> str:
+    """Get AI-powered analysis from Groq as a Data-Analyst persona."""
     data_summary = format_data_for_ai_skimmable(symbol, data)
     
     # Get the most recent date from the data for context
@@ -258,10 +351,10 @@ You are NOT an advisor; you are a lens through which the user views PAST data on
 ## MANDATORY DISCLAIMER
 ⚠️ **HISTORICAL DATA ALERT:** This analysis is based on data ending {latest_date} and includes a mandatory 30+ day lag in accordance with SEBI regulations. This is NOT current market data. Fintra is a data visualization and interpretation tool. This output is generated by AI based on historical technical indicators and is for educational purposes only. It does not account for fundamental factors, news, or individual financial situations. This is NOT financial advice. Past performance is not indicative of future results.
 """
-    return call_gemini_api(prompt)
+    return call_groq_api(prompt, task_type='analysis')
 
 
-def get_gemini_position_summary(position_data: Dict) -> str:
+def get_ai_position_summary(position_data: Dict) -> str:
     """Get an AI-powered summary for a specific user position."""
     symbol = position_data.get('symbol')
     quantity = position_data.get('quantity')
@@ -324,7 +417,7 @@ Provide your historical summary now:
 ## MANDATORY DISCLAIMER
 ⚠️ **HISTORICAL DATA ALERT:** This analysis is based on data ending {latest_date} with a mandatory 30+ day lag per SEBI regulations. This is NOT a current assessment. Fintra is a data-visualization tool. This summary is an automated mathematical interpretation of historical data and your specific position as of {latest_date}. It is NOT financial advice. All trading involves risk; ensure you consult a licensed professional before making investment decisions.
 """
-    return call_gemini_api(prompt)
+    return call_groq_api(prompt, task_type='analysis')
 
 def generate_rule_based_analysis(symbol: str, latest_data: List[Dict], lookback: int = 14) -> str:
     """Generate comprehensive rule-based technical analysis"""

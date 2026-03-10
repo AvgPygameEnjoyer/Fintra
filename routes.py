@@ -21,16 +21,17 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 
 from analysis import (
-    call_gemini_api,
+    call_groq_api,
     clean_df,
     compute_macd,
     compute_rsi,
     conversation_context,
     find_recent_macd_crossover,
     generate_rule_based_analysis,
-    get_gemini_ai_analysis,
-    get_gemini_position_summary,
+    get_ai_analysis,
+    get_ai_position_summary,
     latest_symbol_data,
+    screen_prompt_safety,
 )
 from auth import generate_jwt_token, require_auth, set_token_cookies, verify_jwt_token
 from backtesting import (
@@ -713,7 +714,7 @@ def get_data():
         latest_symbol_data[symbol] = latest_data_list
 
         rule_based_text = generate_rule_based_analysis(symbol, latest_data_list)
-        gemini_analysis = get_gemini_ai_analysis(symbol, latest_data_list)
+        gemini_analysis = get_ai_analysis(symbol, latest_data_list)
 
         if user_id not in conversation_context:
             conversation_context[user_id] = {
@@ -947,10 +948,21 @@ def chat():
         full_prompt = full_prompt.replace('\r', ' ')
 
         # ============================================
-        # STEP 7: CALL API WITH VALIDATION
+        # STEP 7: SAFETY PRE-SCREEN & CALL API
         # ============================================
         
-        assistant_response = call_gemini_api(full_prompt)
+        # Pre-screen the user message through the Prompt Guard model
+        is_safe, safety_reason = screen_prompt_safety(safe_query)
+        if not is_safe:
+            logger.warning(f"🛡️ Chat blocked by safety screen for user {user_id}: {safety_reason}")
+            return jsonify(
+                response="I appreciate your curiosity! However, I can only help with educational topics about technical analysis and market concepts. Let me know if you'd like to learn about RSI, MACD, or another indicator! 📊",
+                context={"mode": mode, "blocked": True},
+                validation={"blocked": True, "reason": "safety_screen", "detail": safety_reason},
+                rate_limit_remaining=remaining
+            ), 200
+        
+        assistant_response = call_groq_api(full_prompt, task_type='chat')
         
         if not assistant_response:
             assistant_response = "I'm sorry, I couldn't generate a response. Please try asking in a different way."
@@ -1453,7 +1465,7 @@ def run_backtest():
             tax_rate=0.002
         )
 
-        # Add AI analysis using existing Gemini integration
+        # Add AI analysis using existing Groq integration
         if not performance.get("error"):
             trades_df = performance.get('trades_df', pd.DataFrame())
             if not trades_df.empty:
@@ -1516,7 +1528,7 @@ quantitative decomposition of HISTORICAL backtest data. This is pure historical 
 ⚠️ **HISTORICAL BACKTEST ALERT:** This analysis is based on historical data from {start_date} to {end_date} with a mandatory 30+ day lag per SEBI regulations. This is a hypothetical historical simulation, NOT a current market assessment, NOT financial advice, and NOT a recommendation to trade. Past results do not predict future returns. All trading involves substantial risk.
 """
                 try:
-                    ai_analysis = call_gemini_api(ai_prompt)
+                    ai_analysis = call_groq_api(ai_prompt, task_type='heavy_data')
                     performance['ai_analysis'] = ai_analysis
                 except Exception as e:
                     logger.error(f"AI analysis failed: {e}")

@@ -56,6 +56,8 @@ class Config:
     # Gemini API Key
     GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+    # Groq API Key
+    GROQ_API_KEY = os.getenv('GROQ_API_KEY')
     # Centralized URL Configuration
     # Set these in Render/Vercel to control CORS and Redirects
     # Default to production URLs if running on Render (IS_PRODUCTION is True)
