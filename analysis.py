@@ -236,6 +236,23 @@ def screen_prompt_safety(user_message: str) -> tuple:
         # If no API key, skip safety check (don't block users)
         return True, "safety_skipped_no_key"
     
+    # 1. Fast Pattern Matching (Static Blocklist)
+    patterns = [
+        "ignore previous instructions",
+        "you are now",
+        "act as",
+        "dan",  # lowercase
+        "system prompt",
+        "you're free"
+    ]
+    user_lower = user_message.lower()
+    for pattern in patterns:
+        if pattern in user_lower:
+            logger.warning(f"🛡️ Safety screen BLOCKED message: hardcoded_pattern={pattern}")
+            return False, f"jailbreak_pattern_matched:{pattern}"
+            
+    # 2. Advanced LLM Pattern Screening (Prompt Guard)
+    
     try:
         client = groq.Groq(api_key=api_key)
         
