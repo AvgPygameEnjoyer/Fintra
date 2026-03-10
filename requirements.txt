@@ -22,7 +22,7 @@ redis>=5.0.0
 upstash-redis>=1.0.0
 flask-limiter>=3.5.0
 flask-socketio>=5.3.0
-
+redisvl>=0.1.0
 # Lightweight embedding model - only ~10MB, no PyTorch needed
 # Falls back to sentence-transformers or disabled if not available
 fastembed>=0.3.0
