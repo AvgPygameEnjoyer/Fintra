@@ -15,13 +15,24 @@ logger = logging.getLogger(__name__)
 # Try lightweight embedding libraries in order of preference
 EMBEDDING_BACKEND = None
 
-# Option 1: FastEmbed (lightweight, ~10MB, no PyTorch)
-try:
-    from fastembed import TextEmbedding
-    EMBEDDING_BACKEND = 'fastembed'
-    logger.info("✅ FastEmbed available - using lightweight embeddings")
-except ImportError:
-    pass
+# Option 0: Gemini API (Zero local memory, prioritize on free tier)
+if os.getenv('GEMINI_API_KEY'):
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=os.getenv('GEMINI_API_KEY'))
+        EMBEDDING_BACKEND = 'gemini'
+        logger.info("✅ Gemini API fully configured - using 0-RAM embeddings")
+    except ImportError:
+        pass
+
+# Option 1: FastEmbed (lightweight, ~200MB, no PyTorch)
+if EMBEDDING_BACKEND is None:
+    try:
+        from fastembed import TextEmbedding
+        EMBEDDING_BACKEND = 'fastembed'
+        logger.info("✅ FastEmbed available - using lightweight embeddings")
+    except ImportError:
+        pass
 
 # Option 2: sentence-transformers (heavy, fallback)
 if EMBEDDING_BACKEND is None:
@@ -51,36 +62,40 @@ class RAGEngine:
     
     def __init__(self):
         self.model = None
-        self._load_model()
+        self.backend = EMBEDDING_BACKEND
+        # Lazy Loading: DO NOT call self._load_model() here!
         self.index_name = RedisConfig.VECTOR_INDEX_NAME
         self.vector_dim = RedisConfig.VECTOR_DIM
         self.similarity_threshold = RedisConfig.SIMILARITY_THRESHOLD
         
     def _load_model(self):
-        """Load the embedding model (FastEmbed or sentence-transformers)"""
-        if not NUMPY_AVAILABLE:
-            logger.warning("NumPy not available. RAG features disabled.")
-            self.model = None
+        """Lazy load the embedding model"""
+        if self.model is not None:
             return
             
-        if EMBEDDING_BACKEND is None:
-            logger.warning("No embedding library available. Install fastembed or sentence-transformers.")
-            self.model = None
+        if self.backend == 'gemini':
+            self.model = 'gemini_api'
+            return
+            
+        if not NUMPY_AVAILABLE:
+            logger.warning("NumPy not available. RAG features disabled.")
+            return
+            
+        if self.backend is None:
+            logger.warning("No embedding library available.")
             return
             
         try:
-            logger.info(f"Loading embedding model (backend: {EMBEDDING_BACKEND})...")
+            logger.info(f"Loading embedding model (backend: {self.backend})...")
             
-            if EMBEDDING_BACKEND == 'fastembed':
+            if self.backend == 'fastembed':
                 # FastEmbed - lightweight, no PyTorch
                 self.model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
                 logger.info("✅ FastEmbed model loaded successfully")
-            elif EMBEDDING_BACKEND == 'sentence_transformers':
+            elif self.backend == 'sentence_transformers':
                 # sentence-transformers - heavy fallback
                 self.model = SentenceTransformer('all-MiniLM-L6-v2')
                 logger.info("✅ SentenceTransformer model loaded successfully")
-            else:
-                self.model = None
                 
         except Exception as e:
             logger.error(f"❌ Failed to load embedding model: {e}")
@@ -88,16 +103,25 @@ class RAGEngine:
     
     def embed_text(self, text: str) -> Optional[List[float]]:
         """Generate embedding vector for text"""
-        if not self.model or not NUMPY_AVAILABLE:
+        self._load_model()
+        if not self.model: # Removed numpy check for Gemini
             logger.error("Embedding model not available")
             return None
         
         try:
-            if EMBEDDING_BACKEND == 'fastembed':
+            if self.backend == 'gemini':
+                import google.generativeai as genai
+                result = genai.embed_content(
+                    model="models/embedding-001",
+                    content=text,
+                    task_type="retrieval_document"
+                )
+                return result['embedding']
+            elif self.backend == 'fastembed':
                 # FastEmbed returns generator, convert to list
                 embedding = list(self.model.embed([text]))[0]
                 return embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
-            elif EMBEDDING_BACKEND == 'sentence_transformers':
+            elif self.backend == 'sentence_transformers':
                 # sentence-transformers
                 embedding = self.model.encode(text, convert_to_tensor=False)
                 return embedding.tolist()
@@ -108,7 +132,20 @@ class RAGEngine:
             return None
     
     def embed_query(self, query: str) -> Optional[List[float]]:
-        """Alias for embed_text - for query embedding"""
+        """Generate embedding vector for a query (Gemini requires different task_type)"""
+        self._load_model()
+        if self.backend == 'gemini':
+            try:
+                import google.generativeai as genai
+                result = genai.embed_content(
+                    model="models/embedding-001",
+                    content=query,
+                    task_type="retrieval_query"
+                )
+                return result['embedding']
+            except Exception as e:
+                logger.error(f"Error generating Gemini API query embedding: {e}")
+                return None
         return self.embed_text(query)
     
     def create_index(self):

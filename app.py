@@ -101,21 +101,23 @@ def create_app():
                         
                         if doc_count == 0:
                             logger.info("📚 Knowledge base empty, indexing documents...")
-                            # Run indexing script
-                            import subprocess
-                            import sys
-                            
-                            result = subprocess.run(
-                                [sys.executable, "scripts/index_knowledge.py"],
-                                capture_output=True,
-                                text=True,
-                                timeout=300  # 5 minutes
-                            )
-                            
-                            if result.returncode == 0:
-                                logger.info("✅ Knowledge base indexed successfully")
-                            else:
-                                logger.error(f"❌ Knowledge base indexing failed: {result.stderr[-200:]}")
+                            # Run indexing sequentially in this same thread to save memory
+                            # instead of spawning a new Python subprocess
+                            try:
+                                import sys
+                                project_root = os.path.dirname(os.path.abspath(__file__))
+                                if project_root not in sys.path:
+                                    sys.path.insert(0, project_root)
+                                    
+                                from scripts.index_knowledge import index_documents
+                                success = index_documents()
+                                
+                                if success:
+                                    logger.info("✅ Knowledge base indexed successfully (Sequential)")
+                                else:
+                                    logger.error("❌ Knowledge base indexing failed")
+                            except Exception as idx_err:
+                                logger.error(f"❌ Error during sequential indexing: {idx_err}")
                         else:
                             logger.info(f"✅ Knowledge base already indexed ({doc_count} documents)")
                             

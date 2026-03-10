@@ -21,6 +21,7 @@ exec gunicorn app:app \
     --max-requests-jitter 20 \
     --worker-class gthread \
     --worker-tmp-dir /dev/shm \
+    --preload \
     --log-level info \
     --access-logfile - \
     --error-logfile -
