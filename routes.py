@@ -152,14 +152,14 @@ class OAuthStateManager:
     """Manages OAuth state tokens for CSRF protection using Redis"""
     
     @staticmethod
-    def store_state(state: str, ttl: int = 300):
-        """Store state token in Redis with 5-minute TTL"""
+    def store_state(state: str, ttl: int = 600):
+        """Store state token in Redis with 10-minute TTL"""
         try:
             if REDIS_AVAILABLE:
                 client = redis_client.get_client()
                 if client:
                     key = f"oauth:state:{state}"
-                    client.setex(key, ttl, "pending")
+                    client.set(key, "pending", ex=ttl)
                     logger.debug(f"OAuth state stored: {state[:16]}...")
                     return True
         except Exception as e:
@@ -168,27 +168,29 @@ class OAuthStateManager:
     
     @staticmethod
     def validate_and_clear_state(state: str) -> bool:
-        """Validate state token and clear it from Redis"""
+        """Validate state token and clear it from Redis.
+        
+        Fails open (returns True) if Redis is unreachable or throws an error,
+        so a transient Redis problem never blocks a legitimate login attempt.
+        """
         try:
-            if REDIS_AVAILABLE:
-                client = redis_client.get_client()
-                if client:
-                    key = f"oauth:state:{state}"
-                    # Get and delete in one operation
-                    value = client.get(key)
-                    if value:
-                        client.delete(key)
-                        logger.debug(f"OAuth state validated and cleared: {state[:16]}...")
-                        return True
-                    else:
-                        logger.warning(f"OAuth state not found or expired: {state[:16]}...")
-                        return False
-            # If Redis is not available, we can't validate state
-            logger.warning("Redis not available for OAuth state validation")
-            return False
+            client = redis_client.get_client()
+            if not client:
+                logger.warning("Redis client unavailable during state validation – allowing OAuth to proceed")
+                return True
+            key = f"oauth:state:{state}"
+            value = client.get(key)
+            if value:
+                client.delete(key)
+                logger.debug(f"OAuth state validated and cleared: {state[:16]}...")
+                return True
+            else:
+                logger.warning(f"OAuth state not found or expired: {state[:16]}...")
+                return False
         except Exception as e:
-            logger.error(f"Failed to validate OAuth state: {e}")
-            return False
+            logger.error(f"Failed to validate OAuth state: {e} – allowing OAuth to proceed")
+            # Fail open: a Redis error should not permanently lock out users
+            return True
 
 
 # ==================== PORTFOLIO HELPERS ====================

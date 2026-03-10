@@ -193,7 +193,7 @@ class ChatCache:
                 'cached_at': datetime.now().isoformat()
             }
             
-            client.setex(key, ttl, json.dumps(data))
+            client.set(key, json.dumps(data), ex=ttl)
             logger.debug(f"Chat response cached: {key}")
         except Exception as e:
             logger.error(f"Chat cache set error: {e}")
@@ -236,7 +236,7 @@ class RateLimiter:
             
             if current is None:
                 # First request in window
-                client.setex(key, window, 1)
+                client.set(key, 1, ex=window)
                 return True
             
             current_count = int(current)
@@ -285,7 +285,7 @@ class SessionManager:
             key = f"session:{session_id}"
             ttl = ttl or RedisConfig.SESSION_TTL
             
-            client.setex(key, ttl, json.dumps(data))
+            client.set(key, json.dumps(data), ex=ttl)
             logger.debug(f"Session stored: {session_id}")
         except Exception as e:
             logger.error(f"Session store error: {e}")
@@ -350,7 +350,7 @@ class DataCache:
                 return
             
             ttl = ttl or RedisConfig.DATA_CACHE_TTL
-            client.setex(f"data:{key}", ttl, json.dumps(data))
+            client.set(f"data:{key}", json.dumps(data), ex=ttl)
         except Exception as e:
             logger.error(f"Data cache set error: {e}")
     
