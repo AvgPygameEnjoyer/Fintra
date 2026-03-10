@@ -51,7 +51,8 @@ class RedisClient:
             try:
                 # 0. Fast-track Upstash REST API if provided (fixes DNS/IP blocking issues)
                 raw_host = os.getenv('REDIS_HOST')
-                rest_token = os.getenv('REDIS_PASSWORD')
+                # Upstash REST API expects a separate API token passed as the Bearer
+                rest_token = os.getenv('REDIS_API_KEY') or os.getenv('REDIS_PASSWORD')
                 
                 if raw_host and rest_token and 'upstash.io' in raw_host:
                     # Ensure the host has the required https protocol for the REST client
