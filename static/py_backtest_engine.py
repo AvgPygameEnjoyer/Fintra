@@ -83,16 +83,27 @@ class BacktestEngine:
         self.df['bb_upper'] = self.df['bb_middle'] + (self.df['bb_std'] * std_dev)
         self.df['bb_lower'] = self.df['bb_middle'] - (self.df['bb_std'] * std_dev)
 
-    def run_strategy(self, strategy_name="composite"):
+    def run_strategy(self, config):
         """
         Executes the pattern matching logic based on the selected strategy.
         Returns the DataFrame with signals and indicators.
         Available strategies: 'golden_cross', 'rsi', 'macd', 'composite', 'momentum', 'mean_reversion', 'breakout'
         """
-        # Ensure indicators are present
-        self.add_moving_averages()
-        self.add_rsi()
-        self.add_macd()
+        strategy_name = config.get('strategy', 'composite')
+        
+        # Extract custom parameters from config
+        sma_short = int(config.get('sma_short', 50))
+        sma_long = int(config.get('sma_long', 200))
+        rsi_window = int(config.get('rsi_window', 14))
+        rsi_oversold = int(config.get('rsi_oversold', 30))
+        rsi_overbought = int(config.get('rsi_overbought', 70))
+        macd_short = int(config.get('macd_short', 12))
+        macd_long = int(config.get('macd_long', 26))
+        
+        # Ensure indicators are present with custom parameters where applicable
+        self.add_moving_averages(short_window=sma_short, long_window=sma_long)
+        self.add_rsi(window=rsi_window)
+        self.add_macd(span_short=macd_short, span_long=macd_long)
         self.add_atr()
         self.add_adx()
         self.add_volume_analysis()
@@ -114,10 +125,10 @@ class BacktestEngine:
                              (self.df['sma_short'].shift(1) >= self.df['sma_long'].shift(1))
 
         elif strategy_name == "rsi":
-            # Buy: RSI crosses below 30 (Oversold entry)
-            # Sell: RSI crosses above 70 (Overbought exit)
-            buy_cond = (self.df['rsi'] < 30) & (self.df['rsi'].shift(1) >= 30)
-            sell_cond = (self.df['rsi'] > 70) & (self.df['rsi'].shift(1) <= 70)
+            # Buy: RSI crosses below oversold (entry)
+            # Sell: RSI crosses above overbought (exit)
+            buy_cond = (self.df['rsi'] < rsi_oversold) & (self.df['rsi'].shift(1) >= rsi_oversold)
+            sell_cond = (self.df['rsi'] > rsi_overbought) & (self.df['rsi'].shift(1) <= rsi_overbought)
 
         elif strategy_name == "macd":
             # Buy: MACD crosses above Signal
@@ -201,7 +212,7 @@ class BacktestEngine:
         return result
 
     def get_performance_summary(self, initial_capital=100000.0, is_long_only=True, start_date=None, end_date=None, 
-                                atr_multiplier=3.0, tax_rate=0.002):
+                                atr_multiplier=3.0, risk_per_trade=0.02, tax_rate=0.002):
         """
         Event-Driven Backtest Simulator.
         Handles: Next Day Open Execution, Volatility Sizing, Dynamic ATR Stops, Gaps, Taxes.
@@ -305,11 +316,10 @@ class BacktestEngine:
                 # Rule: Risk 2% of capital per trade. Stop distance is 2 * ATR.
                 # Position Size = (Capital * 0.02) / (2 * ATR) -> Simplified: Capital * 0.01 / ATR
                 # If ATR is missing, default to 100% equity.
-                atr = today['atr']
                 if pd.notna(atr) and atr > 0:
-                    risk_per_trade = current_val * 0.02 # 2% Risk
+                    risk_amount = current_val * risk_per_trade
                     stop_distance = 2 * atr
-                    target_shares = risk_per_trade / stop_distance
+                    target_shares = risk_amount / stop_distance
                     
                     # Cap shares so we don't spend more than cash
                     max_affordable = cash / (exec_price * (1 + tax_rate))
@@ -374,7 +384,7 @@ def run_backtest_browser(data_json, config):
             df.set_index('Date', inplace=True)
             
         engine = BacktestEngine(df)
-        engine.run_strategy(config.get('strategy', 'composite'))
+        engine.run_strategy(config)
         
         perf = engine.get_performance_summary(
             initial_capital=float(config.get('initial_balance', 100000)),
@@ -382,6 +392,7 @@ def run_backtest_browser(data_json, config):
             start_date=config.get('start_date'),
             end_date=config.get('end_date'),
             atr_multiplier=float(config.get('atr_multiplier', 3.0)),
+            risk_per_trade=float(config.get('risk_per_trade', 2.0)) / 100.0,
             tax_rate=0.002
         )
         

@@ -132,6 +132,46 @@
                                 <input type="number" id="risk-per-trade" name="risk_per_trade" value="2.0" step="0.1" min="0.1" max="10.0">
                             </div>
 
+                            <!-- Dynamic Strategy Parameters -->
+                            <div id="dynamic-params-container">
+                                <!-- Golden Cross Params -->
+                                <div id="params-golden_cross" class="strategy-specific-params" style="display: none; margin-top: 15px; border-top: 1px dashed #c7d2fe; padding-top: 15px;">
+                                    <div class="param-group">
+                                        <label for="sma-short">Short SMA Period:</label>
+                                        <input type="number" id="sma-short" name="sma_short" value="50" step="1" min="5" max="100">
+                                    </div>
+                                    <div class="param-group">
+                                        <label for="sma-long">Long SMA Period:</label>
+                                        <input type="number" id="sma-long" name="sma_long" value="200" step="1" min="50" max="500">
+                                    </div>
+                                </div>
+
+                                <!-- RSI Params -->
+                                <div id="params-rsi" class="strategy-specific-params" style="display: none; margin-top: 15px; border-top: 1px dashed #c7d2fe; padding-top: 15px;">
+                                    <div class="param-group">
+                                        <label for="rsi-oversold">RSI Oversold (Buy &lt;):</label>
+                                        <input type="number" id="rsi-oversold" name="rsi_oversold" value="30" step="1" min="10" max="49">
+                                    </div>
+                                    <div class="param-group">
+                                        <label for="rsi-overbought">RSI Overbought (Sell &gt;):</label>
+                                        <input type="number" id="rsi-overbought" name="rsi_overbought" value="70" step="1" min="51" max="90">
+                                    </div>
+                                </div>
+
+                                <!-- MACD Params -->
+                                <div id="params-macd" class="strategy-specific-params" style="display: none; margin-top: 15px; border-top: 1px dashed #c7d2fe; padding-top: 15px;">
+                                    <div class="param-group">
+                                        <label for="macd-short">MACD Short Span:</label>
+                                        <input type="number" id="macd-short" name="macd_short" value="12" step="1" min="5" max="50">
+                                    </div>
+                                    <div class="param-group">
+                                        <label for="macd-long">MACD Long Span:</label>
+                                        <input type="number" id="macd-long" name="macd_long" value="26" step="1" min="10" max="100">
+                                    </div>
+                                </div>
+                            </div>
+
+
                             <div class="stat-selector">
                                 <h4 class="stat-selector-title">
                                     📊 Visible Result Metrics

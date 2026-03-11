@@ -49,6 +49,20 @@ export function initializeBacktesting() {
         }
     };
 
+    const strategySelect = document.getElementById('strategy-select');
+    if (strategySelect) {
+        strategySelect.addEventListener('change', (e) => {
+            document.querySelectorAll('.strategy-specific-params').forEach(el => {
+                el.style.display = 'none';
+            });
+            const selectedStrategy = e.target.value;
+            const targetParams = document.getElementById(`params-${selectedStrategy}`);
+            if (targetParams && currentMode === 'advanced') {
+                targetParams.style.display = 'block';
+            }
+        });
+    }
+
     setDefaultDateRange();
 }
 
@@ -65,10 +79,21 @@ function setMode(mode) {
         if (DOM.beginnerModeBtn) DOM.beginnerModeBtn.classList.add('active');
         if (DOM.advancedModeBtn) DOM.advancedModeBtn.classList.remove('active');
         if (DOM.advancedParams) DOM.advancedParams.style.display = 'none';
+        
+        // Hide all strategy-specific params when leaving advanced
+        document.querySelectorAll('.strategy-specific-params').forEach(el => {
+            el.style.display = 'none';
+        });
     } else {
         if (DOM.advancedModeBtn) DOM.advancedModeBtn.classList.add('active');
         if (DOM.beginnerModeBtn) DOM.beginnerModeBtn.classList.remove('active');
         if (DOM.advancedParams) DOM.advancedParams.style.display = 'block';
+
+        // Trigger change event to show relevant dynamic params
+        const strategySelect = document.getElementById('strategy-select');
+        if (strategySelect) {
+            strategySelect.dispatchEvent(new Event('change'));
+        }
     }
 }
 
