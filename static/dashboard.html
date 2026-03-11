@@ -382,25 +382,89 @@
 
     <!-- Live Replay Modal -->
     <dialog id="replay-modal" class="replay-modal">
-        <h3>📈 Live Replay</h3>
-        <p>Select a 1‑minute window (max 60 min) to replay. Data will be from at least 30 days ago.</p>
-        <div class="replay-controls">
-            <label>Start:&nbsp;<input type="datetime-local" id="replay-start" required></label>
-            <label>End:&nbsp;<input type="datetime-local" id="replay-end" required></label>
-            <label>Speed:&nbsp;
-                <select id="replay-speed">
-                    <option value="0.5">0.5× (slow)</option>
-                    <option value="1" selected>1× (real‑time)</option>
-                    <option value="2">2×</option>
-                    <option value="4">4×</option>
-                </select>
-            </label>
+        <div class="replay-modal-inner">
+            <div class="replay-header">
+                <div class="replay-title">
+                    <span class="replay-icon">📈</span>
+                    <div>
+                        <h3>Live Candle Replay</h3>
+                        <span class="replay-subtitle" id="replay-symbol-label">Select a time window to replay</span>
+                    </div>
+                </div>
+                <button id="replay-close-btn" class="replay-close-btn">&times;</button>
+            </div>
+
+            <div id="replay-setup" class="replay-setup">
+                <div class="replay-date-picker">
+                    <label class="replay-field-label">📅 Select Date</label>
+                    <div class="replay-date-grid" id="replay-date-grid"></div>
+                </div>
+                <div class="replay-time-picker">
+                    <div class="replay-time-group">
+                        <label class="replay-field-label">🕐 Start Time</label>
+                        <div class="replay-time-select">
+                            <select id="replay-hour-start" class="replay-time-dropdown"></select>
+                            <span class="replay-time-sep">:</span>
+                            <select id="replay-min-start" class="replay-time-dropdown"></select>
+                        </div>
+                    </div>
+                    <div class="replay-time-group">
+                        <label class="replay-field-label">🕑 End Time</label>
+                        <div class="replay-time-select">
+                            <select id="replay-hour-end" class="replay-time-dropdown"></select>
+                            <span class="replay-time-sep">:</span>
+                            <select id="replay-min-end" class="replay-time-dropdown"></select>
+                        </div>
+                    </div>
+                    <div class="replay-duration-badge" id="replay-duration-badge">Duration: --</div>
+                </div>
+                <div class="replay-setup-actions">
+                    <button id="replay-launch-btn" class="replay-launch-btn" disabled>
+                        <span>▶</span> Start Replay
+                    </button>
+                </div>
+            </div>
+
+            <div id="replay-player" class="replay-player" style="display:none;">
+                <div class="replay-chart-container">
+                    <canvas id="replay-chart"></canvas>
+                </div>
+                <div class="replay-candle-info" id="replay-candle-info">
+                    <span class="candle-info-item"><b>O</b> <span id="rc-open">--</span></span>
+                    <span class="candle-info-item"><b>H</b> <span id="rc-high">--</span></span>
+                    <span class="candle-info-item"><b>L</b> <span id="rc-low">--</span></span>
+                    <span class="candle-info-item"><b>C</b> <span id="rc-close">--</span></span>
+                    <span class="candle-info-item"><b>Vol</b> <span id="rc-vol">--</span></span>
+                    <span class="candle-info-item candle-time"><span id="rc-time">--:--</span></span>
+                </div>
+                <div class="replay-progress-container">
+                    <div class="replay-progress-bar" id="replay-progress-bar">
+                        <div class="replay-progress-fill" id="replay-progress-fill"></div>
+                        <div class="replay-progress-thumb" id="replay-progress-thumb"></div>
+                    </div>
+                    <div class="replay-progress-labels">
+                        <span id="replay-candle-counter">0 / 0</span>
+                        <span id="replay-time-label">--:-- → --:--</span>
+                    </div>
+                </div>
+                <div class="replay-transport">
+                    <div class="replay-transport-left">
+                        <button id="replay-btn-back" class="transport-btn" title="Step Back">⏮</button>
+                        <button id="replay-btn-play" class="transport-btn transport-play" title="Play / Pause">▶</button>
+                        <button id="replay-btn-forward" class="transport-btn" title="Step Forward">⏭</button>
+                    </div>
+                    <div class="replay-speed-pills">
+                        <button class="speed-pill" data-speed="0.5">0.5×</button>
+                        <button class="speed-pill active" data-speed="1">1×</button>
+                        <button class="speed-pill" data-speed="2">2×</button>
+                        <button class="speed-pill" data-speed="4">4×</button>
+                    </div>
+                    <button id="replay-btn-reset" class="transport-btn transport-reset" title="Back to Setup">↩</button>
+                </div>
+            </div>
+
+            <div id="replay-status" class="replay-status"></div>
         </div>
-        <div class="replay-actions">
-            <button id="replay-start-btn" class="mc-btn mc-btn-primary">Start Replay</button>
-            <button id="replay-cancel-btn" class="mc-btn mc-btn-secondary">Cancel</button>
-        </div>
-        <div id="replay-status" class="replay-status"></div>
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
