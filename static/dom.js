@@ -10,7 +10,7 @@ export function initialize() {
         'modal-autocomplete', 'add-position-entry-price', 'current-price-indicator',
         'search-tab-btn', 'portfolio-tab-btn', 'backtesting-tab-btn', 'add-position-btn', 'portfolio-content',
         'backtesting-symbol', 'backtesting-autocomplete', 'clear-backtesting-btn', 'backtesting-form',
-        'beginner-mode-btn', 'advanced-mode-btn', 'strategy-select', 'atr-multiplier', 'risk-per-trade',
+        'beginner-mode-btn', 'advanced-mode-btn', 'advanced-params', 'strategy-select', 'atr-multiplier', 'risk-per-trade',
         'start-date', 'end-date', 'initial-balance', 'run-backtest-btn', 'backtesting-loading',
         'backtesting-error', 'backtesting-results',
         'add-position-modal', 'add-position-form', 'close-modal-btn',
