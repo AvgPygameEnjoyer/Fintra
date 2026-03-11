@@ -162,15 +162,11 @@ class TestDataUpdateLogic:
 class TestDataFetching:
     """Tests for data fetching functionality."""
     
-    @patch('scripts.check_and_update_data.yf.Ticker')
-    def test_fetch_stock_data_respects_sebi_limit(self, mock_ticker_class):
+    @patch('scripts.check_and_update_data.fetch_daily_ohlcv')
+    def test_fetch_stock_data_respects_sebi_limit(self, mock_fetch):
         """Test that fetched data respects SEBI compliance date."""
         pipeline = DataUpdatePipeline()
         sebi_date = pipeline.get_sebi_compliance_date()
-        
-        # Mock the yfinance response
-        mock_ticker = MagicMock()
-        mock_ticker_class.return_value = mock_ticker
         
         # Create mock data that spans past the SEBI date
         dates = pd.date_range(end=datetime.now(), periods=10, freq='D')
@@ -182,43 +178,38 @@ class TestDataFetching:
             'Volume': np.random.randint(1000000, 5000000, 10)
         }, index=dates)
         
-        mock_ticker.history.return_value = mock_data
+        mock_fetch.return_value = mock_data
         
         # Fetch data
         result = pipeline.fetch_stock_data('TEST.NS', sebi_date)
         
-        # Verify the mock was called with correct date range
-        call_args = mock_ticker.history.call_args
-        assert call_args is not None
+        # Verify the mock was called
+        mock_fetch.assert_called_once()
         
         # Verify data doesn't violate SEBI
         if result is not None and not result.empty:
             max_date = result.index.max()
             assert max_date <= sebi_date, "Fetched data violates SEBI compliance"
     
-    @patch('scripts.check_and_update_data.yf.Ticker')
-    def test_fetch_stock_data_empty_response(self, mock_ticker_class):
-        """Test handling of empty response from yfinance."""
+    @patch('scripts.check_and_update_data.fetch_daily_ohlcv')
+    def test_fetch_stock_data_empty_response(self, mock_fetch):
+        """Test handling of empty response from providers."""
         pipeline = DataUpdatePipeline()
         sebi_date = pipeline.get_sebi_compliance_date()
         
-        mock_ticker = MagicMock()
-        mock_ticker_class.return_value = mock_ticker
-        mock_ticker.history.return_value = pd.DataFrame()
+        mock_fetch.return_value = None
         
         result = pipeline.fetch_stock_data('EMPTY.NS', sebi_date)
         
         assert result is None, "Empty response should return None"
     
-    @patch('scripts.check_and_update_data.yf.Ticker')
-    def test_fetch_stock_data_api_error(self, mock_ticker_class):
+    @patch('scripts.check_and_update_data.fetch_daily_ohlcv')
+    def test_fetch_stock_data_api_error(self, mock_fetch):
         """Test handling of API errors."""
         pipeline = DataUpdatePipeline()
         sebi_date = pipeline.get_sebi_compliance_date()
         
-        mock_ticker = MagicMock()
-        mock_ticker_class.return_value = mock_ticker
-        mock_ticker.history.side_effect = Exception("API Error")
+        mock_fetch.side_effect = Exception("API Error")
         
         result = pipeline.fetch_stock_data('ERROR.NS', sebi_date)
         

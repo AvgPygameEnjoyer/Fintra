@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 from config import Config
 from redis_client import redis_client, init_redis
-import yfinance as yf
+from data_providers import fetch_intraday_ohlcv
 
 logger = logging.getLogger(__name__)
 
@@ -51,18 +51,13 @@ def get_one_min_candles(symbol: str, start_iso: str, end_iso: str) -> pd.DataFra
             data = json.loads(cached)
             return pd.DataFrame(data)
 
-    # Cache miss – fetch via yfinance (interval=1m)
-    logger.info("Fetching 1‑min data for %s from %s to %s", symbol, start_iso, end_iso)
-    try:
-        ticker = yf.Ticker(symbol)
-        df = ticker.history(interval='1m', start=start_dt, end=end_dt, auto_adjust=False)
-    except Exception as e:
-        logger.error(f"Failed to fetch 1‑min data for {symbol}: {e}")
-        raise
-
-    if df.empty:
+    # Cache miss – fetch using data providers fallback chain
+    df = fetch_intraday_ohlcv(symbol, start_dt, end_dt)
+    
+    if df is None or df.empty:
         logger.warning("Empty 1‑min data for %s", symbol)
-        raise ValueError("No minute‑level data available for the requested period")
+        raise ValueError("No minute‑level data available for the requested period. "
+                         "Ensure the date is a trading day (weekday, not a holiday).")
 
     # Ensure required columns exist
     required = ['Open', 'High', 'Low', 'Close', 'Volume']
@@ -71,15 +66,36 @@ def get_one_min_candles(symbol: str, start_iso: str, end_iso: str) -> pd.DataFra
             df[col] = None
 
     # Reset index to a datetime column named 'timestamp'
+    # yfinance uses 'Datetime' as index name for intraday data
     df = df.reset_index()
-    df.rename(columns={'index': 'timestamp'}, inplace=True)
+    # Rename whatever the index column is to 'timestamp'
+    if 'Datetime' in df.columns:
+        df.rename(columns={'Datetime': 'timestamp'}, inplace=True)
+    elif 'Date' in df.columns:
+        df.rename(columns={'Date': 'timestamp'}, inplace=True)
+    elif 'index' in df.columns:
+        df.rename(columns={'index': 'timestamp'}, inplace=True)
+
     # Convert to list of dicts for JSON caching
     records = df.to_dict(orient='records')
     if client:
-        import json, math
+        import json
         # store for 12 hours (43200 seconds)
         try:
-            client.setex(cache_key, 43200, json.dumps(records))
+            # Serialise timestamps for JSON
+            import math
+            serialisable = []
+            for r in records:
+                row = {}
+                for k, v in r.items():
+                    if hasattr(v, 'isoformat'):
+                        row[k] = v.isoformat()
+                    elif isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                        row[k] = 0
+                    else:
+                        row[k] = v
+                serialisable.append(row)
+            client.setex(cache_key, 43200, json.dumps(serialisable))
             logger.info("Cached replay data for %s", cache_key)
         except Exception as e:
             logger.error("Failed to cache replay data: %s", e)

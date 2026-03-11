@@ -34,7 +34,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
-import yfinance as yf
+import sys
+import os
+
+# Add parent directory to path so we can import from the main app
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from data_providers import fetch_daily_ohlcv
 
 # Configure logging
 logging.basicConfig(
@@ -169,11 +174,10 @@ class DataUpdatePipeline:
             
             logger.info(f"Fetching {symbol} from {start_date} to {end_date}")
             
-            # Download from yfinance
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(start=start_date, end=end_date)
+            # Fetch using data providers fallback chain
+            df = fetch_daily_ohlcv(symbol, period="2y")
             
-            if df.empty:
+            if df is None or df.empty:
                 logger.warning(f"No data returned for {symbol}")
                 return None
             

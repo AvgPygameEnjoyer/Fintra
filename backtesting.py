@@ -9,13 +9,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Try to import yfinance for fallback
-try:
-    import yfinance as yf
-    YFINANCE_AVAILABLE = True
-except ImportError:
-    YFINANCE_AVAILABLE = False
-    logger.warning("yfinance not available, local data only")
+from data_providers import fetch_daily_ohlcv
 
 # SEBI Compliance Constants
 DATA_LAG_DAYS = 31
@@ -646,53 +640,29 @@ def load_stock_data(symbol: str, apply_lag: bool = True) -> Tuple[Optional[pd.Da
 
 def fetch_from_yfinance(symbol: str, period: str = "90d", interval: str = "1d") -> Optional[pd.DataFrame]:
     """
-    Fetch stock data from yfinance as fallback.
-    Automatically adds .NS suffix for NSE stocks if not present.
+    Fetch stock data from data providers fallback chain.
+    Keeps original function name for backwards compatibility.
     
     Args:
         symbol: Stock symbol to fetch
         period: Time period to fetch (e.g., '90d', '1y')
-        interval: Data interval (e.g., '1d', '1h')
+        interval: Data interval (e.g., '1d', '1h') - note: only '1d' supported by fallback chain
     
     Returns:
         DataFrame with OHLCV data or None if fetch fails
     """
-    if not YFINANCE_AVAILABLE:
-        logger.warning("yfinance not available, cannot fetch from API")
-        return None
-    
+    if interval != "1d":
+        logger.warning(f"Interval {interval} requested but data_providers only supports 1d currently.")
+        
     try:
-        # Ensure symbol has .NS suffix for NSE stocks
-        symbol_upper = symbol.upper().strip()
-        if not symbol_upper.endswith('.NS'):
-            symbol_with_suffix = f"{symbol_upper}.NS"
-        else:
-            symbol_with_suffix = symbol_upper
-        
-        logger.info(f"Fetching {symbol_with_suffix} from yfinance (period={period}, interval={interval})")
-        ticker = yf.Ticker(symbol_with_suffix)
-        df = ticker.history(period=period, interval=interval)
-        
-        if df.empty:
-            logger.warning(f"No data returned from yfinance for {symbol_with_suffix}")
-            return None
-            
-        # Strip timezone to ensure compatibility with local naive datetimes
-        if getattr(df.index, 'tz', None) is not None:
-            df.index = df.index.tz_localize(None)
-        
-        # Standardize column names to lowercase
-        df.columns = [col.lower().replace(' ', '_') for col in df.columns]
-        
-        # Convert to PascalCase for consistency with local data
-        df.columns = [col.title().replace('_', '') for col in df.columns]
-        df.index.name = 'Date'
-        
-        logger.info(f"Successfully fetched {len(df)} rows from yfinance for {symbol_with_suffix}")
-        return df
+        df = fetch_daily_ohlcv(symbol, period=period, providers=['yfinance'])
+        if df is not None and not df.empty:
+            logger.info(f"Successfully fetched {len(df)} rows from yfinance data provider for {symbol}")
+            return df
+        return None
         
     except Exception as e:
-        logger.error(f"Error fetching {symbol_with_suffix if 'symbol_with_suffix' in locals() else symbol} from yfinance: {e}")
+        logger.error(f"Error fetching {symbol} from data providers: {e}")
         return None
 
 
@@ -813,10 +783,40 @@ def get_stock_data_with_fallback(
         logger.warning(f"No local data available for {symbol_upper}")
         metadata['data_completeness']['local_missing'] = True
 
-    # Step 3: Neither source available
+    # Step 3: Try external API fallbacks
+    logger.info(f"Local data failed, trying external API fallbacks for {symbol_upper}")
+    api_df = fetch_daily_ohlcv(symbol_upper, period=period, providers=['polygon', 'alphavantage', 'finnhub'])
+
+    if api_df is not None and not api_df.empty:
+        metadata['api_fallback_available'] = True
+        metadata['data_completeness']['api_rows'] = len(api_df)
+        metadata['data_completeness']['api_date_range'] = {
+            'start': api_df.index.min().strftime('%Y-%m-%d'),
+            'end': api_df.index.max().strftime('%Y-%m-%d')
+        }
+
+        # Apply SEBI lag if requested
+        if apply_lag:
+            api_df = apply_sebi_lag(api_df)
+            metadata['data_completeness']['api_rows_after_lag'] = len(api_df)
+
+        # Check if api data is sufficient
+        if len(api_df) >= min_rows:
+            logger.info(f"Using external API fallback data for {symbol_upper}: {len(api_df)} rows")
+            metadata['source'] = 'api_fallback'
+            metadata['fallback_used'] = True
+            return api_df, metadata
+        else:
+            logger.warning(f"External API data insufficient for {symbol_upper}: {len(api_df)} rows (min: {min_rows})")
+            metadata['data_completeness']['api_insufficient'] = True
+    else:
+        logger.warning(f"No data returned from external APIs for {symbol_upper}")
+        metadata['data_completeness']['api_missing'] = True
+
+    # Step 4: No source available
     logger.error(f"No data available for {symbol_upper} from any source")
     metadata['source'] = None
-    metadata['error'] = 'No data available from yfinance or local storage'
+    metadata['error'] = 'No data available from yfinance, local storage, or external APIs'
     return None, metadata
 
 

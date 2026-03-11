@@ -58,6 +58,11 @@ class Config:
 
     # Groq API Key
     GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+
+    # Market Data Fallback API Keys
+    ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
+    POLYGON_API_KEY = os.getenv('POLYGON_API_KEY')
+    FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY')
     # Centralized URL Configuration
     # Set these in Render/Vercel to control CORS and Redirects
     # Default to production URLs if running on Render (IS_PRODUCTION is True)
