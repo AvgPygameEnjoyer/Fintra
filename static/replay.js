@@ -57,7 +57,7 @@ function populateDateGrid() {
 
     const today = new Date();
     const dates = [];
-    for (let i = 31; i <= 90; i++) {
+    for (let i = 31; i <= 60; i++) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         if (d.getDay() === 0 || d.getDay() === 6) continue;

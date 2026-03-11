@@ -5,7 +5,7 @@ and data availability tracking.
 """
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from typing import Dict, Optional, Tuple
 
 import pandas as pd
@@ -15,6 +15,20 @@ logger = logging.getLogger(__name__)
 # Constants for SEBI compliance
 DATA_LAG_DAYS = 31
 DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), 'data')
+INTRADAY_DIRECTORY = os.path.join(os.path.dirname(__file__), 'intraday_data')
+
+
+def get_intraday_window(today: Optional[datetime] = None) -> Tuple[datetime, datetime]:
+    base_date = datetime.utcnow().date()
+    if isinstance(today, datetime):
+        base_date = today.date()
+    elif today is not None:
+        base_date = today
+    start_date = base_date - timedelta(days=60)
+    end_date = base_date - timedelta(days=31)
+    start_dt = datetime.combine(start_date, time(0, 0, 0))
+    end_dt = datetime.combine(end_date, time(23, 59, 59))
+    return start_dt, end_dt
 
 
 class DataComplianceManager:
@@ -233,6 +247,17 @@ def get_parquet_path(symbol: str) -> Optional[str]:
         first_char = '0-9'
     file_path = os.path.join(DATA_DIRECTORY, first_char, f"{symbol}.parquet")
     return file_path if os.path.exists(file_path) else None
+
+
+def get_intraday_parquet_path(symbol: str) -> Optional[str]:
+    if not symbol or len(symbol) == 0:
+        return None
+    symbol_upper = symbol.upper().strip()
+    first_char = symbol_upper[0]
+    if first_char.isdigit():
+        first_char = '0-9'
+    dir_path = os.path.join(INTRADAY_DIRECTORY, first_char)
+    return os.path.join(dir_path, f"{symbol_upper}.parquet")
 
 
 def load_stock_data_with_compliance(symbol: str) -> Tuple[Optional[pd.DataFrame], Dict]:
