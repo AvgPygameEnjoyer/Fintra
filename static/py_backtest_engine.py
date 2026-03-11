@@ -251,6 +251,7 @@ class BacktestEngine:
             
             # 2. Determine Execution for Next Day
             signal = today['signal'] # 1 = Hold/Buy, 0 = Cash/Sell
+            atr = today['atr']  # Read ATR once per day for both stop-loss and position sizing
             
             exit_price = None
             exit_reason = None
@@ -260,7 +261,6 @@ class BacktestEngine:
                 # Update highest price seen during trade (using Today's High)
                 highest_price_since_entry = max(highest_price_since_entry, today['high'])
                 
-                atr = today['atr']
                 if pd.notna(atr) and atr > 0:
                     stop_price = highest_price_since_entry - (atr * atr_multiplier)
                     

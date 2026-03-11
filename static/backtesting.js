@@ -79,7 +79,7 @@ function setMode(mode) {
         if (DOM.beginnerModeBtn) DOM.beginnerModeBtn.classList.add('active');
         if (DOM.advancedModeBtn) DOM.advancedModeBtn.classList.remove('active');
         if (DOM.advancedParams) DOM.advancedParams.style.display = 'none';
-        
+
         // Hide all strategy-specific params when leaving advanced
         document.querySelectorAll('.strategy-specific-params').forEach(el => {
             el.style.display = 'none';
@@ -439,14 +439,14 @@ function displayBacktestResults(results, params) {
     // Read stat visibility from checkboxes (default all visible in beginner mode)
     const isAdvanced = currentMode === 'advanced';
     const statVisible = {
-        finalValue:  !isAdvanced || (document.getElementById('stat-final-value')?.checked !== false),
-        buyHold:     !isAdvanced || (document.getElementById('stat-buy-hold')?.checked !== false),
-        roi:         !isAdvanced || (document.getElementById('stat-roi')?.checked !== false),
-        sharpe:      !isAdvanced || (document.getElementById('stat-sharpe')?.checked !== false),
+        finalValue: !isAdvanced || (document.getElementById('stat-final-value')?.checked !== false),
+        buyHold: !isAdvanced || (document.getElementById('stat-buy-hold')?.checked !== false),
+        roi: !isAdvanced || (document.getElementById('stat-roi')?.checked !== false),
+        sharpe: !isAdvanced || (document.getElementById('stat-sharpe')?.checked !== false),
         maxDrawdown: !isAdvanced || (document.getElementById('stat-max-dd')?.checked !== false),
-        winRate:     !isAdvanced || (document.getElementById('stat-win-rate')?.checked !== false),
-        tradeCount:  !isAdvanced || (document.getElementById('stat-trade-count')?.checked !== false),
-        aiAnalysis:  !isAdvanced || (document.getElementById('stat-ai-analysis')?.checked !== false),
+        winRate: !isAdvanced || (document.getElementById('stat-win-rate')?.checked !== false),
+        tradeCount: !isAdvanced || (document.getElementById('stat-trade-count')?.checked !== false),
+        aiAnalysis: !isAdvanced || (document.getElementById('stat-ai-analysis')?.checked !== false),
     };
 
     // Build AI summary
