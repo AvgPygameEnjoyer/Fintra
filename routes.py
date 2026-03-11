@@ -36,7 +36,6 @@ from analysis import (
 from auth import generate_jwt_token, require_auth, set_token_cookies, verify_jwt_token
 from backtesting import (
     DATA_LAG_DAYS,
-    YFINANCE_AVAILABLE,
     BacktestEngine,
     apply_sebi_lag,
     batch_fetch_prices,
@@ -663,10 +662,8 @@ def get_data():
                 
                 if metadata.get('yfinance_available'):
                     error_details.append("yfinance fallback attempted but failed")
-                elif not YFINANCE_AVAILABLE:
-                    error_details.append("yfinance not available")
                 else:
-                    error_details.append("yfinance fallback attempted but no data returned")
+                    error_details.append("all data providers attempted but no data returned")
                 
                 if metadata.get('error'):
                     error_details.append(f"error: {metadata.get('error')}")
