@@ -8,26 +8,41 @@ on:
   # Allow manual triggering
   workflow_dispatch:
     inputs:
-      sample_size:
-        description: 'Number of stocks to check (default: 100)'
+      run_daily:
+        description: 'Run daily data updater'
         required: false
-        default: '100'
-      force_update:
-        description: 'Force update all stocks regardless of date'
+        default: 'true'
+      run_intraday:
+        description: 'Run intraday data updater'
+        required: false
+        default: 'true'
+      daily_sample_size:
+        description: 'Number of daily stocks to check (empty = all)'
+        required: false
+        default: ''
+      daily_force_update:
+        description: 'Force update all daily stocks'
         required: false
         default: 'false'
+      intraday_max_symbols:
+        description: 'Max intraday symbols (empty = all)'
+        required: false
+        default: ''
+      intraday_min_rows:
+        description: 'Minimum rows for intraday files'
+        required: false
+        default: '0'
 
 jobs:
-  check-and-update-data:
+  update-daily-data:
     runs-on: ubuntu-latest
+    if: github.event.inputs.run_daily != 'false'
     
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        # Need full history for potential rollbacks
         fetch-depth: 0
-        # Use a token that can push to the repo
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Python
@@ -53,18 +68,23 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
 
-    - name: Check and update data
-      id: update_data
+    - name: Update daily data
+      id: update_daily
       run: |
-        SAMPLE_SIZE="${{ github.event.inputs.sample_size || '100' }}"
-        FORCE_UPDATE="${{ github.event.inputs.force_update || 'false' }}"
-        python scripts/check_and_update_data.py --sample-size $SAMPLE_SIZE --force-update $FORCE_UPDATE
+        ARGS=""
+        if [ -n "${{ github.event.inputs.daily_sample_size }}" ]; then
+          ARGS="$ARGS --sample-size ${{ github.event.inputs.daily_sample_size }}"
+        fi
+        if [ "${{ github.event.inputs.daily_force_update }}" == "true" ]; then
+          ARGS="$ARGS --force-update"
+        fi
+        python scripts/daily_data_updater.py $ARGS
       env:
-        DATA_LAG_DAYS: 31
+        SEBI_LAG_DAYS: 31
         UPDATE_BUFFER_DAYS: 7
 
-    - name: Check for changes
-      id: check_changes
+    - name: Check for daily data changes
+      id: check_daily_changes
       run: |
         if [ -n "$(git status --porcelain data/)" ]; then
           echo "changes_detected=true" >> $GITHUB_OUTPUT
@@ -72,76 +92,181 @@ jobs:
           git status --porcelain data/
         else
           echo "changes_detected=false" >> $GITHUB_OUTPUT
-          echo "No data changes detected"
+          echo "No daily data changes detected"
         fi
 
-    - name: Commit and push changes
-      if: steps.check_changes.outputs.changes_detected == 'true'
+    - name: Commit daily data changes
+      if: steps.check_daily_changes.outputs.changes_detected == 'true'
       run: |
-        # Create a timestamp for the commit message
         TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        
-        # Stage only parquet files in data directory
         git add data/
+        git commit -m "📊 Daily Data Update: $TIMESTAMP
         
-        # Create commit with detailed message
-        git commit -m "📊 Data Update: $TIMESTAMP
-
-        
-        - Updated NSE stock data
+        - Updated NSE daily OHLCV data
         - SEBI compliant (31-day lag)
         - Automated daily check
         
         Workflow run: ${{ github.run_id }}"
-        
-        # Push changes
         git push
 
-    - name: Generate update report
+    - name: Generate daily update report
       if: always()
       run: |
-        echo "# Data Update Report" >> $GITHUB_STEP_SUMMARY
+        echo "# Daily Data Update Report" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "**SEBI Compliance:** 31-day lag enforced" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         
-        if [ "${{ steps.check_changes.outputs.changes_detected }}" == "true" ]; then
-          echo "✅ **Status:** Data updated successfully" >> $GITHUB_STEP_SUMMARY
+        if [ "${{ steps.check_daily_changes.outputs.changes_detected }}" == "true" ]; then
+          echo "✅ **Status:** Daily data updated successfully" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Updated files:**" >> $GITHUB_STEP_SUMMARY
-          git diff --name-only HEAD~1 HEAD | grep -E '^data/.*\.parquet$' | head -20 | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY
+          git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E '^data/.*\.parquet$' | head -20 | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY || echo "- No parquet files in diff" >> $GITHUB_STEP_SUMMARY
         else
-          echo "⏭️ **Status:** No updates needed (data is fresh)" >> $GITHUB_STEP_SUMMARY
+          echo "⏭️ **Status:** No daily updates needed (data is fresh)" >> $GITHUB_STEP_SUMMARY
         fi
 
-    - name: Upload update log
+    - name: Upload daily update log
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: data-update-log-${{ github.run_id }}
+        name: daily-update-log-${{ github.run_id }}
         path: |
-          data_update_report.json
-          data_update_errors.log
+          daily_update_report.json
+          daily_update.log
+        if-no-files-found: ignore
+
+  update-intraday-data:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.run_intraday != 'false'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    - name: Update intraday data
+      id: update_intraday
+      run: |
+        ARGS=""
+        if [ -n "${{ github.event.inputs.intraday_max_symbols }}" ]; then
+          ARGS="$ARGS --max-symbols ${{ github.event.inputs.intraday_max_symbols }}"
+        fi
+        if [ -n "${{ github.event.inputs.intraday_min_rows }}" ]; then
+          ARGS="$ARGS --min-rows ${{ github.event.inputs.intraday_min_rows }}"
+        fi
+        python scripts/intraday_data_updater.py $ARGS
+      env:
+        SEBI_LAG_DAYS: 31
+        WINDOW_START_OFFSET: 61
+
+    - name: Check for intraday data changes
+      id: check_intraday_changes
+      run: |
+        if [ -n "$(git status --porcelain intraday_data/)" ]; then
+          echo "changes_detected=true" >> $GITHUB_OUTPUT
+          echo "Changed files:"
+          git status --porcelain intraday_data/
+        else
+          echo "changes_detected=false" >> $GITHUB_OUTPUT
+          echo "No intraday data changes detected"
+        fi
+
+    - name: Commit intraday data changes
+      if: steps.check_intraday_changes.outputs.changes_detected == 'true'
+      run: |
+        TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        git add intraday_data/
+        git commit -m "📈 Intraday Data Update: $TIMESTAMP
+        
+        - Updated NSE intraday (1-min) data
+        - Sliding window: 61 to 31 days ago
+        - SEBI compliant (31-day lag)
+        
+        Workflow run: ${{ github.run_id }}"
+        git push
+
+    - name: Generate intraday update report
+      if: always()
+      run: |
+        echo "# Intraday Data Update Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Window:** today-61 to today-31 days" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.check_intraday_changes.outputs.changes_detected }}" == "true" ]; then
+          echo "✅ **Status:** Intraday data updated successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Updated files:**" >> $GITHUB_STEP_SUMMARY
+          git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -E '^intraday_data/.*\.parquet$' | head -20 | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY || echo "- No parquet files in diff" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⏭️ **Status:** No intraday updates needed" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload intraday update log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: intraday-update-log-${{ github.run_id }}
+        path: |
+          intraday_update_report.json
+          intraday_update.log
         if-no-files-found: ignore
 
   notify:
-    needs: check-and-update-data
+    needs: [update-daily-data, update-intraday-data]
     runs-on: ubuntu-latest
     if: always()
     
     steps:
     - name: Notify on failure
-      if: needs.check-and-update-data.result == 'failure'
+      if: needs.update-daily-data.result == 'failure' || needs.update-intraday-data.result == 'failure'
       uses: actions/github-script@v7
       with:
         script: |
+          const dailyResult = '${{ needs.update-daily-data.result }}';
+          const intradayResult = '${{ needs.update-intraday-data.result }}';
+          const failures = [];
+          
+          if (dailyResult === 'failure') failures.push('Daily data updater');
+          if (intradayResult === 'failure') failures.push('Intraday data updater');
+          
           github.rest.issues.create({
             owner: context.repo.owner,
             repo: context.repo.repo,
             title: '🚨 Data Update Pipeline Failed',
             body: `Data update workflow failed on ${new Date().toISOString()}
+            
+            **Failed jobs:** ${failures.join(', ')}
             
             Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
             
