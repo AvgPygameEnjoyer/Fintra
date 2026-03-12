@@ -614,7 +614,7 @@ body {
     top: 0;
     height: 100vh;
     width: 320px;
-    background: white;
+    background: #0F2138;
     box-shadow: 2px 0 15px rgba(0, 0, 0, 0.1);
     z-index: 1000;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -675,24 +675,30 @@ body {
 
 .sidebar-search {
     padding: 20px 24px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
 }
 
 .sidebar-search-input {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid #e5e7eb;
+    border: 2px solid #1B3554;
     border-radius: 8px;
     font-size: 0.95rem;
     outline: none;
     transition: all 0.3s ease;
     font-family: inherit;
+    background: #1B3554;
+    color: #D6E2F0;
+}
+
+.sidebar-search-input::placeholder {
+    color: #8FA7BF;
 }
 
 .sidebar-search-input:focus {
-    border-color: var(--primary-purple);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #38BDF8;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
 }
 
 .sidebar-content {
@@ -706,35 +712,37 @@ body {
 }
 
 .sidebar-stock-item {
-    padding: 16px 24px;
-    border-bottom: 1px solid #f3f4f6;
+    padding: 20px 28px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     flex-direction: column;
     position: relative;
+    background: transparent;
+    color: #C7D4E5;
 }
 
 .sidebar-stock-item:hover {
-    background: #f8fafc;
+    background: #1C3A5F;
     transform: translateX(2px);
 }
 
 .sidebar-stock-item.active {
-    background: #f0f7ff;
-    border-left: 4px solid var(--fintra-blue);
-    padding-left: 20px;
+    background: #1F4E79;
+    border-left: 3px solid #38BDF8;
+    padding-left: 21px;
 }
 
 .sidebar-stock-symbol {
     font-weight: 700;
-    color: var(--fintra-blue);
+    color: #38BDF8;
     font-size: 1rem;
     margin-bottom: 4px;
 }
 
 .sidebar-stock-name {
-    color: #6b7280;
+    color: #8FA7BF;
     font-size: 0.85rem;
     line-height: 1.4;
 }
@@ -745,13 +753,13 @@ body {
 
 .sidebar-group-header {
     padding: 16px 24px;
-    background: #f8fafc;
-    color: var(--fintra-dark-blue);
+    background: #0F2138;
+    color: #8FA7BF;
     font-weight: 700;
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     position: sticky;
     top: 0;
     z-index: 10;
