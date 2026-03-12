@@ -35,14 +35,18 @@ class TestValidateSymbol:
         assert is_valid is True
         assert error == ""
 
-    def test_valid_symbol_with_dash(self):
+    @patch('backend.validation.get_symbol_whitelist')
+    def test_valid_symbol_with_dash(self, mock_whitelist):
         """Test symbol containing dash."""
-        is_valid, error = validate_symbol('M&M.NS')
+        mock_whitelist.return_value = []  # Empty whitelist = basic validation only
+        is_valid, error = validate_symbol('L-T.NS')
         assert is_valid is True
         assert error == ""
 
-    def test_valid_lowercase_symbol_is_uppercased(self):
+    @patch('backend.validation.get_symbol_whitelist')
+    def test_valid_lowercase_symbol_is_uppercased(self, mock_whitelist):
         """Test lowercase symbols are accepted and uppercased."""
+        mock_whitelist.return_value = []  # Empty whitelist = basic validation only
         is_valid, error = validate_symbol('tcs.ns')
         assert is_valid is True
 
@@ -579,6 +583,10 @@ class TestGetSymbolWhitelist:
     @patch('backend.validation.get_available_symbols')
     def test_caches_whitelist(self, mock_get_symbols):
         """Test whitelist is cached after first call."""
+        # Reset cache first
+        import backend.validation as val_module
+        val_module._SYMBOL_WHITELIST = None
+        
         mock_get_symbols.return_value = ['RELIANCE.NS', 'TCS.NS']
 
         # First call
