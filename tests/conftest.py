@@ -10,9 +10,9 @@ import pytest
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app import create_app
-from database import db
-from models import Position, User
+from backend.app import create_app
+from backend.database import db
+from backend.models import Position, User
 
 
 @pytest.fixture(scope='session')
@@ -100,8 +100,8 @@ def test_position(db_session, test_user):
 @pytest.fixture
 def auth_headers(test_user):
     """Generate authentication headers for test user"""
-    from auth import generate_jwt_token
-    from config import Config
+    from backend.auth import generate_jwt_token
+    from backend.config import Config
     
     user_data = {
         'user_id': test_user.google_user_id,

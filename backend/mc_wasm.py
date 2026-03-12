@@ -15,7 +15,9 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
-WASM_PATH = os.path.join(os.path.dirname(__file__), 'static', 'wasm', 'monte_carlo.wasm')
+WASM_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'static', 'wasm', 'monte_carlo.wasm'
+)
 
 
 class MonteCarloWasmWrapper:

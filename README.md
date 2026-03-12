@@ -49,15 +49,15 @@ Fintra isn't just another stock dashboard—it's a **production-grade financial 
 
 ## 📊 Project Metrics
 
-> **14,200+ lines of production code** across a full-stack financial platform
+> **21,400+ lines of production code** across a full-stack financial platform
 
 | Category | Metric | Details |
 |----------|--------|---------|
-| **Python Backend** | 5,648 lines | 14 core modules (routes, auth, analysis, backtesting, Monte Carlo) |
-| **JavaScript Frontend** | 3,745 lines | 17 ES6 modules with dynamic imports |
-| **CSS Styling** | 4,428 lines | Custom design system with CSS variables |
-| **HTML Templates** | 441 lines | 2 responsive pages (landing + dashboard) |
-| **Test Suite** | 430 lines | Authentication & validation coverage |
+| **Python Backend** | 7,154 lines | 21 core modules (routes, auth, analysis, backtesting, Monte Carlo) |
+| **JavaScript Frontend** | 5,024 lines | 19 ES6 modules with dynamic imports |
+| **CSS Styling** | 7,526 lines | Custom design system with CSS variables |
+| **HTML Templates** | 820 lines | 3 responsive pages (landing + dashboard) |
+| **Test Suite** | 924 lines | Authentication & validation coverage |
 | **API Endpoints** | 24 routes | RESTful design with JWT protection |
 | **Market Data** | 2,235 files | Parquet datasets covering NSE/BSE (India) equities |
 | **AI Models** | 5 models | Gemini 2.0 Flash + 4 Gemma variants |

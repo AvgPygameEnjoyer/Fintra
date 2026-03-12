@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from redis_client import RedisConfig, redis_client
+from backend.redis_client import RedisConfig, redis_client
 
 logger = logging.getLogger(__name__)
 

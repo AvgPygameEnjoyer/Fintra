@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 
 # Constants for SEBI compliance
 DATA_LAG_DAYS = 31
-DATA_DIRECTORY = os.path.join(os.path.dirname(__file__), 'data')
-INTRADAY_DIRECTORY = os.path.join(os.path.dirname(__file__), 'intraday_data')
+PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+DATA_DIRECTORY = os.path.join(PROJECT_ROOT, 'data')
+INTRADAY_DIRECTORY = os.path.join(PROJECT_ROOT, 'intraday_data')
 
 
 def get_intraday_window(today: Optional[datetime] = None) -> Tuple[datetime, datetime]:

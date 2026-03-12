@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from data_compliance import INTRADAY_DIRECTORY, get_intraday_window
+from backend.data_compliance import INTRADAY_DIRECTORY, get_intraday_window
 
 
 def _get_parquet_files(base_dir: Path):

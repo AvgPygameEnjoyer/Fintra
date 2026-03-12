@@ -14,8 +14,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 
-from rag_engine import init_rag, rag_engine
-from redis_client import init_redis
+from backend.rag_engine import init_rag, rag_engine
+from backend.redis_client import init_redis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -1,7 +1,7 @@
 import logging
 from flask_socketio import Namespace, emit, disconnect
 from flask import request
-from replay import get_one_min_candles
+from backend.replay import get_one_min_candles
 
 logger = logging.getLogger(__name__)
 

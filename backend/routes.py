@@ -20,7 +20,7 @@ from flask import Blueprint, jsonify, make_response, redirect, request, session
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 
-from analysis import (
+from backend.analysis import (
     call_groq_api,
     clean_df,
     compute_macd,
@@ -33,8 +33,8 @@ from analysis import (
     latest_symbol_data,
     screen_prompt_safety,
 )
-from auth import generate_jwt_token, require_auth, set_token_cookies, verify_jwt_token
-from backtesting import (
+from backend.auth import generate_jwt_token, require_auth, set_token_cookies, verify_jwt_token
+from backend.backtesting import (
     DATA_LAG_DAYS,
     BacktestEngine,
     apply_sebi_lag,
@@ -45,18 +45,18 @@ from backtesting import (
     get_stock_data_with_fallback,
     load_stock_data,
 )
-from chatbot_validation import (
+from backend.chatbot_validation import (
     ChatbotSafetyEnforcer,
     ConversationStateTracker,
     FrameworkValidator,
     get_conversation_state,
     validate_chat_input,
 )
-from config import Config
-from database import db
-from mc_engine import MonteCarloEngine, SimulationConfig
-from models import Position, User
-from validation import (
+from backend.config import Config
+from backend.database import db
+from backend.mc_engine import MonteCarloEngine, SimulationConfig
+from backend.models import Position, User
+from backend.validation import (
     BACKTEST_ATR_MULTIPLIER_MAX,
     BACKTEST_ATR_MULTIPLIER_MIN,
     BACKTEST_BALANCE_MAX,
@@ -81,8 +81,8 @@ from validation import (
 
 # Redis and RAG imports with explicit feature flags
 try:
-    from rag_engine import init_rag, rag_engine
-    from redis_client import ChatCache, DataCache, RateLimiter, init_redis, redis_client
+    from backend.rag_engine import init_rag, rag_engine
+    from backend.redis_client import ChatCache, DataCache, RateLimiter, init_redis, redis_client
     IMPORT_OK = True
 except ImportError as e:
     logging.warning(f"Redis/RAG modules not available: {e}")
@@ -1842,7 +1842,7 @@ def replay_candles():
         return jsonify(error='Missing required params: symbol, start, end'), 400
 
     try:
-        from replay import get_one_min_candles
+        from backend.replay import get_one_min_candles
         df = get_one_min_candles(symbol, start, end)
         candles = df.to_dict(orient='records')
 
@@ -1864,7 +1864,7 @@ def replay_candles():
 @api.route('/replay/window', methods=['GET'])
 def replay_window():
     try:
-        from data_compliance import get_intraday_window
+        from backend.data_compliance import get_intraday_window
         start_dt, end_dt = get_intraday_window()
         return jsonify(
             window_start=start_dt.isoformat(),

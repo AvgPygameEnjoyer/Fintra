@@ -4,7 +4,7 @@ Defines the database schema for Users and their Positions.
 """
 from datetime import datetime, timezone
 
-from database import db
+from backend.database import db
 
 
 class User(db.Model):

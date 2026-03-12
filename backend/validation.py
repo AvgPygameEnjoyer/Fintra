@@ -46,7 +46,7 @@ def get_available_symbols() -> List[str]:
     Returns cached list for performance.
     """
     symbols = []
-    data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
     
     try:
         if os.path.exists(data_dir):

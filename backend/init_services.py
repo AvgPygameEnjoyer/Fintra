@@ -6,8 +6,8 @@ Feature flags: ENABLE_REDIS and ENABLE_RAG can override automatic init behavior.
 import logging
 import os
 
-from rag_engine import init_rag
-from redis_client import init_redis
+from backend.rag_engine import init_rag
+from backend.redis_client import init_redis
 
 logger = logging.getLogger(__name__)
 

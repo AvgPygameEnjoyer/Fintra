@@ -39,8 +39,8 @@ import os
 
 # Add parent directory to path so we can import from the main app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from data_providers import fetch_daily_ohlcv
-from data_compliance import get_intraday_window, INTRADAY_DIRECTORY
+from backend.data_providers import fetch_daily_ohlcv
+from backend.data_compliance import get_intraday_window, INTRADAY_DIRECTORY
 
 # Configure logging
 logging.basicConfig(

@@ -4,17 +4,20 @@ Initializes Flask app, configures middleware, registers blueprints.
 """
 import logging
 import os
+import sys
 import traceback
 from sys import stdout
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 # SocketIO removed — replay uses REST endpoint instead
 from sqlalchemy import text
 
-from config import Config
-from database import db
-from routes import api
+from backend.config import Config
+from backend.database import db
+from backend.routes import api
 
 #easter egg
 # ==================== LOGGING SETUP ====================
@@ -31,7 +34,9 @@ def create_app():
     """Application factory pattern"""
     # Define the static folder using an absolute path for reliability, especially in Docker.
     # This ensures Flask knows exactly where to find files like main.js and styles.css.
-    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+    static_dir = os.path.abspath(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'static')
+    )
     app = Flask(__name__, 
                 static_folder=static_dir, 
                 static_url_path='')
@@ -67,8 +72,8 @@ def create_app():
             """Worker thread to initialize services without blocking startup"""
             try:
                 # Import here to avoid circular imports
-                from rag_engine import init_rag, rag_engine
-                from redis_client import init_redis, redis_client
+                from backend.rag_engine import init_rag, rag_engine
+                from backend.redis_client import init_redis, redis_client
                 
                 logger.info("🔄 Background initialization started...")
                 
@@ -102,7 +107,7 @@ def create_app():
                             # instead of spawning a new Python subprocess
                             try:
                                 import sys
-                                project_root = os.path.dirname(os.path.abspath(__file__))
+                                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                                 if project_root not in sys.path:
                                     sys.path.insert(0, project_root)
                                     
@@ -178,7 +183,7 @@ def create_app():
         pending_access = getattr(g, 'pending_access_token', None)
         pending_refresh = getattr(g, 'pending_refresh_token', None)
         if pending_access and pending_refresh:
-            from auth import set_token_cookies
+            from backend.auth import set_token_cookies
             set_token_cookies(response, pending_access, pending_refresh)
             logger.info("🔄 Silently refreshed auth tokens on response")
         

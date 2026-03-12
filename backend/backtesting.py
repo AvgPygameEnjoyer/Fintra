@@ -9,7 +9,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-from data_providers import fetch_daily_ohlcv
+from backend.data_providers import fetch_daily_ohlcv
 
 # SEBI Compliance Constants
 DATA_LAG_DAYS = 31
@@ -26,7 +26,7 @@ def check_data_availability(symbol: str = None) -> Dict:
     Returns information about data freshness and range.
     """
     try:
-        data_dir = os.path.join(os.path.dirname(__file__), 'data')
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
         
         # Sample files to check date range
         sample_files = []
@@ -501,7 +501,7 @@ def get_parquet_path(symbol: str) -> Optional[str]:
     Automatically adds .NS suffix for NSE stocks if not present.
     """
     # Use absolute path relative to this file's directory
-    base_dir = os.path.dirname(__file__)
+    base_dir = os.path.dirname(os.path.dirname(__file__))
     if not symbol or len(symbol) == 0:
         logger.error(f"Invalid symbol: {symbol}")
         return None

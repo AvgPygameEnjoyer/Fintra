@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-from config import Config
+from backend.config import Config
 
 logger = logging.getLogger(__name__)
 

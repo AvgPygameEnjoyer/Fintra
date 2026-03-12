@@ -12,7 +12,7 @@ export PYTHONUNBUFFERED=1
 export MPLBACKEND=Agg
 
 # Run gunicorn with memory-efficient settings
-exec gunicorn app:app \
+exec gunicorn backend.app:app \
     --bind 0.0.0.0:$PORT \
     --workers 1 \
     --threads 2 \

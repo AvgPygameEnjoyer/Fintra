@@ -13,8 +13,8 @@ from typing import List, Optional, Tuple
 import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from data_compliance import get_intraday_window, get_intraday_parquet_path, INTRADAY_DIRECTORY
-from data_providers import fetch_intraday_ohlcv
+from backend.data_compliance import get_intraday_window, get_intraday_parquet_path, INTRADAY_DIRECTORY
+from backend.data_providers import fetch_intraday_ohlcv
 
 logger = logging.getLogger(__name__)
 

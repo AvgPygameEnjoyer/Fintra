@@ -5,7 +5,7 @@ import time
 import pandas as pd
 from datetime import datetime, timedelta
 import yfinance as yf
-from config import Config
+from backend.config import Config
 
 logger = logging.getLogger(__name__)
 

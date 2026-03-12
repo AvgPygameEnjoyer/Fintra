@@ -2,10 +2,10 @@ import logging
 import pandas as pd
 import datetime
 import os
-from config import Config
-from redis_client import redis_client, init_redis
-from data_providers import fetch_intraday_ohlcv
-from data_compliance import get_intraday_window, get_intraday_parquet_path
+from backend.config import Config
+from backend.redis_client import redis_client, init_redis
+from backend.data_providers import fetch_intraday_ohlcv
+from backend.data_compliance import get_intraday_window, get_intraday_parquet_path
 
 logger = logging.getLogger(__name__)
 

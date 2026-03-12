@@ -11,7 +11,7 @@ import jwt
 import requests
 from flask import current_app, jsonify, request, session
 
-from config import Config
+from backend.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ def require_auth():
             user_id = payload.get('user_id')
             if user_id:
                 # We need user data from DB to generate a new access token.
-                from models import User
+                from backend.models import User
                 db_user = User.query.filter_by(google_user_id=user_id).first()
                 if db_user:
                     logger.info(f"Refresh token valid for user {user_id}. Issuing new access token.")
