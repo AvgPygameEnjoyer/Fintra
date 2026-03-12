@@ -99,12 +99,14 @@ body {
 .search-input {
     width: 100%;
     padding: 16px 20px;
-    border: 2px solid #e5e7eb;
+    border: 2px solid #4a6175;
     border-radius: var(--border-radius);
     font-size: 1rem;
     transition: all 0.3s ease;
     outline: none;
     font-family: inherit;
+    background: #364d64;
+    color: white;
 }
 
 .clear-search-btn {
@@ -131,9 +133,13 @@ body {
     display: grid;
 }
 
+.search-input::placeholder {
+    color: #8ca0b0;
+}
+
 .search-input:focus {
-    border-color: var(--primary-purple);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #4a7a94;
+    box-shadow: 0 0 0 3px rgba(54, 77, 100, 0.3);
 }
 
 .autocomplete-dropdown {
@@ -141,14 +147,14 @@ body {
     top: 100%;
     left: 0;
     right: 0;
-    background: white;
-    border: 1px solid #e5e7eb;
+    background: #2d3f52;
+    border: 1px solid #4a6175;
     border-top: none;
     border-radius: 0 0 var(--border-radius) var(--border-radius);
     max-height: 300px;
     overflow-y: auto;
     z-index: 1000;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
     display: none;
 }
 
@@ -160,30 +166,31 @@ body {
     padding: 14px 20px;
     cursor: pointer;
     transition: all 0.2s ease;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid #4a6175;
+    color: #e2e8f0;
 }
 
 .autocomplete-item:hover,
 .autocomplete-item.selected {
-    background: #f9fafb;
+    background: #364d64;
     transform: translateX(2px);
 }
 
 .autocomplete-item .ticker-symbol {
     font-weight: 700;
-    color: var(--fintra-blue);
+    color: var(--fintra-accent-teal);
     font-size: 0.95rem;
 }
 
 .autocomplete-item .company-name {
-    color: #6b7280;
+    color: #94a3b8;
     font-size: 0.875rem;
     margin-top: 4px;
 }
 
 .search-btn {
     padding: 16px 32px;
-    background: #3F7899;
+    background: #364d64;
     color: white;
     border: none;
     border-radius: var(--border-radius);
@@ -198,8 +205,8 @@ body {
 
 .search-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(63, 120, 153, 0.3);
-    background: #36708a;
+    box-shadow: 0 8px 20px rgba(54, 77, 100, 0.3);
+    background: #2d3f52;
 }
 
 .search-btn:disabled {
@@ -1409,7 +1416,7 @@ footer {
 }
 
 #chat-send {
-    background: #3F7899;
+    background: #364d64;
     color: white;
     border: none;
     border-radius: 20px;
@@ -1431,7 +1438,7 @@ footer {
 }
 
 #chat-toggle {
-    background: #3F7899;
+    background: #364d64;
     color: white;
     border: none;
     border-radius: 50%;
@@ -1709,7 +1716,7 @@ footer {
 }
 
 .logout-btn {
-    background: #3F7899;
+    background: #364d64;
     color: white;
     border: none;
     padding: 8px 16px;
@@ -1720,7 +1727,7 @@ footer {
 }
 
 .logout-btn:hover {
-    background: #36708a;
+    background: #2d3f52;
     transform: translateY(-1px);
 }
 
@@ -4607,7 +4614,7 @@ footer {
     bottom: 0;
     left: 0;
     right: 0;
-    background: #3F7899;
+    background: #364d64;
     color: white;
     padding: 12px 24px;
     z-index: 1000;
